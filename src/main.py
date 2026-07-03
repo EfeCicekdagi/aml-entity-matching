@@ -144,6 +144,9 @@ def main():
     print(alias_df)
     print("-" * 80)
 
+    print(f"Toplam alias sayısı: {len(alias_df)}")
+    print("-" * 80)
+
     token_index = build_alias_token_index(alias_df)
 
     print("Alias token index oluşturuldu.")
