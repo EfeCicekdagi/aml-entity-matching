@@ -17,7 +17,7 @@ from matcher import (
 from vector_utils import (
     load_embedding_model,
     build_alias_embeddings,
-    encode_texts,
+    build_eft_embeddings,
     cosine_score
 )
 
@@ -25,6 +25,9 @@ from vector_utils import (
 def load_data():
     eft_df = pd.read_csv("data/eft_samples.csv")
     company_df = pd.read_csv("data/company_list.csv")
+
+    eft_df = eft_df.reset_index(drop=True)
+    eft_df["eft_row_id"] = eft_df.index
 
     return eft_df, company_df
 
@@ -62,29 +65,29 @@ def run_matching(
     eft_df: pd.DataFrame,
     alias_df: pd.DataFrame,
     token_index: dict,
-    embedding_model=None,
+    eft_embeddings=None,
     alias_embeddings=None
 ) -> pd.DataFrame:
     """
     EFT açıklamaları için önce token index üzerinden şirket alias adayları bulunur.
     Sonra sadece bu adaylar üzerinde skor hesaplanır.
+
+    Bu versiyonda EFT embeddingleri önceden batch olarak üretilir.
+    Matching sırasında model tekrar çağrılmaz.
     """
 
     results = []
 
     for _, eft_row in eft_df.iterrows():
         eft_id = eft_row["eft_id"]
+        eft_row_id = int(eft_row["eft_row_id"])
         description = eft_row["description"]
         normalized_description = normalize_text(description)
 
         description_embedding = None
 
-        if embedding_model is not None and alias_embeddings is not None:
-            description_embedding = encode_texts(
-                model=embedding_model,
-                texts=[normalized_description],
-                batch_size=1
-            )[0]
+        if eft_embeddings is not None:
+            description_embedding = eft_embeddings[eft_row_id]
 
         candidate_aliases = find_candidate_aliases_with_index(
             description=description,
@@ -99,7 +102,7 @@ def run_matching(
             company_id = alias_row["company_id"]
             company_name = alias_row["company_name"]
             alias = alias_row["alias"]
-            alias_row_id = alias_row["alias_row_id"]
+            alias_row_id = int(alias_row["alias_row_id"])
             candidate_filter_score = alias_row["candidate_filter_score"]
             candidate_source = alias_row["candidate_source"]
 
@@ -110,7 +113,7 @@ def run_matching(
             vector_score = 0.0
 
             if description_embedding is not None and alias_embeddings is not None:
-                alias_embedding = alias_embeddings[int(alias_row_id)]
+                alias_embedding = alias_embeddings[alias_row_id]
                 vector_score = cosine_score(description_embedding, alias_embedding)
 
             final_score = calculate_final_score(
@@ -232,10 +235,12 @@ def main():
 
     embedding_model = load_embedding_model()
     alias_embeddings = build_alias_embeddings(alias_df, embedding_model)
+    eft_embeddings = build_eft_embeddings(eft_df, embedding_model)
 
-    if embedding_model is not None and alias_embeddings is not None:
-        print("Alias embeddingleri oluşturuldu.")
+    if embedding_model is not None and alias_embeddings is not None and eft_embeddings is not None:
+        print("Alias ve EFT embeddingleri oluşturuldu.")
         print(f"Alias embedding shape: {alias_embeddings.shape}")
+        print(f"EFT embedding shape: {eft_embeddings.shape}")
         print("-" * 80)
     else:
         print("Vector score devre dışı. Sistem fuzzy + rule score ile çalışacak.")
@@ -245,7 +250,7 @@ def main():
         eft_df=eft_df,
         alias_df=alias_df,
         token_index=token_index,
-        embedding_model=embedding_model,
+        eft_embeddings=eft_embeddings,
         alias_embeddings=alias_embeddings
     )
 

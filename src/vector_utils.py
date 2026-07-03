@@ -91,3 +91,26 @@ def build_alias_embeddings(alias_df, model):
     )
 
     return alias_embeddings
+
+def build_eft_embeddings(eft_df, model):
+    """
+    EFT açıklamaları için batch embedding matrisi üretir.
+    """
+
+    if model is None:
+        return None
+
+    descriptions = (
+        eft_df["description"]
+        .fillna("")
+        .astype(str)
+        .tolist()
+    )
+
+    embeddings = encode_texts(
+        model=model,
+        texts=descriptions,
+        batch_size=32
+    )
+
+    return embeddings
