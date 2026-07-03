@@ -1,0 +1,19 @@
+eft_id,description,normalized_description,company_id,company_name,alias,fuzzy_score,acronym_score,rule_score,final_score,risk_level,reason
+1001,INV 923 PAYMENT ABC TRDNG LTD,inv 923 payment abc trdng limited,1,ABC Trading Limited,abc trading,0.855,0.0,0.8,0.6785,Low Risk,Yazımsal benzerlik yüksek bulundu. Şirket adıyla ortak önemli tokenlar bulundu.
+1001,INV 923 PAYMENT ABC TRDNG LTD,inv 923 payment abc trdng limited,1,ABC Trading Limited,abc trading limited,0.855,0.0,0.8,0.6785,Low Risk,Yazımsal benzerlik yüksek bulundu. Şirket adıyla ortak önemli tokenlar bulundu.
+1001,INV 923 PAYMENT ABC TRDNG LTD,inv 923 payment abc trdng limited,2,North Star Trading Limited,north star trading limited,0.6102,0.0,0.0,0.4271,No Match,Güçlü eşleşme sinyali bulunamadı.
+1002,PAYMENT TO NST LTD FOR SERVICE,payment to nst limited for service,2,North Star Trading Limited,nst,0.6,1.0,0.0,0.62,Low Risk,Şirket acronym'i EFT açıklamasında bulundu.
+1002,PAYMENT TO NST LTD FOR SERVICE,payment to nst limited for service,1,ABC Trading Limited,abc trading limited,0.855,0.0,0.0,0.5985,Low Risk,Yazımsal benzerlik yüksek bulundu.
+1002,PAYMENT TO NST LTD FOR SERVICE,payment to nst limited for service,2,North Star Trading Limited,north star trading limited,0.5383,1.0,0.0,0.5768,Low Risk,Şirket acronym'i EFT açıklamasında bulundu.
+1003,GLOBAL ENERGY PETRO CORP TRANSFER,global energy petro corporation transfer,3,Global Energy Petroleum Corporation,global energy petroleum,0.855,0.0,0.8,0.6785,Low Risk,Yazımsal benzerlik yüksek bulundu. Şirket adıyla ortak önemli tokenlar bulundu.
+1003,GLOBAL ENERGY PETRO CORP TRANSFER,global energy petro corporation transfer,3,Global Energy Petroleum Corporation,global energy petroleum corporation,0.8267,0.0,0.8,0.6587,Low Risk,Yazımsal benzerlik yüksek bulundu. Şirket adıyla ortak önemli tokenlar bulundu.
+1003,GLOBAL ENERGY PETRO CORP TRANSFER,global energy petro corporation transfer,1,ABC Trading Limited,at,0.6,0.0,0.0,0.42,No Match,Güçlü eşleşme sinyali bulunamadı.
+1004,SUNRISE LOG LLC INVOICE PAYMENT,sunrise log llc invoice payment,4,Sunrise Logistics LLC,sunrise logistics,0.855,0.0,0.8,0.6785,Low Risk,Yazımsal benzerlik yüksek bulundu. Şirket adıyla ortak önemli tokenlar bulundu.
+1004,SUNRISE LOG LLC INVOICE PAYMENT,sunrise log llc invoice payment,4,Sunrise Logistics LLC,sunrise logistics llc,0.6531,0.0,0.8,0.5372,No Match,Şirket adıyla ortak önemli tokenlar bulundu.
+1004,SUNRISE LOG LLC INVOICE PAYMENT,sunrise log llc invoice payment,4,Sunrise Logistics LLC,sl,0.4,0.0,0.8,0.36,No Match,Şirket adıyla ortak önemli tokenlar bulundu.
+1005,RANDOM MARKET PAYMENT,random market payment,2,North Star Trading Limited,nst,0.72,0.0,0.0,0.504,No Match,Güçlü eşleşme sinyali bulunamadı.
+1005,RANDOM MARKET PAYMENT,random market payment,3,Global Energy Petroleum Corporation,global energy petroleum corporation,0.4145,0.0,0.0,0.2902,No Match,Güçlü eşleşme sinyali bulunamadı.
+1005,RANDOM MARKET PAYMENT,random market payment,2,North Star Trading Limited,north star trading,0.4103,0.0,0.0,0.2872,No Match,Güçlü eşleşme sinyali bulunamadı.
+1006,DELTA EXPORT INC PAYMENT,delta export incorporated payment,5,Delta Export Incorporated,delta export incorporated,0.95,0.0,0.8,0.745,Medium Risk,Yazımsal benzerlik yüksek bulundu. Şirket adıyla ortak önemli tokenlar bulundu.
+1006,DELTA EXPORT INC PAYMENT,delta export incorporated payment,5,Delta Export Incorporated,delta export,0.9,0.0,0.8,0.71,Medium Risk,Yazımsal benzerlik yüksek bulundu. Şirket adıyla ortak önemli tokenlar bulundu.
+1006,DELTA EXPORT INC PAYMENT,delta export incorporated payment,5,Delta Export Incorporated,de,0.6,0.0,0.8,0.5,No Match,Şirket adıyla ortak önemli tokenlar bulundu.
