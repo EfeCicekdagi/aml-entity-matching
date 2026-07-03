@@ -19,7 +19,14 @@ GENERAL_WORDS = {
     "payment",
     "invoice",
     "export",
-    "import"
+    "import",
+    "transfer",
+    "eft",
+    "inv",
+    "for",
+    "to",
+    "market",
+    "random"
 }
 
 
@@ -56,23 +63,42 @@ def calculate_acronym_score(description: str, company_name: str) -> float:
     return 0.0
 
 
-def calculate_rule_score(description: str, company_name: str) -> float:
+def get_common_tokens(description: str, company_name: str) -> set[str]:
     """
-    Basit kural bazlı skor üretir.
+    Açıklama ve şirket adı arasındaki ortak tokenları döndürür.
     """
 
     desc_tokens = set(tokenize(description))
     company_tokens = set(tokenize(company_name))
 
-    common_tokens = desc_tokens.intersection(company_tokens)
+    return desc_tokens.intersection(company_tokens)
+
+
+def get_important_common_tokens(description: str, company_name: str) -> set[str]:
+    """
+    Açıklama ve şirket adı arasındaki genel olmayan ortak tokenları döndürür.
+    """
+
+    common_tokens = get_common_tokens(description, company_name)
+
+    important_common_tokens = {
+        token for token in common_tokens
+        if token not in GENERAL_WORDS
+    }
+
+    return important_common_tokens
+
+
+def calculate_rule_score(description: str, company_name: str) -> float:
+    """
+    Basit kural bazlı skor üretir.
+    """
+
+    common_tokens = get_common_tokens(description, company_name)
+    important_common_tokens = get_important_common_tokens(description, company_name)
 
     if not common_tokens:
         return 0.0
-
-    important_common_tokens = [
-        token for token in common_tokens
-        if token not in GENERAL_WORDS
-    ]
 
     score = 0.0
 
@@ -84,11 +110,14 @@ def calculate_rule_score(description: str, company_name: str) -> float:
     if len(common_tokens) >= 2:
         score += 0.3
 
+    # İki veya daha fazla önemli ortak token varsa daha güçlü kabul et
+    if len(important_common_tokens) >= 2:
+        score += 0.2
+
     # Eşleşme sadece genel kelimelerden oluşuyorsa cezalandır
     if common_tokens and not important_common_tokens:
-        score -= 0.3
+        score -= 0.4
 
-    # Skoru 0-1 aralığında tut
     score = max(0.0, min(1.0, score))
 
     return score
@@ -113,10 +142,61 @@ def calculate_final_score(
     return round(final_score, 4)
 
 
-def assign_risk_level(final_score: float) -> str:
+def is_valid_match(
+    fuzzy_score: float,
+    acronym_score: float,
+    rule_score: float,
+    candidate_source: str
+) -> bool:
     """
-    Final skora göre risk seviyesi atar.
+    Eşleşmenin gerçekten dikkate değer olup olmadığını kontrol eder.
+
+    Amaç:
+    - Çok düşük skorlu eşleşmeleri No Match yapmak
+    - Fuzzy fallback ile gelen zayıf kayıtları elemek
+    - Sadece zayıf sinyal taşıyan kayıtları düşürmek
     """
+
+    # Çok güçlü acronym varsa kabul edilebilir
+    if acronym_score == 1.0 and fuzzy_score >= 0.45:
+        return True
+
+    # Token index ile geldiyse daha esnek davranabiliriz
+    if candidate_source == "token_index":
+        if fuzzy_score >= 0.55 and rule_score >= 0.3:
+            return True
+
+        if fuzzy_score >= 0.70:
+            return True
+
+    # Fuzzy fallback ile geldiyse daha sıkı davran
+    if candidate_source == "fuzzy_fallback":
+        if fuzzy_score >= 0.78 and rule_score >= 0.3:
+            return True
+
+    return False
+
+
+def assign_risk_level(
+    final_score: float,
+    fuzzy_score: float,
+    acronym_score: float,
+    rule_score: float,
+    candidate_source: str
+) -> str:
+    """
+    Final skora ve geçerlilik kontrolüne göre risk seviyesi atar.
+    """
+
+    valid_match = is_valid_match(
+        fuzzy_score=fuzzy_score,
+        acronym_score=acronym_score,
+        rule_score=rule_score,
+        candidate_source=candidate_source
+    )
+
+    if not valid_match:
+        return "No Match"
 
     if final_score >= 0.85:
         return "High Risk"
@@ -131,7 +211,8 @@ def assign_risk_level(final_score: float) -> str:
 def build_reason(
     fuzzy_score: float,
     acronym_score: float,
-    rule_score: float
+    rule_score: float,
+    candidate_source: str
 ) -> str:
     """
     Skorların nedenini açıklamak için basit reason üretir.
@@ -139,8 +220,16 @@ def build_reason(
 
     reasons = []
 
+    if candidate_source == "token_index":
+        reasons.append("Aday şirket token index üzerinden bulundu.")
+
+    if candidate_source == "fuzzy_fallback":
+        reasons.append("Aday şirket fuzzy fallback ile bulundu.")
+
     if fuzzy_score >= 0.75:
         reasons.append("Yazımsal benzerlik yüksek bulundu.")
+    elif fuzzy_score >= 0.55:
+        reasons.append("Yazımsal benzerlik orta seviyede bulundu.")
 
     if acronym_score == 1.0:
         reasons.append("Şirket acronym'i EFT açıklamasında bulundu.")

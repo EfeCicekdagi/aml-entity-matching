@@ -94,12 +94,19 @@ def run_matching(
                 rule_score=rule_score
             )
 
-            risk_level = assign_risk_level(final_score)
+            risk_level = assign_risk_level(
+                final_score=final_score,
+                fuzzy_score=fuzzy_score,
+                acronym_score=acronym_score,
+                rule_score=rule_score,
+                candidate_source=candidate_source
+            )
 
             reason = build_reason(
                 fuzzy_score=fuzzy_score,
                 acronym_score=acronym_score,
-                rule_score=rule_score
+                rule_score=rule_score,
+                candidate_source=candidate_source
             )
 
             results.append({
