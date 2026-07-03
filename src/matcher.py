@@ -126,17 +126,18 @@ def calculate_rule_score(description: str, company_name: str) -> float:
 def calculate_final_score(
     fuzzy_score: float,
     acronym_score: float,
-    rule_score: float
+    rule_score: float,
+    vector_score: float = 0.0
 ) -> float:
     """
-    İlk MVP final skor formülü.
-    Vector similarity sonraki fazda eklenecek.
+    Fuzzy + vector + acronym + rule score ile final skor üretir.
     """
 
     final_score = (
-        0.70 * fuzzy_score +
-        0.20 * acronym_score +
-        0.10 * rule_score
+        0.50 * fuzzy_score +
+        0.30 * vector_score +
+        0.15 * acronym_score +
+        0.05 * rule_score
     )
 
     return round(final_score, 4)
@@ -146,32 +147,34 @@ def is_valid_match(
     fuzzy_score: float,
     acronym_score: float,
     rule_score: float,
+    vector_score: float,
     candidate_source: str
 ) -> bool:
     """
     Eşleşmenin gerçekten dikkate değer olup olmadığını kontrol eder.
-
-    Amaç:
-    - Çok düşük skorlu eşleşmeleri No Match yapmak
-    - Fuzzy fallback ile gelen zayıf kayıtları elemek
-    - Sadece zayıf sinyal taşıyan kayıtları düşürmek
     """
 
     # Çok güçlü acronym varsa kabul edilebilir
-    if acronym_score == 1.0 and fuzzy_score >= 0.45:
+    if acronym_score == 1.0 and (fuzzy_score >= 0.40 or vector_score >= 0.55):
         return True
 
-    # Token index ile geldiyse daha esnek davranabiliriz
+    # Token index ile geldiyse daha esnek
     if candidate_source == "token_index":
         if fuzzy_score >= 0.55 and rule_score >= 0.3:
+            return True
+
+        if vector_score >= 0.70 and rule_score >= 0.3:
             return True
 
         if fuzzy_score >= 0.70:
             return True
 
-    # Fuzzy fallback ile geldiyse daha sıkı davran
+    # Fuzzy fallback ile geldiyse daha sıkı
     if candidate_source == "fuzzy_fallback":
         if fuzzy_score >= 0.78 and rule_score >= 0.3:
+            return True
+
+        if vector_score >= 0.78 and rule_score >= 0.3:
             return True
 
     return False
@@ -182,6 +185,7 @@ def assign_risk_level(
     fuzzy_score: float,
     acronym_score: float,
     rule_score: float,
+    vector_score: float,
     candidate_source: str
 ) -> str:
     """
@@ -192,6 +196,7 @@ def assign_risk_level(
         fuzzy_score=fuzzy_score,
         acronym_score=acronym_score,
         rule_score=rule_score,
+        vector_score=vector_score,
         candidate_source=candidate_source
     )
 
@@ -212,6 +217,7 @@ def build_reason(
     fuzzy_score: float,
     acronym_score: float,
     rule_score: float,
+    vector_score: float,
     candidate_source: str
 ) -> str:
     """
@@ -230,6 +236,11 @@ def build_reason(
         reasons.append("Yazımsal benzerlik yüksek bulundu.")
     elif fuzzy_score >= 0.55:
         reasons.append("Yazımsal benzerlik orta seviyede bulundu.")
+
+    if vector_score >= 0.75:
+        reasons.append("Vector similarity yüksek bulundu.")
+    elif vector_score >= 0.60:
+        reasons.append("Vector similarity orta seviyede bulundu.")
 
     if acronym_score == 1.0:
         reasons.append("Şirket acronym'i EFT açıklamasında bulundu.")

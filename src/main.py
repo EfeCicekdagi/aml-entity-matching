@@ -14,6 +14,12 @@ from matcher import (
     assign_risk_level,
     build_reason
 )
+from vector_utils import (
+    load_embedding_model,
+    build_alias_embeddings,
+    encode_texts,
+    cosine_score
+)
 
 
 def load_data():
@@ -47,6 +53,7 @@ def prepare_company_aliases(company_df: pd.DataFrame) -> pd.DataFrame:
     alias_df = pd.DataFrame(rows)
 
     alias_df = alias_df.reset_index(drop=True)
+    alias_df["alias_row_id"] = alias_df.index
 
     return alias_df
 
@@ -54,7 +61,9 @@ def prepare_company_aliases(company_df: pd.DataFrame) -> pd.DataFrame:
 def run_matching(
     eft_df: pd.DataFrame,
     alias_df: pd.DataFrame,
-    token_index: dict
+    token_index: dict,
+    embedding_model=None,
+    alias_embeddings=None
 ) -> pd.DataFrame:
     """
     EFT açıklamaları için önce token index üzerinden şirket alias adayları bulunur.
@@ -67,6 +76,15 @@ def run_matching(
         eft_id = eft_row["eft_id"]
         description = eft_row["description"]
         normalized_description = normalize_text(description)
+
+        description_embedding = None
+
+        if embedding_model is not None and alias_embeddings is not None:
+            description_embedding = encode_texts(
+                model=embedding_model,
+                texts=[normalized_description],
+                batch_size=1
+            )[0]
 
         candidate_aliases = find_candidate_aliases_with_index(
             description=description,
@@ -81,6 +99,7 @@ def run_matching(
             company_id = alias_row["company_id"]
             company_name = alias_row["company_name"]
             alias = alias_row["alias"]
+            alias_row_id = alias_row["alias_row_id"]
             candidate_filter_score = alias_row["candidate_filter_score"]
             candidate_source = alias_row["candidate_source"]
 
@@ -88,10 +107,17 @@ def run_matching(
             acronym_score = calculate_acronym_score(description, company_name)
             rule_score = calculate_rule_score(description, company_name)
 
+            vector_score = 0.0
+
+            if description_embedding is not None and alias_embeddings is not None:
+                alias_embedding = alias_embeddings[int(alias_row_id)]
+                vector_score = cosine_score(description_embedding, alias_embedding)
+
             final_score = calculate_final_score(
                 fuzzy_score=fuzzy_score,
                 acronym_score=acronym_score,
-                rule_score=rule_score
+                rule_score=rule_score,
+                vector_score=vector_score
             )
 
             risk_level = assign_risk_level(
@@ -99,6 +125,7 @@ def run_matching(
                 fuzzy_score=fuzzy_score,
                 acronym_score=acronym_score,
                 rule_score=rule_score,
+                vector_score=vector_score,
                 candidate_source=candidate_source
             )
 
@@ -106,6 +133,7 @@ def run_matching(
                 fuzzy_score=fuzzy_score,
                 acronym_score=acronym_score,
                 rule_score=rule_score,
+                vector_score=vector_score,
                 candidate_source=candidate_source
             )
 
@@ -119,6 +147,7 @@ def run_matching(
                 "candidate_source": candidate_source,
                 "candidate_filter_score": candidate_filter_score,
                 "fuzzy_score": round(fuzzy_score, 4),
+                "vector_score": round(vector_score, 4),
                 "acronym_score": round(acronym_score, 4),
                 "rule_score": round(rule_score, 4),
                 "final_score": final_score,
@@ -201,10 +230,23 @@ def main():
     print(f"Index içindeki unique token sayısı: {len(token_index)}")
     print("-" * 80)
 
+    embedding_model = load_embedding_model()
+    alias_embeddings = build_alias_embeddings(alias_df, embedding_model)
+
+    if embedding_model is not None and alias_embeddings is not None:
+        print("Alias embeddingleri oluşturuldu.")
+        print(f"Alias embedding shape: {alias_embeddings.shape}")
+        print("-" * 80)
+    else:
+        print("Vector score devre dışı. Sistem fuzzy + rule score ile çalışacak.")
+        print("-" * 80)
+
     result_df = run_matching(
         eft_df=eft_df,
         alias_df=alias_df,
-        token_index=token_index
+        token_index=token_index,
+        embedding_model=embedding_model,
+        alias_embeddings=alias_embeddings
     )
 
     best_matches_df = get_best_matches(result_df)
