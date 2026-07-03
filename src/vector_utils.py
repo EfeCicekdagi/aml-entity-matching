@@ -1,4 +1,5 @@
 import numpy as np
+from config import EMBEDDING_MODEL_NAME, EMBEDDING_BATCH_SIZE
 
 try:
     import torch
@@ -19,7 +20,7 @@ def get_device() -> str:
     return "cpu"
 
 
-def load_embedding_model(model_name: str = "sentence-transformers/all-MiniLM-L6-v2"):
+def load_embedding_model(model_name: str = EMBEDDING_MODEL_NAME):
     """
     SentenceTransformer modelini yükler.
     Kütüphane kurulu değilse None döndürür.
@@ -37,7 +38,7 @@ def load_embedding_model(model_name: str = "sentence-transformers/all-MiniLM-L6-
     return model
 
 
-def encode_texts(model, texts: list[str], batch_size: int = 32):
+def encode_texts(model, texts: list[str], batch_size: int = EMBEDDING_BATCH_SIZE):
     """
     Metinleri embedding vektörlerine çevirir.
     """

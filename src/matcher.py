@@ -1,7 +1,15 @@
 from rapidfuzz import fuzz
 from text_utils import normalize_text, tokenize
 from alias_utils import generate_acronym
-
+from config import (
+    FUZZY_WEIGHT,
+    VECTOR_WEIGHT,
+    ACRONYM_WEIGHT,
+    RULE_WEIGHT,
+    HIGH_RISK_THRESHOLD,
+    MEDIUM_RISK_THRESHOLD,
+    LOW_RISK_THRESHOLD
+)
 
 GENERAL_WORDS = {
     "global",
@@ -131,13 +139,14 @@ def calculate_final_score(
 ) -> float:
     """
     Fuzzy + vector + acronym + rule score ile final skor üretir.
+    Ağırlıklar config.py dosyasından alınır.
     """
 
     final_score = (
-        0.50 * fuzzy_score +
-        0.30 * vector_score +
-        0.15 * acronym_score +
-        0.05 * rule_score
+        FUZZY_WEIGHT * fuzzy_score +
+        VECTOR_WEIGHT * vector_score +
+        ACRONYM_WEIGHT * acronym_score +
+        RULE_WEIGHT * rule_score
     )
 
     return round(final_score, 4)
@@ -200,14 +209,11 @@ def assign_risk_level(
         candidate_source=candidate_source
     )
 
-    if not valid_match:
-        return "No Match"
-
-    if final_score >= 0.85:
+    if final_score >= HIGH_RISK_THRESHOLD:
         return "High Risk"
-    elif final_score >= 0.70:
+    elif final_score >= MEDIUM_RISK_THRESHOLD:
         return "Medium Risk"
-    elif final_score >= 0.55:
+    elif final_score >= LOW_RISK_THRESHOLD:
         return "Low Risk"
     else:
         return "No Match"

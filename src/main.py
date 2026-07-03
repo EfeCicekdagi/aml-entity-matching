@@ -1,5 +1,18 @@
 import pandas as pd
 import os
+from config import (
+    EFT_FILE_PATH,
+    COMPANY_FILE_PATH,
+    OUTPUT_DIR,
+    RESULTS_OUTPUT_PATH,
+    BEST_MATCHES_OUTPUT_PATH,
+    SUSPICIOUS_EFTS_OUTPUT_PATH,
+    CHUNK_SIZE,
+    MIN_CANDIDATE_SCORE,
+    MAX_CANDIDATES,
+    FUZZY_FALLBACK_LIMIT
+)
+
 from text_utils import normalize_text
 from alias_utils import generate_aliases
 from candidate_filter import (
@@ -28,7 +41,7 @@ def load_company_data():
     Şirket listesi EFT verisine göre daha küçük kabul edilir.
     """
 
-    company_df = pd.read_csv("data/company_list.csv")
+    company_df = pd.read_csv(COMPANY_FILE_PATH)
 
     return company_df
 
@@ -38,7 +51,7 @@ def load_eft_data():
     Küçük testler için EFT verisini komple okur.
     """
 
-    eft_df = pd.read_csv("data/eft_samples.csv")
+    eft_df = pd.read_csv(EFT_FILE_PATH)
 
     eft_df = eft_df.reset_index(drop=True)
     eft_df["eft_row_id"] = eft_df.index
@@ -107,9 +120,9 @@ def run_matching(
             description=description,
             alias_df=alias_df,
             token_index=token_index,
-            min_candidate_score=0.4,
-            max_candidates=20,
-            fuzzy_fallback_limit=5
+            min_candidate_score=MIN_CANDIDATE_SCORE,
+            max_candidates=MAX_CANDIDATES,
+            fuzzy_fallback_limit=FUZZY_FALLBACK_LIMIT
         )
 
         for alias_row in candidate_aliases:
@@ -254,7 +267,7 @@ def main_chunked(chunk_size: int = 10000):
     Büyük veri için önerilen çalışma şeklidir.
     """
 
-    os.makedirs("outputs", exist_ok=True)
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
 
     company_df = load_company_data()
 
@@ -281,9 +294,9 @@ def main_chunked(chunk_size: int = 10000):
         print("Vector score devre dışı. Sistem fuzzy + rule score ile çalışacak.")
         print("-" * 80)
 
-    results_path = "outputs/results.csv"
-    best_matches_path = "outputs/best_matches.csv"
-    suspicious_path = "outputs/suspicious_efts.csv"
+    results_path = RESULTS_OUTPUT_PATH
+    best_matches_path = BEST_MATCHES_OUTPUT_PATH
+    suspicious_path = SUSPICIOUS_EFTS_OUTPUT_PATH
 
     write_results_header = True
     write_best_header = True
@@ -293,7 +306,7 @@ def main_chunked(chunk_size: int = 10000):
     total_suspicious = 0
 
     eft_reader = pd.read_csv(
-        "data/eft_samples.csv",
+        EFT_FILE_PATH,
         chunksize=chunk_size
     )
 
@@ -422,10 +435,10 @@ def main():
     suspicious_efts_df.to_csv("outputs/suspicious_efts.csv", index=False)
 
     print("Sonuç dosyaları oluşturuldu:")
-    print("outputs/results.csv")
-    print("outputs/best_matches.csv")
-    print("outputs/suspicious_efts.csv")
+    print(RESULTS_OUTPUT_PATH)
+    print(BEST_MATCHES_OUTPUT_PATH)
+    print(SUSPICIOUS_EFTS_OUTPUT_PATH)
 
 
 if __name__ == "__main__":
-    main_chunked(chunk_size=3)
+    main_chunked(chunk_size=CHUNK_SIZE)
