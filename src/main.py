@@ -2,7 +2,10 @@ import pandas as pd
 
 from text_utils import normalize_text
 from alias_utils import generate_aliases
-from candidate_filter import find_candidate_aliases
+from candidate_filter import (
+    build_alias_token_index,
+    find_candidate_aliases_with_index
+)
 from matcher import (
     calculate_fuzzy_score,
     calculate_acronym_score,
@@ -41,12 +44,21 @@ def prepare_company_aliases(company_df: pd.DataFrame) -> pd.DataFrame:
                 "normalized_alias": normalize_text(alias)
             })
 
-    return pd.DataFrame(rows)
+    alias_df = pd.DataFrame(rows)
+
+    # loc ile index erişimi kullandığımız için index'i düzenli tutalım
+    alias_df = alias_df.reset_index(drop=True)
+
+    return alias_df
 
 
-def run_matching(eft_df: pd.DataFrame, alias_df: pd.DataFrame) -> pd.DataFrame:
+def run_matching(
+    eft_df: pd.DataFrame,
+    alias_df: pd.DataFrame,
+    token_index: dict
+) -> pd.DataFrame:
     """
-    EFT açıklamaları için önce şirket alias adayları bulunur.
+    EFT açıklamaları için önce token index üzerinden şirket alias adayları bulunur.
     Sonra sadece bu adaylar üzerinde skor hesaplanır.
     """
 
@@ -57,9 +69,10 @@ def run_matching(eft_df: pd.DataFrame, alias_df: pd.DataFrame) -> pd.DataFrame:
         description = eft_row["description"]
         normalized_description = normalize_text(description)
 
-        candidate_aliases = find_candidate_aliases(
+        candidate_aliases = find_candidate_aliases_with_index(
             description=description,
             alias_df=alias_df,
+            token_index=token_index,
             min_candidate_score=0.4,
             max_candidates=20,
             fuzzy_fallback_limit=5
@@ -131,7 +144,17 @@ def main():
     print(alias_df)
     print("-" * 80)
 
-    result_df = run_matching(eft_df, alias_df)
+    token_index = build_alias_token_index(alias_df)
+
+    print("Alias token index oluşturuldu.")
+    print(f"Index içindeki unique token sayısı: {len(token_index)}")
+    print("-" * 80)
+
+    result_df = run_matching(
+        eft_df=eft_df,
+        alias_df=alias_df,
+        token_index=token_index
+    )
 
     print("Eşleşme sonuçları:")
     print(result_df)

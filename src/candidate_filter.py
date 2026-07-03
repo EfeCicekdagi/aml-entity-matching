@@ -52,6 +52,53 @@ def get_important_tokens(text: str) -> set[str]:
     return important_tokens
 
 
+def build_alias_token_index(alias_df):
+    """
+    Alias kayıtlarından token index oluşturur.
+
+    Örnek index:
+    {
+        "abc": {0, 3, 8},
+        "north": {1},
+        "star": {1, 7}
+    }
+
+    Buradaki sayılar alias_df index değerleridir.
+    """
+
+    token_index = {}
+
+    for row_index, row in alias_df.iterrows():
+        alias = row["alias"]
+
+        important_tokens = get_important_tokens(alias)
+
+        for token in important_tokens:
+            if token not in token_index:
+                token_index[token] = set()
+
+            token_index[token].add(row_index)
+
+    return token_index
+
+
+def get_alias_rows_by_indices(alias_df, row_indices: set[int]):
+    """
+    alias_df içinden sadece verilen indexlere sahip satırları döndürür.
+    """
+
+    if not row_indices:
+        return []
+
+    rows = []
+
+    for row_index in row_indices:
+        row = alias_df.loc[row_index]
+        rows.append(row.to_dict())
+
+    return rows
+
+
 def has_acronym_match(description_tokens: set[str], alias: str) -> bool:
     """
     Alias acronym ise açıklamada birebir geçiyor mu kontrol eder.
@@ -119,34 +166,44 @@ def cheap_candidate_score(description: str, alias: str) -> float:
     return min(score, 1.0)
 
 
-def find_candidate_aliases(
+def find_candidate_aliases_with_index(
     description: str,
     alias_df,
+    token_index: dict,
     min_candidate_score: float = 0.4,
     max_candidates: int = 20,
     fuzzy_fallback_limit: int = 5
 ):
     """
-    Bir EFT açıklaması için olası şirket alias adaylarını seçer.
+    Bir EFT açıklaması için token index kullanarak olası şirket alias adaylarını seçer.
 
-    Önce ucuz token/acronym/suffix sinyalleriyle aday bulur.
-    Eğer hiç aday bulunamazsa fuzzy fallback ile en yakın birkaç alias'ı getirir.
+    Bu fonksiyon tüm alias_df üzerinde dönmez.
+    Önce açıklamadaki önemli tokenlara bakar.
+    Sonra sadece bu tokenlarla ilişkili alias kayıtlarını skorlar.
     """
+
+    description_important_tokens = get_important_tokens(description)
+
+    candidate_row_indices = set()
+
+    for token in description_important_tokens:
+        matched_indices = token_index.get(token, set())
+        candidate_row_indices.update(matched_indices)
+
+    candidate_rows = get_alias_rows_by_indices(alias_df, candidate_row_indices)
 
     candidates = []
 
-    for _, alias_row in alias_df.iterrows():
+    for alias_row in candidate_rows:
         alias = alias_row["alias"]
 
         candidate_score = cheap_candidate_score(description, alias)
 
         if candidate_score >= min_candidate_score:
-            row_dict = alias_row.to_dict()
-            row_dict["candidate_filter_score"] = round(candidate_score, 4)
-            row_dict["candidate_source"] = "cheap_filter"
-            candidates.append(row_dict)
+            alias_row["candidate_filter_score"] = round(candidate_score, 4)
+            alias_row["candidate_source"] = "token_index"
+            candidates.append(alias_row)
 
-    # En güçlü adayları tut
     candidates = sorted(
         candidates,
         key=lambda x: x["candidate_filter_score"],
@@ -155,7 +212,8 @@ def find_candidate_aliases(
 
     candidates = candidates[:max_candidates]
 
-    # Eğer hiç aday çıkmazsa fuzzy fallback çalıştır
+    # Eğer token index hiç aday bulamazsa fuzzy fallback çalışır.
+    # Bu fallback hâlâ tüm alias_df üzerinde döner ama sadece aday çıkmayan kayıtlar için devreye girer.
     if not candidates:
         normalized_description = normalize_text(description)
 
