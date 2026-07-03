@@ -46,7 +46,6 @@ def prepare_company_aliases(company_df: pd.DataFrame) -> pd.DataFrame:
 
     alias_df = pd.DataFrame(rows)
 
-    # loc ile index erişimi kullandığımız için index'i düzenli tutalım
     alias_df = alias_df.reset_index(drop=True)
 
     return alias_df
@@ -135,6 +134,48 @@ def run_matching(
     return top_results
 
 
+def get_best_matches(result_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Her EFT için en yüksek final_score değerine sahip tek eşleşmeyi döndürür.
+    """
+
+    if result_df.empty:
+        return result_df
+
+    best_matches = (
+        result_df
+        .sort_values(
+            by=["eft_id", "final_score"],
+            ascending=[True, False]
+        )
+        .groupby("eft_id")
+        .head(1)
+        .reset_index(drop=True)
+    )
+
+    return best_matches
+
+
+def get_suspicious_efts(best_matches_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    En iyi eşleşmeler içerisinden No Match olmayan EFT kayıtlarını döndürür.
+    """
+
+    if best_matches_df.empty:
+        return best_matches_df
+
+    suspicious_df = best_matches_df[
+        best_matches_df["risk_level"] != "No Match"
+    ].copy()
+
+    suspicious_df = suspicious_df.sort_values(
+        by="final_score",
+        ascending=False
+    ).reset_index(drop=True)
+
+    return suspicious_df
+
+
 def main():
     eft_df, company_df = load_data()
 
@@ -159,11 +200,29 @@ def main():
         token_index=token_index
     )
 
-    print("Eşleşme sonuçları:")
+    best_matches_df = get_best_matches(result_df)
+    suspicious_efts_df = get_suspicious_efts(best_matches_df)
+
+    print("Top eşleşme sonuçları:")
     print(result_df)
+    print("-" * 80)
+
+    print("Her EFT için en iyi eşleşme:")
+    print(best_matches_df)
+    print("-" * 80)
+
+    print("Şüpheli EFT kayıtları:")
+    print(suspicious_efts_df)
+    print("-" * 80)
 
     result_df.to_csv("outputs/results.csv", index=False)
-    print("Sonuç dosyası oluşturuldu: outputs/results.csv")
+    best_matches_df.to_csv("outputs/best_matches.csv", index=False)
+    suspicious_efts_df.to_csv("outputs/suspicious_efts.csv", index=False)
+
+    print("Sonuç dosyaları oluşturuldu:")
+    print("outputs/results.csv")
+    print("outputs/best_matches.csv")
+    print("outputs/suspicious_efts.csv")
 
 
 if __name__ == "__main__":
