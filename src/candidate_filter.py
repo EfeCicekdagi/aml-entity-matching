@@ -24,7 +24,10 @@ GENERAL_WORDS = {
     "eft",
     "inv",
     "for",
-    "to"
+    "to",
+    "inc",
+    "ltd",
+    "co"
 }
 
 
@@ -33,7 +36,10 @@ COMPANY_SUFFIX_WORDS = {
     "llc",
     "incorporated",
     "corporation",
-    "company"
+    "company",
+    "inc",
+    "ltd",
+    "co"
 }
 
 
@@ -223,7 +229,7 @@ def find_candidate_aliases_with_index(
             alias = alias_row["alias"]
             normalized_alias = normalize_text(alias)
 
-            fuzzy_score = fuzz.partial_ratio(
+            fuzzy_score = fuzz.WRatio(
                 normalized_description,
                 normalized_alias
             ) / 100

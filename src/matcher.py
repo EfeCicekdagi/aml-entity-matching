@@ -34,7 +34,10 @@ GENERAL_WORDS = {
     "for",
     "to",
     "market",
-    "random"
+    "random",
+    "inc",
+    "ltd",
+    "co"
 }
 
 
