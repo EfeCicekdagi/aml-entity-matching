@@ -2,6 +2,7 @@ import pandas as pd
 
 from text_utils import normalize_text
 from alias_utils import generate_aliases
+from candidate_filter import find_candidate_aliases
 from matcher import (
     calculate_fuzzy_score,
     calculate_acronym_score,
@@ -45,9 +46,8 @@ def prepare_company_aliases(company_df: pd.DataFrame) -> pd.DataFrame:
 
 def run_matching(eft_df: pd.DataFrame, alias_df: pd.DataFrame) -> pd.DataFrame:
     """
-    EFT açıklamaları ile şirket alias'larını karşılaştırır.
-    İlk MVP olduğu için tüm küçük veri üzerinde brute force çalışır.
-    Büyük veride bunu candidate filtering ile değiştireceğiz.
+    EFT açıklamaları için önce şirket alias adayları bulunur.
+    Sonra sadece bu adaylar üzerinde skor hesaplanır.
     """
 
     results = []
@@ -57,10 +57,20 @@ def run_matching(eft_df: pd.DataFrame, alias_df: pd.DataFrame) -> pd.DataFrame:
         description = eft_row["description"]
         normalized_description = normalize_text(description)
 
-        for _, alias_row in alias_df.iterrows():
+        candidate_aliases = find_candidate_aliases(
+            description=description,
+            alias_df=alias_df,
+            min_candidate_score=0.4,
+            max_candidates=20,
+            fuzzy_fallback_limit=5
+        )
+
+        for alias_row in candidate_aliases:
             company_id = alias_row["company_id"]
             company_name = alias_row["company_name"]
             alias = alias_row["alias"]
+            candidate_filter_score = alias_row["candidate_filter_score"]
+            candidate_source = alias_row["candidate_source"]
 
             fuzzy_score = calculate_fuzzy_score(description, alias)
             acronym_score = calculate_acronym_score(description, company_name)
@@ -87,6 +97,8 @@ def run_matching(eft_df: pd.DataFrame, alias_df: pd.DataFrame) -> pd.DataFrame:
                 "company_id": company_id,
                 "company_name": company_name,
                 "alias": alias,
+                "candidate_source": candidate_source,
+                "candidate_filter_score": candidate_filter_score,
                 "fuzzy_score": round(fuzzy_score, 4),
                 "acronym_score": round(acronym_score, 4),
                 "rule_score": round(rule_score, 4),
@@ -97,7 +109,9 @@ def run_matching(eft_df: pd.DataFrame, alias_df: pd.DataFrame) -> pd.DataFrame:
 
     result_df = pd.DataFrame(results)
 
-    # Her EFT için en yüksek skorlu ilk 3 sonucu alalım
+    if result_df.empty:
+        return result_df
+
     result_df = result_df.sort_values(
         by=["eft_id", "final_score"],
         ascending=[True, False]
