@@ -1,5 +1,5 @@
 import pandas as pd
-
+import os
 from text_utils import normalize_text
 from alias_utils import generate_aliases
 from candidate_filter import (
@@ -22,14 +22,28 @@ from vector_utils import (
 )
 
 
-def load_data():
-    eft_df = pd.read_csv("data/eft_samples.csv")
+def load_company_data():
+    """
+    Şirket listesini okur.
+    Şirket listesi EFT verisine göre daha küçük kabul edilir.
+    """
+
     company_df = pd.read_csv("data/company_list.csv")
+
+    return company_df
+
+
+def load_eft_data():
+    """
+    Küçük testler için EFT verisini komple okur.
+    """
+
+    eft_df = pd.read_csv("data/eft_samples.csv")
 
     eft_df = eft_df.reset_index(drop=True)
     eft_df["eft_row_id"] = eft_df.index
 
-    return eft_df, company_df
+    return eft_df
 
 
 def prepare_company_aliases(company_df: pd.DataFrame) -> pd.DataFrame:
@@ -214,9 +228,143 @@ def get_suspicious_efts(best_matches_df: pd.DataFrame) -> pd.DataFrame:
 
     return suspicious_df
 
+def write_chunk_output(
+    df: pd.DataFrame,
+    output_path: str,
+    write_header: bool
+):
+    """
+    Chunk sonucunu CSV dosyasına ekler.
+    İlk chunk için header yazılır, sonraki chunklarda header yazılmaz.
+    """
+
+    if df.empty:
+        return
+
+    df.to_csv(
+        output_path,
+        mode="w" if write_header else "a",
+        header=write_header,
+        index=False
+    )
+    
+def main_chunked(chunk_size: int = 10000):
+    """
+    EFT verisini chunk'lar halinde işleyen ana pipeline.
+    Büyük veri için önerilen çalışma şeklidir.
+    """
+
+    os.makedirs("outputs", exist_ok=True)
+
+    company_df = load_company_data()
+
+    alias_df = prepare_company_aliases(company_df)
+
+    print("Şirket alias kayıtları hazırlandı.")
+    print(f"Toplam alias sayısı: {len(alias_df)}")
+    print("-" * 80)
+
+    token_index = build_alias_token_index(alias_df)
+
+    print("Alias token index oluşturuldu.")
+    print(f"Index içindeki unique token sayısı: {len(token_index)}")
+    print("-" * 80)
+
+    embedding_model = load_embedding_model()
+    alias_embeddings = build_alias_embeddings(alias_df, embedding_model)
+
+    if embedding_model is not None and alias_embeddings is not None:
+        print("Alias embeddingleri oluşturuldu.")
+        print(f"Alias embedding shape: {alias_embeddings.shape}")
+        print("-" * 80)
+    else:
+        print("Vector score devre dışı. Sistem fuzzy + rule score ile çalışacak.")
+        print("-" * 80)
+
+    results_path = "outputs/results.csv"
+    best_matches_path = "outputs/best_matches.csv"
+    suspicious_path = "outputs/suspicious_efts.csv"
+
+    write_results_header = True
+    write_best_header = True
+    write_suspicious_header = True
+
+    total_processed = 0
+    total_suspicious = 0
+
+    eft_reader = pd.read_csv(
+        "data/eft_samples.csv",
+        chunksize=chunk_size
+    )
+
+    for chunk_no, eft_chunk_df in enumerate(eft_reader, start=1):
+        print(f"Chunk {chunk_no} işleniyor... Satır sayısı: {len(eft_chunk_df)}")
+
+        eft_chunk_df = eft_chunk_df.reset_index(drop=True)
+        eft_chunk_df["eft_row_id"] = eft_chunk_df.index
+
+        eft_embeddings = build_eft_embeddings(
+            eft_df=eft_chunk_df,
+            model=embedding_model
+        )
+
+        result_df = run_matching(
+            eft_df=eft_chunk_df,
+            alias_df=alias_df,
+            token_index=token_index,
+            eft_embeddings=eft_embeddings,
+            alias_embeddings=alias_embeddings
+        )
+
+        best_matches_df = get_best_matches(result_df)
+        suspicious_efts_df = get_suspicious_efts(best_matches_df)
+
+        write_chunk_output(
+            df=result_df,
+            output_path=results_path,
+            write_header=write_results_header
+        )
+
+        write_chunk_output(
+            df=best_matches_df,
+            output_path=best_matches_path,
+            write_header=write_best_header
+        )
+
+        write_chunk_output(
+            df=suspicious_efts_df,
+            output_path=suspicious_path,
+            write_header=write_suspicious_header
+        )
+
+        if not result_df.empty:
+            write_results_header = False
+
+        if not best_matches_df.empty:
+            write_best_header = False
+
+        if not suspicious_efts_df.empty:
+            write_suspicious_header = False
+
+        total_processed += len(eft_chunk_df)
+        total_suspicious += len(suspicious_efts_df)
+
+        print(f"Chunk {chunk_no} tamamlandı.")
+        print(f"Toplam işlenen EFT: {total_processed}")
+        print(f"Toplam şüpheli EFT: {total_suspicious}")
+        print("-" * 80)
+
+    print("Chunk processing tamamlandı.")
+    print(f"Toplam işlenen EFT: {total_processed}")
+    print(f"Toplam şüpheli EFT: {total_suspicious}")
+    print("Sonuç dosyaları oluşturuldu:")
+    print(results_path)
+    print(best_matches_path)
+    print(suspicious_path)
 
 def main():
-    eft_df, company_df = load_data()
+    eft_df = load_eft_data()
+    company_df = load_company_data()
 
     alias_df = prepare_company_aliases(company_df)
 
@@ -280,4 +428,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    main_chunked(chunk_size=3)
