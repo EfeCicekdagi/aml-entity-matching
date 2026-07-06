@@ -31,7 +31,8 @@ from vector_utils import (
     load_embedding_model,
     build_alias_embeddings,
     build_eft_embeddings,
-    cosine_score
+    cosine_score,
+    build_faiss_index
 )
 
 
@@ -93,7 +94,8 @@ def run_matching(
     alias_df: pd.DataFrame,
     token_index: dict,
     eft_embeddings=None,
-    alias_embeddings=None
+    alias_embeddings=None,
+    faiss_index=None
 ) -> pd.DataFrame:
     """
     EFT açıklamaları için önce token index üzerinden şirket alias adayları bulunur.
@@ -124,6 +126,18 @@ def run_matching(
             max_candidates=MAX_CANDIDATES,
             fuzzy_fallback_limit=FUZZY_FALLBACK_LIMIT
         )
+        
+        # Add FAISS vector candidates
+        if faiss_index is not None and description_embedding is not None:
+            D, I = faiss_index.search(description_embedding.reshape(1, -1), k=5) # Top 5 vector matches
+            existing_candidate_indices = {c["alias_row_id"] for c in candidate_aliases}
+            for score, idx in zip(D[0], I[0]):
+                if idx != -1 and idx not in existing_candidate_indices and score >= 0.5:
+                    alias_row = alias_df.iloc[idx].to_dict()
+                    alias_row["candidate_filter_score"] = float(score)
+                    alias_row["candidate_source"] = "Vector Match"
+                    candidate_aliases.append(alias_row)
+                    existing_candidate_indices.add(idx)
 
         for alias_row in candidate_aliases:
             company_id = alias_row["company_id"]
@@ -131,7 +145,7 @@ def run_matching(
             alias = alias_row["alias"]
             alias_row_id = int(alias_row["alias_row_id"])
             candidate_filter_score = alias_row["candidate_filter_score"]
-            candidate_source = alias_row["candidate_source"]
+            candidate_source = alias_row.get("candidate_source", "Token Match")
 
             fuzzy_score = calculate_fuzzy_score(description, alias)
             acronym_score = calculate_acronym_score(description, company_name)
@@ -285,6 +299,7 @@ def main_chunked(chunk_size: int = 10000):
 
     embedding_model = load_embedding_model()
     alias_embeddings = build_alias_embeddings(alias_df, embedding_model)
+    faiss_index = build_faiss_index(alias_embeddings)
 
     if embedding_model is not None and alias_embeddings is not None:
         print("Alias embeddingleri oluşturuldu.")
@@ -326,7 +341,8 @@ def main_chunked(chunk_size: int = 10000):
             alias_df=alias_df,
             token_index=token_index,
             eft_embeddings=eft_embeddings,
-            alias_embeddings=alias_embeddings
+            alias_embeddings=alias_embeddings,
+            faiss_index=faiss_index
         )
 
         best_matches_df = get_best_matches(result_df)

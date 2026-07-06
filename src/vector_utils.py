@@ -1,4 +1,5 @@
 import numpy as np
+import faiss
 from config import EMBEDDING_MODEL_NAME, EMBEDDING_BATCH_SIZE
 
 try:
@@ -92,6 +93,19 @@ def build_alias_embeddings(alias_df, model):
     )
 
     return alias_embeddings
+
+def build_faiss_index(embeddings):
+    """
+    Embedding matrisi icin FAISS L2 index olusturur.
+    Cosinus benzerligi icin normalize edilmis vektorlerde Inner Product indexi kullanilir.
+    """
+    if embeddings is None or len(embeddings) == 0:
+        return None
+    
+    d = embeddings.shape[1]
+    index = faiss.IndexFlatIP(d) # Inner Product is Cosine Similarity for normalized vectors
+    index.add(embeddings)
+    return index
 
 def build_eft_embeddings(eft_df, model):
     """

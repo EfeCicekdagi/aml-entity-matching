@@ -2,7 +2,7 @@
 # File Paths
 # =========================
 
-EFT_FILE_PATH = "data/bank_efts.csv"
+EFT_FILE_PATH = "data/mock_bank_efts.csv"
 COMPANY_FILE_PATH = "data/company_list.csv"
 OUTPUT_DIR = "outputs"
 
@@ -15,7 +15,7 @@ SUSPICIOUS_EFTS_OUTPUT_PATH = f"{OUTPUT_DIR}/suspicious_efts.csv"
 # Chunk Processing
 # =========================
 
-CHUNK_SIZE = 10000
+CHUNK_SIZE = 200
 
 
 # =========================
