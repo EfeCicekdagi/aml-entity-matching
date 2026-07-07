@@ -134,6 +134,8 @@ def run_matching(
             fuzzy_fallback_limit=FUZZY_FALLBACK_LIMIT
         )
         
+        existing_candidate_indices = {int(c["alias_row_id"]) for c in candidate_aliases}
+        
         # Add FAISS / Postgres vector candidates
         if search_stats is None:
             search_stats = {"faiss_time": 0.0, "postgres_time": 0.0, "count": 0}

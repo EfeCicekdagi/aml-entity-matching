@@ -59,11 +59,11 @@ EMBEDDING_BATCH_SIZE = 32
 # =========================
 
 # Options: "faiss", "postgres", "compare"
-VECTOR_ENGINE = "postgres"
+VECTOR_ENGINE = "compare"
 
 # PostgreSQL Settings
 PG_HOST = "127.0.0.1"
-PG_PORT = "5432"
+PG_PORT = "5433"
 PG_DB = "aml_db"
 PG_USER = "postgres"
 PG_PASSWORD = "password"
