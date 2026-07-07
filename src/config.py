@@ -2,7 +2,7 @@
 # File Paths
 # =========================
 
-EFT_FILE_PATH = "data/mock_bank_efts.csv"
+EFT_FILE_PATH = "data/bank_efts.csv"
 COMPANY_FILE_PATH = "data/company_list.csv"
 OUTPUT_DIR = "outputs"
 
@@ -15,7 +15,7 @@ SUSPICIOUS_EFTS_OUTPUT_PATH = f"{OUTPUT_DIR}/suspicious_efts.csv"
 # Chunk Processing
 # =========================
 
-CHUNK_SIZE = 200
+CHUNK_SIZE = 10000
 
 
 # =========================
@@ -59,10 +59,10 @@ EMBEDDING_BATCH_SIZE = 32
 # =========================
 
 # Options: "faiss", "postgres", "compare"
-VECTOR_ENGINE = "compare"
+VECTOR_ENGINE = "postgres"
 
 # PostgreSQL Settings
-PG_HOST = "localhost"
+PG_HOST = "127.0.0.1"
 PG_PORT = "5432"
 PG_DB = "aml_db"
 PG_USER = "postgres"
