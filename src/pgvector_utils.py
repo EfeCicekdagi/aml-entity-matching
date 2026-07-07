@@ -119,3 +119,64 @@ def search_pgvector(conn, query_embedding, k=5):
         logger.error(f"Error during pgvector search: {e}")
         conn.rollback()
         return []
+
+
+def insert_suspicious_results(conn, suspicious_df):
+    """
+    Creates suspicious_efts table if not exists and inserts suspicious EFTs into it.
+    """
+    if conn is None or suspicious_df is None or suspicious_df.empty: return
+    
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS suspicious_efts (
+                    id serial PRIMARY KEY,
+                    eft_id text,
+                    description text,
+                    normalized_description text,
+                    company_id text,
+                    company_name text,
+                    alias text,
+                    candidate_source text,
+                    candidate_filter_score float,
+                    fuzzy_score float,
+                    vector_score float,
+                    acronym_score float,
+                    rule_score float,
+                    final_score float,
+                    risk_level text,
+                    reason text,
+                    created_at timestamp DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+            
+            for _, row in suspicious_df.iterrows():
+                cur.execute("""
+                    INSERT INTO suspicious_efts (
+                        eft_id, description, normalized_description, company_id, company_name,
+                        alias, candidate_source, candidate_filter_score, fuzzy_score,
+                        vector_score, acronym_score, rule_score, final_score, risk_level, reason
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """, (
+                    str(row.get('eft_id')), 
+                    str(row.get('description')), 
+                    str(row.get('normalized_description')),
+                    str(row.get('company_id')), 
+                    str(row.get('company_name')), 
+                    str(row.get('alias')),
+                    str(row.get('candidate_source')), 
+                    float(row.get('candidate_filter_score', 0)),
+                    float(row.get('fuzzy_score', 0)), 
+                    float(row.get('vector_score', 0)),
+                    float(row.get('acronym_score', 0)), 
+                    float(row.get('rule_score', 0)),
+                    float(row.get('final_score', 0)), 
+                    str(row.get('risk_level')), 
+                    str(row.get('reason'))
+                ))
+        conn.commit()
+        logger.info(f"Inserted {len(suspicious_df)} suspicious EFTs into PostgreSQL.")
+    except Exception as e:
+        logger.error(f"Error inserting suspicious EFTs: {e}")
+        conn.rollback()

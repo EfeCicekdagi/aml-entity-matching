@@ -16,7 +16,7 @@ from config import (
     VECTOR_ENGINE
 )
 
-from pgvector_utils import get_db_connection, init_db, insert_alias_embeddings, search_pgvector
+from pgvector_utils import get_db_connection, init_db, insert_alias_embeddings, search_pgvector, insert_suspicious_results
 
 from text_utils import normalize_text
 from alias_utils import generate_aliases
@@ -412,20 +412,14 @@ def main_chunked(chunk_size: int = 10000):
             write_header=write_best_header
         )
 
-        write_chunk_output(
-            df=suspicious_efts_df,
-            output_path=suspicious_path,
-            write_header=write_suspicious_header
-        )
+        # Sadece PostgreSQL'e yaz, CSV'ye yazma
+        insert_suspicious_results(db_conn, suspicious_efts_df)
 
         if not result_df.empty:
             write_results_header = False
 
         if not best_matches_df.empty:
             write_best_header = False
-
-        if not suspicious_efts_df.empty:
-            write_suspicious_header = False
 
         total_processed += len(eft_chunk_df)
         total_suspicious += len(suspicious_efts_df)
@@ -447,7 +441,7 @@ def main_chunked(chunk_size: int = 10000):
     print("Sonuç dosyaları oluşturuldu:")
     print(results_path)
     print(best_matches_path)
-    print(suspicious_path)
+    # print(suspicious_path)  # Artık CSV'ye yazılmıyor
 
 def main():
     eft_df = load_eft_data()
