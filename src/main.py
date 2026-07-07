@@ -333,7 +333,11 @@ def main_chunked(chunk_size: int = 10000):
     alias_embeddings = build_alias_embeddings(alias_df, embedding_model)
     
     faiss_index = None
-    db_conn = None
+    
+    # Her zaman PostgreSQL'e bağlan (sonuçları yazmak için)
+    db_conn = get_db_connection()
+    if not db_conn:
+        print("Uyarı: PostgreSQL bağlantısı başarısız. Şüpheli EFT'ler veritabanına yazılamayacak.")
 
     if VECTOR_ENGINE in ["faiss", "compare"]:
         faiss_index = build_faiss_index(alias_embeddings)
@@ -341,8 +345,7 @@ def main_chunked(chunk_size: int = 10000):
             print("FAISS Index oluşturuldu.")
 
     if VECTOR_ENGINE in ["postgres", "compare"]:
-        print("PostgreSQL'e bağlanılıyor ve veriler aktarılıyor...")
-        db_conn = get_db_connection()
+        print("PostgreSQL arama motoru hazırlanıyor ve veriler aktarılıyor...")
         if db_conn:
             init_db(db_conn)
             insert_alias_embeddings(db_conn, alias_df, alias_embeddings)
