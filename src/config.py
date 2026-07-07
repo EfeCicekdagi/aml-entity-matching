@@ -52,3 +52,18 @@ LOW_RISK_THRESHOLD = 0.65
 
 EMBEDDING_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 EMBEDDING_BATCH_SIZE = 32
+
+
+# =========================
+# Vector Database Engine
+# =========================
+
+# Options: "faiss", "postgres", "compare"
+VECTOR_ENGINE = "compare"
+
+# PostgreSQL Settings
+PG_HOST = "localhost"
+PG_PORT = "5432"
+PG_DB = "aml_db"
+PG_USER = "postgres"
+PG_PASSWORD = "password"

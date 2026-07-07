@@ -1,5 +1,7 @@
 import pandas as pd
 import os
+import time
+
 from config import (
     EFT_FILE_PATH,
     COMPANY_FILE_PATH,
@@ -10,8 +12,11 @@ from config import (
     CHUNK_SIZE,
     MIN_CANDIDATE_SCORE,
     MAX_CANDIDATES,
-    FUZZY_FALLBACK_LIMIT
+    FUZZY_FALLBACK_LIMIT,
+    VECTOR_ENGINE
 )
+
+from pgvector_utils import get_db_connection, init_db, insert_alias_embeddings, search_pgvector
 
 from text_utils import normalize_text
 from alias_utils import generate_aliases
@@ -95,7 +100,9 @@ def run_matching(
     token_index: dict,
     eft_embeddings=None,
     alias_embeddings=None,
-    faiss_index=None
+    faiss_index=None,
+    db_conn=None,
+    search_stats=None
 ) -> pd.DataFrame:
     """
     EFT açıklamaları için önce token index üzerinden şirket alias adayları bulunur.
@@ -127,17 +134,40 @@ def run_matching(
             fuzzy_fallback_limit=FUZZY_FALLBACK_LIMIT
         )
         
-        # Add FAISS vector candidates
-        if faiss_index is not None and description_embedding is not None:
-            D, I = faiss_index.search(description_embedding.reshape(1, -1), k=5) # Top 5 vector matches
-            existing_candidate_indices = {c["alias_row_id"] for c in candidate_aliases}
-            for score, idx in zip(D[0], I[0]):
-                if idx != -1 and idx not in existing_candidate_indices and score >= 0.5:
-                    alias_row = alias_df.iloc[idx].to_dict()
-                    alias_row["candidate_filter_score"] = float(score)
-                    alias_row["candidate_source"] = "Vector Match"
-                    candidate_aliases.append(alias_row)
-                    existing_candidate_indices.add(idx)
+        # Add FAISS / Postgres vector candidates
+        if search_stats is None:
+            search_stats = {"faiss_time": 0.0, "postgres_time": 0.0, "count": 0}
+
+        if description_embedding is not None:
+            # FAISS
+            if VECTOR_ENGINE in ["faiss", "compare"] and faiss_index is not None:
+                start_time = time.perf_counter()
+                D, I = faiss_index.search(description_embedding.reshape(1, -1), k=5)
+                search_stats["faiss_time"] += (time.perf_counter() - start_time)
+                
+                if VECTOR_ENGINE == "faiss":
+                    for score, idx in zip(D[0], I[0]):
+                        if idx != -1 and idx not in existing_candidate_indices and score >= 0.5:
+                            alias_row = alias_df.iloc[idx].to_dict()
+                            alias_row["candidate_filter_score"] = float(score)
+                            alias_row["candidate_source"] = "FAISS Vector Match"
+                            candidate_aliases.append(alias_row)
+                            existing_candidate_indices.add(idx)
+
+            # Postgres
+            if VECTOR_ENGINE in ["postgres", "compare"] and db_conn is not None:
+                start_time = time.perf_counter()
+                pg_matches = search_pgvector(db_conn, description_embedding, k=5)
+                search_stats["postgres_time"] += (time.perf_counter() - start_time)
+                
+                if VECTOR_ENGINE in ["postgres", "compare"]:
+                    for match in pg_matches:
+                        idx = match["alias_row_id"]
+                        if idx not in existing_candidate_indices and match["candidate_filter_score"] >= 0.5:
+                            candidate_aliases.append(match)
+                            existing_candidate_indices.add(idx)
+            
+            search_stats["count"] += 1
 
         for alias_row in candidate_aliases:
             company_id = alias_row["company_id"]
@@ -299,7 +329,24 @@ def main_chunked(chunk_size: int = 10000):
 
     embedding_model = load_embedding_model()
     alias_embeddings = build_alias_embeddings(alias_df, embedding_model)
-    faiss_index = build_faiss_index(alias_embeddings)
+    
+    faiss_index = None
+    db_conn = None
+
+    if VECTOR_ENGINE in ["faiss", "compare"]:
+        faiss_index = build_faiss_index(alias_embeddings)
+        if faiss_index:
+            print("FAISS Index oluşturuldu.")
+
+    if VECTOR_ENGINE in ["postgres", "compare"]:
+        print("PostgreSQL'e bağlanılıyor ve veriler aktarılıyor...")
+        db_conn = get_db_connection()
+        if db_conn:
+            init_db(db_conn)
+            insert_alias_embeddings(db_conn, alias_df, alias_embeddings)
+            print("PostgreSQL hazırlığı tamamlandı.")
+        else:
+            print("PostgreSQL bağlantısı başarısız. Lütfen veritabanının çalıştığından emin olun.")
 
     if embedding_model is not None and alias_embeddings is not None:
         print("Alias embeddingleri oluşturuldu.")
@@ -319,6 +366,7 @@ def main_chunked(chunk_size: int = 10000):
 
     total_processed = 0
     total_suspicious = 0
+    search_stats = {"faiss_time": 0.0, "postgres_time": 0.0, "count": 0}
 
     eft_reader = pd.read_csv(
         EFT_FILE_PATH,
@@ -342,7 +390,9 @@ def main_chunked(chunk_size: int = 10000):
             token_index=token_index,
             eft_embeddings=eft_embeddings,
             alias_embeddings=alias_embeddings,
-            faiss_index=faiss_index
+            faiss_index=faiss_index,
+            db_conn=db_conn,
+            search_stats=search_stats
         )
 
         best_matches_df = get_best_matches(result_df)
@@ -384,6 +434,12 @@ def main_chunked(chunk_size: int = 10000):
         print("-" * 80)
 
     print("Chunk processing tamamlandı.")
+    print("--- Hız Karşılaştırması ---")
+    if VECTOR_ENGINE in ["faiss", "compare"]:
+        print(f"Toplam FAISS Arama Süresi: {search_stats['faiss_time']:.4f} saniye")
+    if VECTOR_ENGINE in ["postgres", "compare"]:
+        print(f"Toplam PostgreSQL Arama Süresi: {search_stats['postgres_time']:.4f} saniye")
+    print("-" * 80)
     print(f"Toplam işlenen EFT: {total_processed}")
     print(f"Toplam şüpheli EFT: {total_suspicious}")
     print("Sonuç dosyaları oluşturuldu:")
