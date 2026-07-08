@@ -46,7 +46,7 @@ class BatchProcessor:
                 metrics["input_row_count"] += len(chunk)
                 
                 # 1. Prepare data (clean text, etc. - skipping DB insert for brevity, but you'd normally insert to silver_eft_clean)
-                chunk['normalized_explanation'] = chunk['Açıklama'].astype(str).str.lower() # very basic norm
+                chunk['normalized_explanation'] = chunk['description'].astype(str).str.lower() # very basic norm
                 
                 # 2. Get Embeddings
                 explanations = chunk['normalized_explanation'].tolist()
@@ -54,7 +54,7 @@ class BatchProcessor:
                 
                 # 3. For each row, retrieve, score, and alert
                 for row_idx, row in chunk.iterrows():
-                    eft_id = row.get("EFT_ID", row_idx)  # Fallback to index if no ID
+                    eft_id = row.get("eft_id", row_idx)  # Fallback to index if no ID
                     norm_exp = row["normalized_explanation"]
                     emb = embeddings[row_idx - chunk.index[0]].tolist()
                     

@@ -1,25 +1,32 @@
 import psycopg2
 import logging
 from psycopg2.extras import execute_values
+from psycopg2.pool import SimpleConnectionPool
 
 logger = logging.getLogger(__name__)
 
 class AMLRepository:
     def __init__(self, host, port, dbname, user, password):
-        self.conn_params = {
-            "host": host,
-            "port": port,
-            "dbname": dbname,
-            "user": user,
-            "password": password
-        }
+        try:
+            self.pool = SimpleConnectionPool(
+                minconn=1, maxconn=20,
+                host=host, port=port, dbname=dbname, user=user, password=password
+            )
+        except Exception as e:
+            logger.error(f"Failed to initialize connection pool: {e}")
+            self.pool = None
 
     def get_connection(self):
-        try:
-            return psycopg2.connect(**self.conn_params)
-        except Exception as e:
-            logger.error(f"Failed to connect to PostgreSQL: {e}")
-            return None
+        if self.pool:
+            try:
+                return self.pool.getconn()
+            except Exception as e:
+                logger.error(f"Failed to get connection from pool: {e}")
+        return None
+
+    def release_connection(self, conn):
+        if self.pool and conn:
+            self.pool.putconn(conn)
 
     def execute_script(self, script_path):
         conn = self.get_connection()
@@ -37,7 +44,7 @@ class AMLRepository:
             logger.error(f"Error executing script {script_path}: {e}")
             conn.rollback()
         finally:
-            conn.close()
+            self.release_connection(conn)
 
     def start_run_log(self, run_id, batch_id, pipeline_name="AML_Pipeline"):
         conn = self.get_connection()
@@ -54,7 +61,7 @@ class AMLRepository:
             logger.error(f"Error starting run log: {e}")
             conn.rollback()
         finally:
-            conn.close()
+            self.release_connection(conn)
 
     def finish_run_log(self, run_id, metrics):
         conn = self.get_connection()
@@ -83,7 +90,7 @@ class AMLRepository:
             logger.error(f"Error finishing run log: {e}")
             conn.rollback()
         finally:
-            conn.close()
+            self.release_connection(conn)
 
     def fail_run_log(self, run_id, error_message):
         conn = self.get_connection()
@@ -103,6 +110,6 @@ class AMLRepository:
             logger.error(f"Error failing run log: {e}")
             conn.rollback()
         finally:
-            conn.close()
+            self.release_connection(conn)
 
     # TODO: Add other insert functions (bronze, silver, gold, alert, etc.) later when needed.

@@ -43,7 +43,7 @@ class FinalScorer:
         except Exception as e:
             logger.error(f"Error loading weights from DB: {e}")
         finally:
-            conn.close()
+            self.repo.release_connection(conn)
         return weights
 
     def _load_thresholds(self):
@@ -68,7 +68,7 @@ class FinalScorer:
         except Exception as e:
             logger.error(f"Error loading thresholds from DB: {e}")
         finally:
-            conn.close()
+            self.repo.release_connection(conn)
         return thresholds
 
     def calculate_final_score(self, scores: dict):

@@ -61,4 +61,3 @@ WHERE acronym_score > 0
     SELECT Count(acronym_score)
     FROM suspicious_efts WHERE acronym_score > 0
     SELECT *
-    FROM aml_scoring_weight_config

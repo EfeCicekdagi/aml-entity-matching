@@ -47,7 +47,7 @@ class Reranker:
         except Exception as e:
             logger.error(f"Error reading reranker cache: {e}")
         finally:
-            conn.close()
+            self.repo.release_connection(conn)
             
         return None
 
@@ -71,7 +71,7 @@ class Reranker:
             logger.error(f"Error saving reranker cache: {e}")
             conn.rollback()
         finally:
-            conn.close()
+            self.repo.release_connection(conn)
 
     def score_candidates(self, normalized_explanation: str, candidates: list):
         """
@@ -112,7 +112,7 @@ class Reranker:
                 # CrossEncoder with apply_softmax=False returns raw scores.
                 # BAAI models usually need a sigmoid or are just raw logits. 
                 # Let's normalize to 0-1 if they are logits, but SentenceTransformers might already handle it.
-                scores = self.model.predict(pairs_to_score)
+                scores = self.model.predict(pairs_to_score, show_progress_bar=False)
                 
                 # Apply simple normalization if scores are outside 0-1.
                 # Sigmoid function for logits

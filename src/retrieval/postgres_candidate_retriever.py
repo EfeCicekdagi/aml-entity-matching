@@ -48,7 +48,7 @@ class PostgresCandidateRetriever:
         except Exception as e:
             logger.error(f"Error in trgm retrieval: {e}")
         finally:
-            conn.close()
+            self.repo.release_connection(conn)
             
         return candidates
 
@@ -89,7 +89,7 @@ class PostgresCandidateRetriever:
         except Exception as e:
             logger.error(f"Error in full-text retrieval: {e}")
         finally:
-            conn.close()
+            self.repo.release_connection(conn)
             
         return candidates
 
@@ -132,7 +132,7 @@ class PostgresCandidateRetriever:
         except Exception as e:
             logger.error(f"Error in vector retrieval: {e}")
         finally:
-            conn.close()
+            self.repo.release_connection(conn)
             
         return candidates
 

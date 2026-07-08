@@ -68,7 +68,7 @@ def main():
     # 4. Orchestrate the Run
     run_id = f"RUN-{uuid.uuid4().hex[:8].upper()}"
     batch_id = "BATCH-001"
-    eft_file_path = "data/mock_bank_efts.csv" # Hardcoded for now, could be passed as argument
+    eft_file_path = "data/bank_efts.csv" # Müşterinin 113bin satırlık asıl datası
     
     if not os.path.exists(eft_file_path):
         logger.error(f"Input file not found: {eft_file_path}")
