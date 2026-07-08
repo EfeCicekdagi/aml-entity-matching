@@ -66,9 +66,7 @@ def calculate_acronym_score(description: str, company_name: str) -> float:
     if not acronym:
         return 0.0
 
-    description_tokens = normalized_description.split()
-
-    if acronym in description_tokens:
+    if acronym in normalized_description:
         return 1.0
 
     return 0.0

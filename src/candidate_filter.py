@@ -105,12 +105,9 @@ def get_alias_rows_by_indices(alias_df, row_indices: set[int]):
     return rows
 
 
-def has_acronym_match(description_tokens: set[str], alias: str) -> bool:
+def has_acronym_match(description: str, alias: str) -> bool:
     """
-    Alias acronym ise açıklamada birebir geçiyor mu kontrol eder.
-    Örnek:
-    alias = "nst"
-    description = "payment nst ltd"
+    Alias acronym ise açıklamada alt metin olarak geçiyor mu kontrol eder.
     """
 
     normalized_alias = normalize_text(alias)
@@ -118,7 +115,8 @@ def has_acronym_match(description_tokens: set[str], alias: str) -> bool:
     if len(normalized_alias) < 2:
         return False
 
-    return normalized_alias in description_tokens
+    normalized_description = normalize_text(description)
+    return normalized_alias in normalized_description
 
 
 def has_token_overlap(description: str, alias: str) -> bool:
@@ -163,7 +161,7 @@ def cheap_candidate_score(description: str, alias: str) -> float:
     if has_token_overlap(description, alias):
         score += 0.5
 
-    if has_acronym_match(description_tokens, alias):
+    if has_acronym_match(description, alias):
         score += 0.4
 
     if has_suffix_signal(description, alias):
