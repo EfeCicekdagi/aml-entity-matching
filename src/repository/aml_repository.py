@@ -1,15 +1,15 @@
 import psycopg2
 import logging
 from psycopg2.extras import execute_values
-from psycopg2.pool import SimpleConnectionPool
+from psycopg2.pool import ThreadedConnectionPool
 
 logger = logging.getLogger(__name__)
 
 class AMLRepository:
     def __init__(self, host, port, dbname, user, password):
         try:
-            self.pool = SimpleConnectionPool(
-                minconn=1, maxconn=20,
+            self.pool = ThreadedConnectionPool(
+                minconn=1, maxconn=50,
                 host=host, port=port, dbname=dbname, user=user, password=password
             )
         except Exception as e:
@@ -112,4 +112,21 @@ class AMLRepository:
         finally:
             self.release_connection(conn)
 
-    # TODO: Add other insert functions (bronze, silver, gold, alert, etc.) later when needed.
+    def insert_alert(self, run_id, eft_id, company_id, variant_id, final_score, risk_level):
+        """Writes a detected AML alert to the aml_alert table."""
+        conn = self.get_connection()
+        if not conn:
+            return
+        try:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    INSERT INTO aml_alert
+                        (run_id, eft_id, company_id, variant_id, final_score, risk_level, alert_status)
+                    VALUES (%s, %s, %s, %s, %s, %s, 'OPEN')
+                """, (run_id, eft_id, company_id, variant_id, final_score, risk_level))
+            conn.commit()
+        except Exception as e:
+            logger.error(f"Error inserting alert: {e}")
+            conn.rollback()
+        finally:
+            self.release_connection(conn)

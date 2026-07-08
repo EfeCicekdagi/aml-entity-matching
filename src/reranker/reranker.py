@@ -1,5 +1,6 @@
 import logging
 import hashlib
+import threading
 from sentence_transformers import CrossEncoder
 
 logger = logging.getLogger(__name__)
@@ -14,17 +15,20 @@ class Reranker:
         self.model_version = self.config.get("model_version", "v1")
         self.use_cache = self.config.get("use_cache", True)
         self.model = None
+        self._lock = threading.Lock()
 
     def _load_model(self):
         if not self.model and self.enabled:
-            logger.info(f"Loading Reranker Model: {self.model_name}")
-            try:
-                # Use sentence_transformers CrossEncoder
-                self.model = CrossEncoder(self.model_name, max_length=512)
-                logger.info("Reranker model loaded successfully.")
-            except Exception as e:
-                logger.error(f"Failed to load reranker model: {e}")
-                self.enabled = False
+            with self._lock:
+                if not self.model:
+                    logger.info(f"Loading Reranker Model: {self.model_name}")
+                    try:
+                        # Use sentence_transformers CrossEncoder
+                        self.model = CrossEncoder(self.model_name, max_length=512)
+                        logger.info("Reranker model loaded successfully.")
+                    except Exception as e:
+                        logger.error(f"Failed to load reranker model: {e}")
+                        self.enabled = False
 
     def _generate_cache_key(self, normalized_explanation: str, variant_id: int):
         raw_key = f"{normalized_explanation}_{variant_id}_{self.model_version}"
