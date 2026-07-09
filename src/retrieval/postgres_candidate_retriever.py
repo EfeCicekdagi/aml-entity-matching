@@ -13,6 +13,7 @@ class PostgresCandidateRetriever:
         self.merged_top_k = self.config.get("merged_top_k", 30)
         self.min_trgm_score = self.config.get("min_trgm_score", 0.25)
         self.min_vector_score = self.config.get("min_vector_score", 0.50)
+        self.reranker_prefilter_score = self.config.get("reranker_prefilter_score", 0.60)
 
     def retrieve_trgm_candidates(self, normalized_explanation: str):
         conn = self.repo.get_connection()
@@ -221,40 +222,64 @@ class PostgresCandidateRetriever:
                             "source":        row[6],
                         })
 
-                # ── QUERY 2: Batch Vector Search ────────────────────────────────
-                # pgvector supports comparing one query vector to all stored vectors.
-                # We loop here but with a single connection (no pool overhead per row).
-                # For truly massive scale, pgvector batch-scan with LATERAL would be used,
-                # but this already removes 99% of overhead vs. per-row pool.get/release.
-                embeddings = {r["row_id"]: r["embedding"] for r in rows}
-                vec_query = """
+                # ── QUERY 2: Batch Vector Search (LATERAL JOIN) ─────────────────
+                # Tüm chunk'ı TEK sorguda işler — eski yöntem 10k ayrı SQL'di.
+                # Her embedding için LATERAL ile en yakın K sonuç çekilir.
+                #
+                # FIX: psycopg2, Python list[float]'ı numeric[][] olarak gönderir,
+                # bu yüzden vector[] cast'i başarısız olur.
+                # Çözüm: her embedding'i '[v1,v2,...]' string'ine çevirip
+                # text[] olarak gönder, SQL içinde ::vector ile cast et.
+                row_ids_arr    = [str(r["row_id"]) for r in rows]
+                embeddings_arr = [
+                    "[" + ",".join(str(x) for x in r["embedding"]) + "]"
+                    for r in rows
+                ]
+
+                vec_batch_query = """
                     SELECT
-                        e.company_id,
-                        e.variant_id,
-                        1 - (e.embedding <=> %s::vector) AS candidate_score,
-                        v.original_company_name,
-                        v.normalized_variant_name
-                    FROM gold_company_embedding e
-                    JOIN silver_company_variant v ON e.variant_id = v.variant_id
-                    WHERE v.is_active = true
-                    ORDER BY e.embedding <=> %s::vector
-                    LIMIT %s;
+                        input.row_id,
+                        nearest.company_id,
+                        nearest.variant_id,
+                        nearest.candidate_score,
+                        nearest.company_name,
+                        nearest.variant_name
+                    FROM
+                        (SELECT
+                             UNNEST(%s::text[])           AS row_id,
+                             UNNEST(%s::text[])::vector   AS emb
+                        ) AS input
+                    CROSS JOIN LATERAL (
+                        SELECT
+                            e.company_id,
+                            e.variant_id,
+                            1 - (e.embedding <=> input.emb) AS candidate_score,
+                            v.original_company_name        AS company_name,
+                            v.normalized_variant_name      AS variant_name
+                        FROM gold_company_embedding e
+                        JOIN silver_company_variant v
+                          ON e.variant_id = v.variant_id
+                        WHERE v.is_active = true
+                          AND 1 - (e.embedding <=> input.emb) >= %s
+                        ORDER BY e.embedding <=> input.emb
+                        LIMIT %s
+                    ) AS nearest;
                 """
-                for row in rows:
-                    rid = row["row_id"]
-                    emb = row["embedding"]
-                    cur.execute(vec_query, (emb, emb, self.vector_top_k))
-                    for vrow in cur.fetchall():
-                        score = float(vrow[2])
-                        if score >= self.min_vector_score:
-                            results[rid].append({
-                                "company_id":    vrow[0],
-                                "variant_id":    vrow[1],
-                                "candidate_score": score,
-                                "company_name":  vrow[3],
-                                "variant_name":  vrow[4],
-                                "source":        "pgvector",
-                            })
+                cur.execute(vec_batch_query,
+                            (row_ids_arr, embeddings_arr,
+                             self.min_vector_score, self.vector_top_k))
+
+                for vrow in cur.fetchall():
+                    rid = vrow[0]
+                    if rid in results:
+                        results[rid].append({
+                            "company_id":      vrow[1],
+                            "variant_id":      vrow[2],
+                            "candidate_score": float(vrow[3]),
+                            "company_name":    vrow[4],
+                            "variant_name":    vrow[5],
+                            "source":          "pgvector",
+                        })
 
         except Exception as e:
             logger.error(f"Error in batch_get_candidates: {e}")

@@ -34,45 +34,53 @@ class Reranker:
         raw_key = f"{normalized_explanation}_{variant_id}_{self.model_version}"
         return hashlib.sha256(raw_key.encode('utf-8')).hexdigest()
 
-    def _get_cached_score(self, cache_key: str):
-        if not self.use_cache:
-            return None
-            
+    def _get_cached_scores_batch(self, cache_keys: list) -> dict:
+        """Fetch multiple reranker cache entries in a single SQL round-trip."""
+        if not self.use_cache or not cache_keys:
+            return {}
+
         conn = self.repo.get_connection()
         if not conn:
-            return None
-            
+            return {}
+
         try:
             with conn.cursor() as cur:
-                cur.execute("SELECT reranker_score FROM aml_reranker_cache WHERE cache_key = %s", (cache_key,))
-                res = cur.fetchone()
-                if res:
-                    return float(res[0])
+                cur.execute(
+                    "SELECT cache_key, reranker_score FROM aml_reranker_cache WHERE cache_key = ANY(%s)",
+                    (cache_keys,)
+                )
+                return {row[0]: float(row[1]) for row in cur.fetchall()}
         except Exception as e:
-            logger.error(f"Error reading reranker cache: {e}")
+            logger.error(f"Error batch-reading reranker cache: {e}")
+            return {}
         finally:
             self.repo.release_connection(conn)
-            
-        return None
 
-    def _save_cached_score(self, cache_key: str, normalized_explanation: str, variant_id: int, score: float):
-        if not self.use_cache:
+    def _save_cached_scores_batch(self, entries: list):
+        """Bulk-insert reranker cache entries: entries = list of (cache_key, norm_exp, variant_id, score)."""
+        if not self.use_cache or not entries:
             return
-            
+
         conn = self.repo.get_connection()
         if not conn:
             return
-            
+
         try:
             with conn.cursor() as cur:
-                cur.execute("""
-                    INSERT INTO aml_reranker_cache (cache_key, normalized_explanation, variant_id, reranker_score, reranker_model_version)
-                    VALUES (%s, %s, %s, %s, %s)
+                from psycopg2.extras import execute_values
+                execute_values(cur, """
+                    INSERT INTO aml_reranker_cache
+                        (cache_key, normalized_explanation, variant_id, reranker_score, reranker_model_version)
+                    VALUES %s
                     ON CONFLICT (cache_key) DO NOTHING
-                """, (cache_key, normalized_explanation, variant_id, score, self.model_version))
+                """, [
+                    (e["cache_key"], e["norm_exp"], e["variant_id"],
+                     e["score"], self.model_version)
+                    for e in entries
+                ])
             conn.commit()
         except Exception as e:
-            logger.error(f"Error saving reranker cache: {e}")
+            logger.error(f"Error bulk-saving reranker cache: {e}")
             conn.rollback()
         finally:
             self.repo.release_connection(conn)
@@ -94,45 +102,49 @@ class Reranker:
                 cand['reranker_score'] = 0.0
             return candidates
 
-        pairs_to_score = []
-        indices_to_score = []
+        # ── Batch cache lookup (single SQL round-trip) ──────────────────────────
+        cache_keys = [
+            self._generate_cache_key(normalized_explanation, cand["variant_id"])
+            for cand in candidates
+        ]
+        cached_map = self._get_cached_scores_batch(cache_keys)
 
-        # Check cache first
-        for idx, cand in enumerate(candidates):
-            cache_key = self._generate_cache_key(normalized_explanation, cand["variant_id"])
-            cached_score = self._get_cached_score(cache_key)
-            
-            if cached_score is not None:
-                cand['reranker_score'] = cached_score
+        pairs_to_score  = []
+        indices_to_score = []  # (candidate_idx, cache_key, variant_id)
+
+        for idx, (cand, cache_key) in enumerate(zip(candidates, cache_keys)):
+            if cache_key in cached_map:
+                cand['reranker_score'] = cached_map[cache_key]
             else:
                 pairs_to_score.append((normalized_explanation, cand["variant_name"]))
-                indices_to_score.append((idx, cache_key))
+                indices_to_score.append((idx, cache_key, cand["variant_id"]))
 
-        # Score missing pairs
+        # ── Score missing pairs ─────────────────────────────────────────────────
         if pairs_to_score:
             try:
-                # bge-reranker-v2-m3 returns logits. CrossEncoder predict handles it.
-                # Usually we might want to apply sigmoid if the model doesn't output probabilities.
-                # CrossEncoder with apply_softmax=False returns raw scores.
-                # BAAI models usually need a sigmoid or are just raw logits. 
-                # Let's normalize to 0-1 if they are logits, but SentenceTransformers might already handle it.
                 scores = self.model.predict(pairs_to_score, show_progress_bar=False)
-                
-                # Apply simple normalization if scores are outside 0-1.
-                # Sigmoid function for logits
+
                 import math
                 def sigmoid(x):
                     return 1 / (1 + math.exp(-x))
 
-                for score, (idx, cache_key) in zip(scores, indices_to_score):
-                    # Check if score needs sigmoid (e.g. if it can be negative)
+                new_cache_entries = []
+                for score, (idx, cache_key, variant_id) in zip(scores, indices_to_score):
                     normalized_score = float(sigmoid(score))
-                    
                     candidates[idx]['reranker_score'] = normalized_score
-                    self._save_cached_score(cache_key, normalized_explanation, candidates[idx]["variant_id"], normalized_score)
+                    new_cache_entries.append({
+                        "cache_key":  cache_key,
+                        "norm_exp":   normalized_explanation,
+                        "variant_id": variant_id,
+                        "score":      normalized_score,
+                    })
+
+                # ── Bulk-write cache entries (single SQL round-trip) ────────────
+                self._save_cached_scores_batch(new_cache_entries)
+
             except Exception as e:
                 logger.error(f"Error scoring candidates with reranker: {e}")
-                for idx, _ in indices_to_score:
+                for idx, _, _ in indices_to_score:
                     candidates[idx]['reranker_score'] = 0.0
 
         return candidates

@@ -18,6 +18,7 @@ retrieval:
   reranker_top_k: 10
   min_trgm_score: 0.25
   min_vector_score: 0.50
+  reranker_prefilter_score: 0.60   # candidates below this score skip the reranker
 
 reranker:
   enabled: true

@@ -1,9 +1,45 @@
 import pandas as pd
 import logging
+import math
+import sys
+import os
 from tqdm import tqdm
 from sentence_transformers import SentenceTransformer
 
+# alias_utils & text_utils: fix import path when running from project root
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+from alias_utils import generate_acronym
+from text_utils import normalize_text, remove_company_suffixes
+
 logger = logging.getLogger(__name__)
+
+
+def _acronym_score(explanation: str, variant_name: str) -> float:
+    """
+    Checks whether the EFT explanation contains the acronym of the candidate
+    company name. Returns 1.0 on match, 0.0 otherwise.
+    Example: 'nst payment' vs. 'North Star Trading' → acronym='nst' → 1.0
+    """
+    acronym = generate_acronym(variant_name)
+    if acronym and len(acronym) >= 2 and acronym in explanation.split():
+        return 1.0
+    return 0.0
+
+
+def _rule_score(explanation: str, variant_name: str) -> float:
+    """
+    Simple rule-based overlap score:
+    Fraction of meaningful variant tokens found in the explanation.
+    Ignores common company suffixes (ltd, inc, corp …).
+    """
+    clean_variant = remove_company_suffixes(normalize_text(variant_name))
+    variant_tokens = set(clean_variant.split())
+    if not variant_tokens:
+        return 0.0
+    exp_tokens = set(explanation.split())
+    overlap = variant_tokens & exp_tokens
+    return len(overlap) / len(variant_tokens)
+
 
 class BatchProcessor:
     def __init__(self, repository, config, retriever, reranker, scorer):
@@ -12,10 +48,15 @@ class BatchProcessor:
         self.retriever = retriever
         self.reranker = reranker
         self.scorer = scorer
-        
+
         self.batch_size = self.config.get("embedding", {}).get("batch_size", 128)
         self.embedding_model_name = self.config.get("embedding", {}).get("model_name", "sentence-transformers/all-MiniLM-L6-v2")
         self.embedding_model = None
+
+        # Pre-filter threshold before sending to Reranker (configurable)
+        self.reranker_prefilter_score = (
+            self.config.get("retrieval", {}).get("reranker_prefilter_score", 0.60)
+        )
 
     def _load_embedding_model(self):
         if not self.embedding_model:
@@ -26,24 +67,33 @@ class BatchProcessor:
     def process_file_in_chunks(self, file_path: str, run_id: str, batch_id: str, chunk_size: int = 10000):
         """Reads a CSV file in chunks and processes each chunk."""
         self._load_embedding_model()
-        
+
         metrics = {
-            "input_row_count": 0,
+            "input_row_count":     0,
             "processed_row_count": 0,
-            "candidate_count": 0,
-            "alert_count": 0
+            "candidate_count":     0,
+            "alert_count":         0
         }
-        
+
         self.repo.start_run_log(run_id, batch_id, pipeline_name="AML_Production_Pipeline")
-        
+
         import concurrent.futures
 
+        # ── Pre-compute total chunk count for progress logging ────────────────
         try:
-            logger.info(f"Starting batch processing for {file_path}")
+            total_rows = sum(1 for _ in open(file_path, encoding="utf-8")) - 1  # -1 for header
+        except Exception:
+            total_rows = None
+        total_chunks = math.ceil(total_rows / chunk_size) if total_rows else "?"
+
+        try:
+            logger.info(f"Starting batch processing for {file_path} "
+                        f"(~{total_rows or '?'} rows, chunk_size={chunk_size})")
             chunk_iter = pd.read_csv(file_path, chunksize=chunk_size)
 
             for chunk_idx, chunk in enumerate(chunk_iter):
-                logger.info(f"Processing chunk {chunk_idx+1} ({len(chunk)} rows)...")
+                pct = f"{100*(chunk_idx+1)/total_chunks:.1f}%" if isinstance(total_chunks, int) else "?%"
+                logger.info(f"[Chunk {chunk_idx+1}/{total_chunks} | {pct}] Processing {len(chunk)} rows...")
                 metrics["input_row_count"] += len(chunk)
 
                 # ── STEP 1: Normalize text ────────────────────────────────────
@@ -67,24 +117,27 @@ class BatchProcessor:
                         "embedding":             embeddings[row_idx - chunk_start_idx].tolist(),
                     })
 
+                # O(1) lookup dict: row_id → normalized_explanation
+                row_lookup = {r["row_id"]: r["normalized_explanation"] for r in rows_for_batch}
+
                 # ── STEP 4: ONE batch query → replaces 30,000 individual queries
                 all_candidates = self.retriever.batch_get_candidates(rows_for_batch)
                 metrics["candidate_count"] += sum(len(v) for v in all_candidates.values())
 
                 # ── STEP 5: Rerank only the strong survivors (parallel) ───────
                 run_id_closure = run_id  # closure-safe reference
+                chunk_alerts   = []      # collect alerts for bulk insert
 
                 def _rerank_and_score(row_id, candidates):
-                    row_result = {"alert_count": 0}
-                    # Pre-filter: pass candidates with score >= 0.70 to Reranker
-                    strong = [c for c in candidates if c.get("candidate_score", 0.0) >= 0.70]
+                    row_result = {"alert_count": 0, "alerts": []}
+
+                    # Pre-filter: configurable threshold before Reranker
+                    strong = [c for c in candidates
+                              if c.get("candidate_score", 0.0) >= self.reranker_prefilter_score]
                     if not strong:
                         return row_result
 
-                    norm_exp = next(
-                        (r["normalized_explanation"] for r in rows_for_batch if r["row_id"] == row_id),
-                        ""
-                    )
+                    norm_exp = row_lookup.get(row_id, "")  # O(1) dict lookup
                     strong = self.reranker.score_candidates(norm_exp, strong)
 
                     for cand in strong:
@@ -93,23 +146,22 @@ class BatchProcessor:
                         scores_dict = {
                             "fuzzy_score":    fuzzy_score,
                             "vector_score":   vector_score,
-                            "acronym_score":  0.0,
-                            "rule_score":     0.0,
+                            "acronym_score":  _acronym_score(norm_exp, cand["variant_name"]),
+                            "rule_score":     _rule_score(norm_exp, cand["variant_name"]),
                             "reranker_score": cand.get("reranker_score", 0.0),
                         }
                         final_score = self.scorer.calculate_final_score(scores_dict)
                         risk_level  = self.scorer.assign_risk_level(final_score)
                         if risk_level in ["HIGH", "MEDIUM"]:
                             row_result["alert_count"] += 1
-                            # ✅ Write alert to database
-                            self.repo.insert_alert(
-                                run_id=run_id_closure,
-                                eft_id=int(row_id),
-                                company_id=cand["company_id"],
-                                variant_id=cand["variant_id"],
-                                final_score=final_score,
-                                risk_level=risk_level,
-                            )
+                            row_result["alerts"].append({
+                                "run_id":      run_id_closure,
+                                "eft_id":      int(row_id),
+                                "company_id":  cand["company_id"],
+                                "variant_id":  cand["variant_id"],
+                                "final_score": final_score,
+                                "risk_level":  risk_level,
+                            })
 
                     return row_result
 
@@ -121,15 +173,27 @@ class BatchProcessor:
                     for future in concurrent.futures.as_completed(future_map):
                         try:
                             res = future.result()
-                            metrics["alert_count"]     += res["alert_count"]
+                            metrics["alert_count"]         += res["alert_count"]
                             metrics["processed_row_count"] += 1
+                            chunk_alerts.extend(res["alerts"])
                         except Exception as e:
                             logger.error(f"Row scoring failed: {e}")
                             metrics["processed_row_count"] += 1
 
+                # ── STEP 6: Bulk insert all alerts for this chunk ─────────────
+                if chunk_alerts:
+                    self.repo.insert_alerts_bulk(chunk_alerts)
+                    logger.info(f"  → {len(chunk_alerts)} alert(s) written to DB.")
+
             self.repo.finish_run_log(run_id, metrics)
-            logger.info("Batch processing finished successfully.")
+            logger.info(
+                f"Batch processing finished. "
+                f"Rows: {metrics['input_row_count']} | "
+                f"Candidates: {metrics['candidate_count']} | "
+                f"Alerts: {metrics['alert_count']}"
+            )
 
         except Exception as e:
             logger.error(f"Error in batch processing: {e}")
             self.repo.fail_run_log(run_id, str(e))
+

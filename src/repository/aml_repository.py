@@ -113,20 +113,39 @@ class AMLRepository:
             self.release_connection(conn)
 
     def insert_alert(self, run_id, eft_id, company_id, variant_id, final_score, risk_level):
-        """Writes a detected AML alert to the aml_alert table."""
+        """Writes a single AML alert to the aml_alert table. Prefer insert_alerts_bulk for batch use."""
+        self.insert_alerts_bulk([{
+            "run_id": run_id, "eft_id": eft_id, "company_id": company_id,
+            "variant_id": variant_id, "final_score": final_score, "risk_level": risk_level
+        }])
+
+    def insert_alerts_bulk(self, alerts: list):
+        """
+        Bulk-inserts a list of alert dicts in a single transaction.
+        Each dict must have: run_id, eft_id, company_id, variant_id, final_score, risk_level.
+        Much faster than calling insert_alert() per row — avoids one commit per alert.
+        """
+        if not alerts:
+            return
         conn = self.get_connection()
         if not conn:
             return
         try:
             with conn.cursor() as cur:
-                cur.execute("""
+                execute_values(cur, """
                     INSERT INTO aml_alert
                         (run_id, eft_id, company_id, variant_id, final_score, risk_level, alert_status)
-                    VALUES (%s, %s, %s, %s, %s, %s, 'OPEN')
-                """, (run_id, eft_id, company_id, variant_id, final_score, risk_level))
+                    VALUES %s
+                    ON CONFLICT DO NOTHING
+                """, [
+                    (a["run_id"], a["eft_id"], a["company_id"],
+                     a["variant_id"], a["final_score"], a["risk_level"], "OPEN")
+                    for a in alerts
+                ])
             conn.commit()
+            logger.debug(f"Bulk inserted {len(alerts)} alerts.")
         except Exception as e:
-            logger.error(f"Error inserting alert: {e}")
+            logger.error(f"Error bulk inserting alerts: {e}")
             conn.rollback()
         finally:
             self.release_connection(conn)
