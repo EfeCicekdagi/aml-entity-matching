@@ -9,6 +9,7 @@ embedding:
   model_name: BAAI/bge-m3
   dimension: 1024
   batch_size: 32        # bge-m3 daha agir — batch_size kucultuldu
+  device: auto          # "auto" = GPU if available, else CPU
 
 retrieval:
   pg_trgm_top_k: 20
@@ -17,8 +18,8 @@ retrieval:
   merged_top_k: 30
   reranker_top_k: 10
   min_trgm_score: 0.25
-  min_vector_score: 0.50
-  reranker_prefilter_score: 0.60   # candidates below this score skip the reranker
+  min_vector_score: 0.45          # bge-m3 daha iyi recall — 0.50'den dusuruldu
+  reranker_prefilter_score: 0.55  # bge-m3 ile 0.60'tan dusuruldu
 
 reranker:
   enabled: true
@@ -30,4 +31,4 @@ reranker:
 
 scoring:
   scoring_config_version: scoring_v2_reranker
-  threshold_config_version: threshold_v2_reranker
+  threshold_config_version: threshold_v3_bge_m3  # bge-m3 icin kalibre edilmis

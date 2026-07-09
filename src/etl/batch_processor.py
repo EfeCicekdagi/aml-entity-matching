@@ -3,6 +3,7 @@ import logging
 import math
 import sys
 import os
+import torch
 from tqdm import tqdm
 from sentence_transformers import SentenceTransformer
 
@@ -85,9 +86,17 @@ class BatchProcessor:
         self.reranker = reranker
         self.scorer = scorer
 
-        self.batch_size = self.config.get("embedding", {}).get("batch_size", 128)
-        self.embedding_model_name = self.config.get("embedding", {}).get("model_name", "sentence-transformers/all-MiniLM-L6-v2")
+        self.batch_size = self.config.get("embedding", {}).get("batch_size", 32)
+        self.embedding_model_name = self.config.get("embedding", {}).get("model_name", "BAAI/bge-m3")
         self.embedding_model = None
+
+        # Device selection: config > auto-detect (same pattern as Reranker)
+        cfg_device = self.config.get("embedding", {}).get("device", "auto")
+        if cfg_device == "auto" or cfg_device is None:
+            self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        else:
+            self.device = cfg_device
+        logger.info(f"Embedding model will use device: {self.device}")
 
         # Pre-filter threshold before sending to Reranker (configurable)
         self.reranker_prefilter_score = (
@@ -96,9 +105,12 @@ class BatchProcessor:
 
     def _load_embedding_model(self):
         if not self.embedding_model:
-            logger.info(f"Loading embedding model: {self.embedding_model_name}")
-            self.embedding_model = SentenceTransformer(self.embedding_model_name)
-            logger.info("Embedding model loaded.")
+            logger.info(f"Loading embedding model: {self.embedding_model_name} on {self.device}")
+            self.embedding_model = SentenceTransformer(
+                self.embedding_model_name,
+                device=self.device
+            )
+            logger.info(f"Embedding model loaded on {self.device}.")
 
     def process_file_in_chunks(self, file_path: str, run_id: str, batch_id: str, chunk_size: int = 10000):
         """Reads a CSV file in chunks and processes each chunk."""
