@@ -1,6 +1,7 @@
 import logging
 import hashlib
 import threading
+import torch
 from sentence_transformers import CrossEncoder
 
 logger = logging.getLogger(__name__)
@@ -9,23 +10,34 @@ class Reranker:
     def __init__(self, repository, config):
         self.repo = repository
         self.config = config
-        
-        self.enabled = self.config.get("enabled", True)
-        self.model_name = self.config.get("model_name", "BAAI/bge-reranker-v2-m3")
+
+        self.enabled      = self.config.get("enabled", True)
+        self.model_name   = self.config.get("model_name", "BAAI/bge-reranker-v2-m3")
         self.model_version = self.config.get("model_version", "v1")
-        self.use_cache = self.config.get("use_cache", True)
-        self.model = None
-        self._lock = threading.Lock()
+        self.use_cache    = self.config.get("use_cache", True)
+        self.model        = None
+        self._lock        = threading.Lock()
+
+        # Device selection: config > auto-detect
+        cfg_device = self.config.get("device", "auto")
+        if cfg_device == "auto" or cfg_device is None:
+            self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        else:
+            self.device = cfg_device
+        logger.info(f"Reranker will use device: {self.device}")
 
     def _load_model(self):
         if not self.model and self.enabled:
             with self._lock:
                 if not self.model:
-                    logger.info(f"Loading Reranker Model: {self.model_name}")
+                    logger.info(f"Loading Reranker Model: {self.model_name} on {self.device}")
                     try:
-                        # Use sentence_transformers CrossEncoder
-                        self.model = CrossEncoder(self.model_name, max_length=512)
-                        logger.info("Reranker model loaded successfully.")
+                        self.model = CrossEncoder(
+                            self.model_name,
+                            max_length=512,
+                            device=self.device
+                        )
+                        logger.info(f"Reranker model loaded successfully on {self.device}.")
                     except Exception as e:
                         logger.error(f"Failed to load reranker model: {e}")
                         self.enabled = False

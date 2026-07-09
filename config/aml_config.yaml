@@ -6,9 +6,9 @@ database:
   password: password
 
 embedding:
-  model_name: sentence-transformers/all-MiniLM-L6-v2
-  dimension: 384
-  batch_size: 128
+  model_name: BAAI/bge-m3
+  dimension: 1024
+  batch_size: 32        # bge-m3 daha agir — batch_size kucultuldu
 
 retrieval:
   pg_trgm_top_k: 20
@@ -26,6 +26,7 @@ reranker:
   model_version: v1
   batch_size: 32
   use_cache: true
+  device: auto   # "auto" = GPU if available, else CPU. Override with "cuda" or "cpu".
 
 scoring:
   scoring_config_version: scoring_v2_reranker

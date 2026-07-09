@@ -47,7 +47,7 @@ CREATE TABLE IF NOT EXISTS gold_company_embedding (
     embedding_id BIGSERIAL PRIMARY KEY,
     variant_id BIGINT REFERENCES silver_company_variant(variant_id),
     company_id BIGINT,
-    embedding VECTOR(384),
+    embedding VECTOR(1024),              -- BAAI/bge-m3 (1024 dim)
     embedding_model_name TEXT,
     embedding_model_version TEXT,
     created_at TIMESTAMP DEFAULT now()

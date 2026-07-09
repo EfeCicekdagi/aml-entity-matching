@@ -14,11 +14,22 @@ from text_utils import normalize_text, remove_company_suffixes
 logger = logging.getLogger(__name__)
 
 
+# Jenerik is kelimeleri — rule_score icin anlamsiz overlap yaratir
+_RULE_STOPWORDS = {
+    "services", "service", "group", "holding", "holdings",
+    "international", "global", "enterprises", "enterprise",
+    "solutions", "solution", "industries", "industry",
+    "management", "investments", "investment",
+    "trading", "trade", "export", "import",
+    "logistics", "transport", "energy", "petroleum",
+}
+
+
 def _acronym_score(explanation: str, variant_name: str) -> float:
     """
     Checks whether the EFT explanation contains the acronym of the candidate
     company name. Returns 1.0 on match, 0.0 otherwise.
-    Example: 'nst payment' vs. 'North Star Trading' → acronym='nst' → 1.0
+    Example: 'nst payment' vs. 'North Star Trading' -> acronym='nst' -> 1.0
     """
     acronym = generate_acronym(variant_name)
     if acronym and len(acronym) >= 2 and acronym in explanation.split():
@@ -28,17 +39,42 @@ def _acronym_score(explanation: str, variant_name: str) -> float:
 
 def _rule_score(explanation: str, variant_name: str) -> float:
     """
-    Simple rule-based overlap score:
-    Fraction of meaningful variant tokens found in the explanation.
-    Ignores common company suffixes (ltd, inc, corp …).
+    Token-overlap score between EFT explanation and candidate company name.
+    Filters out:
+      - Generic business words (_RULE_STOPWORDS)
+      - Very short tokens (<= 3 chars) — avoids 'ltd', 'co', 'of' noise
+    Returns fraction of *distinctive* variant tokens found in explanation.
     """
     clean_variant = remove_company_suffixes(normalize_text(variant_name))
-    variant_tokens = set(clean_variant.split())
+    # Keep only long, distinctive tokens
+    variant_tokens = {
+        t for t in clean_variant.split()
+        if len(t) > 3 and t not in _RULE_STOPWORDS
+    }
     if not variant_tokens:
         return 0.0
     exp_tokens = set(explanation.split())
     overlap = variant_tokens & exp_tokens
     return len(overlap) / len(variant_tokens)
+
+
+def _exact_name_score(explanation: str, variant_name: str) -> float:
+    """
+    Bonus score: returns 1.0 if the normalized variant name appears
+    as a substring in the EFT explanation.
+    Catches cases like 'TR TO Indiaforensic SERVICES IN' where the
+    full company name is explicitly written in the description.
+    """
+    norm_variant = normalize_text(variant_name)
+    # Need at least 2 meaningful words to avoid trivial matches
+    tokens = [t for t in norm_variant.split() if len(t) > 3]
+    if len(tokens) < 2:
+        return 0.0
+    # Check if all meaningful tokens appear in the explanation
+    exp_tokens = set(explanation.split())
+    if all(t in exp_tokens for t in tokens):
+        return 1.0
+    return 0.0
 
 
 class BatchProcessor:
@@ -130,14 +166,20 @@ class BatchProcessor:
 
                 def _rerank_and_score(row_id, candidates):
                     row_result = {"alert_count": 0, "alerts": []}
+                    norm_exp = row_lookup.get(row_id, "")
 
-                    # Pre-filter: configurable threshold before Reranker
-                    strong = [c for c in candidates
-                              if c.get("candidate_score", 0.0) >= self.reranker_prefilter_score]
+                    # Pre-filter: pass candidates that EITHER
+                    #   (a) have a high retrieval score, OR
+                    #   (b) have the company name explicitly in the EFT text
+                    #       (exact_name_score=1.0) — catches fuzzy-miss but name-match cases
+                    strong = [
+                        c for c in candidates
+                        if c.get("candidate_score", 0.0) >= self.reranker_prefilter_score
+                        or _exact_name_score(norm_exp, c["variant_name"]) == 1.0
+                    ]
                     if not strong:
                         return row_result
 
-                    norm_exp = row_lookup.get(row_id, "")  # O(1) dict lookup
                     strong = self.reranker.score_candidates(norm_exp, strong)
 
                     for cand in strong:
@@ -147,7 +189,12 @@ class BatchProcessor:
                             "fuzzy_score":    fuzzy_score,
                             "vector_score":   vector_score,
                             "acronym_score":  _acronym_score(norm_exp, cand["variant_name"]),
-                            "rule_score":     _rule_score(norm_exp, cand["variant_name"]),
+                            # rule_score: filtered token overlap (no generic words)
+                            # exact_name_score folded into rule_score as max
+                            "rule_score":     max(
+                                _rule_score(norm_exp, cand["variant_name"]),
+                                _exact_name_score(norm_exp, cand["variant_name"])
+                            ),
                             "reranker_score": cand.get("reranker_score", 0.0),
                         }
                         final_score = self.scorer.calculate_final_score(scores_dict)
