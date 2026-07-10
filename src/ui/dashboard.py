@@ -1,9 +1,9 @@
 """
 AML Alert Review Dashboard — Streamlit
-Calistirilmak icin: streamlit run src/dashboard.py
+Calistirilmak icin: streamlit run src/ui/dashboard.py
 """
 import sys, os
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
 import streamlit as st
 import pandas as pd

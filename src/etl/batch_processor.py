@@ -9,9 +9,9 @@ from sentence_transformers import SentenceTransformer
 
 # alias_utils & text_utils: fix import path when running from project root
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-from alias_utils import generate_acronym
-from text_utils import normalize_text, remove_company_suffixes
-from utils.ner_extractor import NERExtractor
+from src.utils.alias_utils import generate_acronym
+from src.utils.text_utils import normalize_text, remove_company_suffixes
+from src.utils.ner_extractor import NERExtractor
 
 logger = logging.getLogger(__name__)
 

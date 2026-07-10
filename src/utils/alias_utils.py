@@ -1,6 +1,6 @@
 from itertools import product
 
-from text_utils import normalize_text, remove_company_suffixes
+from src.utils.text_utils import normalize_text, remove_company_suffixes
 
 
 STOPWORDS_FOR_ACRONYM = {

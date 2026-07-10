@@ -1,5 +1,5 @@
 import sys, os
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 from src.utils.config_loader import ConfigLoader
 from src.repository.aml_repository import AMLRepository
 

@@ -5,7 +5,7 @@ from pathlib import Path
 
 # Add src to path to import utils
 sys.path.append(str(Path(__file__).parent.parent))
-from text_utils import normalize_text
+from src.utils.text_utils import normalize_text
 
 logger = logging.getLogger(__name__)
 

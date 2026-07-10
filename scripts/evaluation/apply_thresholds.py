@@ -6,7 +6,7 @@ Kalibre edilen degerler:
   LOW    : 0.50-0.62  (zayif eslesme, log'a yazilir ama alert uretilmez)
 """
 import sys, os
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 from src.utils.config_loader import ConfigLoader
 from src.repository.aml_repository import AMLRepository
 
