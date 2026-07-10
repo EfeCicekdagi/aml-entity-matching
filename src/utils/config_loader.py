@@ -25,5 +25,8 @@ class ConfigLoader:
     def get_reranker_config(self):
         return self.config.get("reranker", {})
 
+    def get_ner_config(self):
+        return self.config.get("ner", {})
+
     def get_scoring_config(self):
         return self.config.get("scoring", {})

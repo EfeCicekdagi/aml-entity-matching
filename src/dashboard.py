@@ -57,7 +57,7 @@ def load_alerts(run_id):
     df = pd.read_sql("""
         SELECT a.alert_id, a.eft_id, v.original_company_name,
                ROUND(a.final_score::numeric, 3) AS final_score,
-               a.risk_level, a.alert_status, a.created_at
+               a.risk_level, a.alert_status, a.extracted_entity, a.created_at
         FROM aml_alert a
         JOIN silver_company_variant v ON a.variant_id=v.variant_id
         WHERE a.run_id = %(run_id)s
@@ -176,9 +176,9 @@ with tab2:
         colors = {"HIGH":"🔴","MEDIUM":"🟠","LOW":"⚪"}
         return f"{colors.get(risk,'')} {risk}"
 
-    display_df = filtered[['eft_id','original_company_name','final_score','risk_level','alert_status','created_at']].copy()
+    display_df = filtered[['eft_id','original_company_name','extracted_entity','final_score','risk_level','alert_status','created_at']].copy()
     display_df['risk_level'] = display_df['risk_level'].apply(badge)
-    display_df.columns = ['EFT ID','Şirket','Final Score','Risk','Durum','Tarih']
+    display_df.columns = ['EFT ID','Şirket','Çıkarılan İsim (NER)','Final Score','Risk','Durum','Tarih']
 
     st.dataframe(display_df, use_container_width=True, height=500,
                  column_config={

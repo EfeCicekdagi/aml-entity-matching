@@ -122,8 +122,8 @@ class BatchProcessor:
             )
             logger.info(f"Embedding model loaded on {self.device}.")
 
-    def process_file_in_chunks(self, file_path: str, run_id: str, batch_id: str, chunk_size: int = 10000):
-        """Reads a CSV file in chunks and processes each chunk."""
+    def process_db_table_in_chunks(self, run_id: str, batch_id: str, table_name: str = "bronze_eft_raw", chunk_size: int = 10000):
+        """Reads EFT records from PostgreSQL in chunks and processes each chunk."""
         self._load_embedding_model()
 
         metrics = {
@@ -139,145 +139,172 @@ class BatchProcessor:
 
         # ── Pre-compute total chunk count for progress logging ────────────────
         try:
-            total_rows = sum(1 for _ in open(file_path, encoding="utf-8")) - 1  # -1 for header
-        except Exception:
+            conn = self.repo.get_connection()
+            with conn.cursor() as cur:
+                cur.execute(f"SELECT COUNT(*) FROM {table_name}")
+                total_rows = cur.fetchone()[0]
+        except Exception as e:
+            logger.warning(f"Could not get total rows from {table_name}: {e}")
             total_rows = None
+        finally:
+            if 'conn' in locals() and conn:
+                self.repo.release_connection(conn)
+
         total_chunks = math.ceil(total_rows / chunk_size) if total_rows else "?"
 
         try:
-            logger.info(f"Starting batch processing for {file_path} "
+            logger.info(f"Starting batch processing for {table_name} "
                         f"(~{total_rows or '?'} rows, chunk_size={chunk_size})")
-            chunk_iter = pd.read_csv(file_path, chunksize=chunk_size)
+            
+            conn_for_read = self.repo.get_connection()
+            try:
+                # We suppress pandas warnings about SQLAlchemy
+                import warnings
+                with warnings.catch_warnings():
+                    warnings.simplefilter('ignore', UserWarning)
+                    chunk_iter = pd.read_sql(f"SELECT * FROM {table_name} ORDER BY eft_id", con=conn_for_read, chunksize=chunk_size)
 
-            for chunk_idx, chunk in enumerate(chunk_iter):
-                pct = f"{100*(chunk_idx+1)/total_chunks:.1f}%" if isinstance(total_chunks, int) else "?%"
-                logger.info(f"[Chunk {chunk_idx+1}/{total_chunks} | {pct}] Processing {len(chunk)} rows...")
-                metrics["input_row_count"] += len(chunk)
+                    for chunk_idx, chunk in enumerate(chunk_iter):
+                        pct = f"{100*(chunk_idx+1)/total_chunks:.1f}%" if isinstance(total_chunks, int) else "?%"
+                        logger.info(f"[Chunk {chunk_idx+1}/{total_chunks} | {pct}] Processing {len(chunk)} rows...")
+                        
+                        if len(chunk) == 0:
+                            logger.info("Chunk is empty, skipping.")
+                            continue
 
-                # ── STEP 1: Normalize text ────────────────────────────────────
-                chunk['normalized_explanation'] = chunk['description'].astype(str).str.lower()
-                chunk_start_idx = chunk.index[0]
+                        metrics["input_row_count"] += len(chunk)
 
-                # ── STEP 1.5: Extract Entities (NER) ──────────────────────────
-                explanations = chunk['normalized_explanation'].tolist()
-                extracted_entities = [None] * len(explanations)
-                if self.ner_enabled and self.ner_extractor:
-                    extracted_entities = self.ner_extractor.batch_extract_entities(explanations)
+                        # ── STEP 1: Normalize text ────────────────────────────────────
+                        # Data from DB has 'explanation' column instead of 'description'
+                        chunk['normalized_explanation'] = chunk['explanation'].astype(str).str.lower()
+                        chunk_start_idx = chunk.index[0]
+
+                        # ── STEP 1.5: Extract Entities (NER) ──────────────────────────
+                        explanations = chunk['normalized_explanation'].tolist()
+                        extracted_entities = [None] * len(explanations)
+                        if self.ner_enabled and self.ner_extractor:
+                            extracted_entities = self.ner_extractor.batch_extract_entities(explanations)
                 
-                # Determine search queries: Use extracted entity if found, else full explanation
-                search_queries = [
-                    ent.lower() if ent else exp 
-                    for ent, exp in zip(extracted_entities, explanations)
-                ]
+                        # Determine search queries: ALWAYS use full explanation for robust vector search
+                        # NER is kept purely for dashboard info and safety-net
+                        search_queries = [
+                            exp for exp in explanations
+                        ]
 
-                # ── STEP 2: Batch embed the entire chunk in one GPU/CPU call ──
-                embeddings = self.embedding_model.encode(
-                    search_queries,
-                    batch_size=self.batch_size,
-                    show_progress_bar=False
-                )
+                        # ── STEP 2: Batch embed the entire chunk in one GPU/CPU call ──
+                        embeddings = self.embedding_model.encode(
+                            search_queries,
+                            batch_size=self.batch_size,
+                            show_progress_bar=False
+                        )
 
-                # ── STEP 3: Build row list for batch DB query ─────────────────
-                rows_for_batch = []
-                for row_idx, row in chunk.iterrows():
-                    list_idx = row_idx - chunk_start_idx
-                    rows_for_batch.append({
-                        "row_id":                str(row_idx),
-                        "normalized_explanation": search_queries[list_idx],
-                        "embedding":             embeddings[list_idx].tolist(),
-                        "extracted_entity":      extracted_entities[list_idx]
-                    })
-
-                # O(1) lookup dict: row_id → normalized_explanation
-                row_lookup = {r["row_id"]: r["normalized_explanation"] for r in rows_for_batch}
-                entity_lookup = {r["row_id"]: r["extracted_entity"] for r in rows_for_batch}
-
-                # ── STEP 4: ONE batch query → replaces 30,000 individual queries
-                all_candidates = self.retriever.batch_get_candidates(rows_for_batch)
-                metrics["candidate_count"] += sum(len(v) for v in all_candidates.values())
-
-                # ── STEP 5: Rerank only the strong survivors (parallel) ───────
-                run_id_closure = run_id  # closure-safe reference
-                chunk_alerts   = []      # collect alerts for bulk insert
-
-                def _rerank_and_score(row_id, candidates):
-                    row_result = {"alert_count": 0, "alerts": []}
-                    norm_exp = row_lookup.get(row_id, "")
-
-                    # Pre-filter: pass candidates that EITHER
-                    #   (a) have a high retrieval score, OR
-                    #   (b) have the company name explicitly in the EFT text
-                    #       (exact_name_score=1.0) — catches fuzzy-miss but name-match cases
-                    strong = [
-                        c for c in candidates
-                        if c.get("candidate_score", 0.0) >= self.reranker_prefilter_score
-                        or _exact_name_score(norm_exp, c["variant_name"]) == 1.0
-                    ]
-                    if not strong:
-                        return row_result
-
-                    strong = self.reranker.score_candidates(norm_exp, strong)
-
-                    extracted = entity_lookup.get(row_id, None)
-
-                    for cand in strong:
-                        fuzzy_score  = cand["candidate_score"] if cand["source"] in ["pg_trgm", "combined"] else 0.0
-                        vector_score = cand["candidate_score"] if cand["source"] in ["pgvector", "combined"] else 0.0
-                        scores_dict = {
-                            "fuzzy_score":    fuzzy_score,
-                            "vector_score":   vector_score,
-                            "acronym_score":  _acronym_score(norm_exp, cand["variant_name"]),
-                            # rule_score: filtered token overlap (no generic words)
-                            # exact_name_score folded into rule_score as max
-                            "rule_score":     max(
-                                _rule_score(norm_exp, cand["variant_name"]),
-                                _exact_name_score(norm_exp, cand["variant_name"])
-                            ),
-                            "reranker_score": cand.get("reranker_score", 0.0),
-                        }
-                        final_score = self.scorer.calculate_final_score(scores_dict)
-                        risk_level  = self.scorer.assign_risk_level(final_score)
-                        if risk_level in ["HIGH", "MEDIUM"]:
-                            row_result["alert_count"] += 1
-                            row_result["alerts"].append({
-                                "run_id":      run_id_closure,
-                                "eft_id":      int(row_id),
-                                "company_id":  cand["company_id"],
-                                "variant_id":  cand["variant_id"],
-                                "final_score": final_score,
-                                "risk_level":  risk_level,
-                                "extracted_entity": extracted
+                        # ── STEP 3: Build row list for batch DB query ─────────────────
+                        rows_for_batch = []
+                        for list_idx, (row_idx, row) in enumerate(chunk.iterrows()):
+                            # Use actual eft_id from database if available, otherwise fallback to row_idx
+                            real_eft_id = str(row['eft_id']) if 'eft_id' in row else str(row_idx)
+                            
+                            rows_for_batch.append({
+                                "row_id":                real_eft_id,
+                                "normalized_explanation": search_queries[list_idx],
+                                "embedding":             embeddings[list_idx].tolist(),
+                                "extracted_entity":      extracted_entities[list_idx]
                             })
 
-                    return row_result
+                        # O(1) lookup dict: row_id → normalized_explanation
+                        row_lookup = {r["row_id"]: r["normalized_explanation"] for r in rows_for_batch}
+                        entity_lookup = {r["row_id"]: r["extracted_entity"] for r in rows_for_batch}
 
-                with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
-                    future_map = {
-                        executor.submit(_rerank_and_score, rid, cands): rid
-                        for rid, cands in all_candidates.items()
-                    }
-                    for future in concurrent.futures.as_completed(future_map):
-                        try:
-                            res = future.result()
-                            metrics["alert_count"]         += res["alert_count"]
-                            metrics["processed_row_count"] += 1
-                            chunk_alerts.extend(res["alerts"])
-                        except Exception as e:
-                            logger.error(f"Row scoring failed: {e}")
-                            metrics["processed_row_count"] += 1
+                        # ── STEP 4: ONE batch query → replaces 30,000 individual queries
+                        all_candidates = self.retriever.batch_get_candidates(rows_for_batch)
+                        metrics["candidate_count"] += sum(len(v) for v in all_candidates.values())
 
-                # ── STEP 6: Bulk insert all alerts for this chunk ─────────────
-                if chunk_alerts:
-                    self.repo.insert_alerts_bulk(chunk_alerts)
-                    logger.info(f"  → {len(chunk_alerts)} alert(s) written to DB.")
+                        # ── STEP 5: Rerank only the strong survivors (parallel) ───────
+                        run_id_closure = run_id  # closure-safe reference
+                        chunk_alerts   = []      # collect alerts for bulk insert
 
-            self.repo.finish_run_log(run_id, metrics)
-            logger.info(
-                f"Batch processing finished. "
-                f"Rows: {metrics['input_row_count']} | "
-                f"Candidates: {metrics['candidate_count']} | "
-                f"Alerts: {metrics['alert_count']}"
-            )
+                        def _rerank_and_score(row_id, candidates):
+                            row_result = {"alert_count": 0, "alerts": []}
+                            norm_exp = row_lookup.get(row_id, "")
+
+                            # Pre-filter: pass candidates that EITHER
+                            #   (a) have a high retrieval score, OR
+                            #   (b) have the company name explicitly in the EFT text
+                            #       (exact_name_score=1.0) — catches fuzzy-miss but name-match cases
+                            strong = [
+                                c for c in candidates
+                                if c.get("candidate_score", 0.0) >= self.reranker_prefilter_score
+                                or _exact_name_score(norm_exp, c["variant_name"]) == 1.0
+                            ]
+                            if not strong:
+                                return row_result
+
+                            strong = self.reranker.score_candidates(norm_exp, strong)
+
+                            extracted = entity_lookup.get(row_id, None)
+
+                            for cand in strong:
+                                fuzzy_score  = cand["candidate_score"] if cand["source"] in ["pg_trgm", "combined"] else 0.0
+                                vector_score = cand["candidate_score"] if cand["source"] in ["pgvector", "combined"] else 0.0
+                                scores_dict = {
+                                    "fuzzy_score":    fuzzy_score,
+                                    "vector_score":   vector_score,
+                                    "acronym_score":  _acronym_score(norm_exp, cand["variant_name"]),
+                                    # rule_score: filtered token overlap (no generic words)
+                                    # exact_name_score folded into rule_score as max
+                                    "rule_score":     max(
+                                        _rule_score(norm_exp, cand["variant_name"]),
+                                        _exact_name_score(norm_exp, cand["variant_name"])
+                                    ),
+                                    "reranker_score": cand.get("reranker_score", 0.0),
+                                }
+                                final_score = self.scorer.calculate_final_score(scores_dict)
+                                risk_level  = self.scorer.assign_risk_level(final_score)
+                                if risk_level in ["HIGH", "MEDIUM"]:
+                                    row_result["alert_count"] += 1
+                                    row_result["alerts"].append({
+                                        "run_id":      run_id_closure,
+                                        "eft_id":      int(row_id),
+                                        "company_id":  cand["company_id"],
+                                        "variant_id":  cand["variant_id"],
+                                        "final_score": final_score,
+                                        "risk_level":  risk_level,
+                                        "extracted_entity": extracted
+                                    })
+
+                            return row_result
+
+                        with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
+                            future_map = {
+                                executor.submit(_rerank_and_score, rid, cands): rid
+                                for rid, cands in all_candidates.items()
+                            }
+                            for future in concurrent.futures.as_completed(future_map):
+                                try:
+                                    res = future.result()
+                                    metrics["alert_count"]         += res["alert_count"]
+                                    metrics["processed_row_count"] += 1
+                                    chunk_alerts.extend(res["alerts"])
+                                except Exception as e:
+                                    logger.error(f"Row scoring failed: {e}")
+                                    metrics["processed_row_count"] += 1
+
+                        # ── STEP 6: Bulk insert all alerts for this chunk ─────────────
+                        if chunk_alerts:
+                            self.repo.insert_alerts_bulk(chunk_alerts)
+                            logger.info(f"  → {len(chunk_alerts)} alert(s) written to DB.")
+
+                self.repo.finish_run_log(run_id, metrics)
+                logger.info(
+                    f"Batch processing finished. "
+                    f"Rows: {metrics['input_row_count']} | "
+                    f"Candidates: {metrics['candidate_count']} | "
+                    f"Alerts: {metrics['alert_count']}"
+                )
+
+            finally:
+                if 'conn_for_read' in locals() and conn_for_read:
+                    self.repo.release_connection(conn_for_read)
 
         except Exception as e:
             logger.error(f"Error in batch processing: {e}")

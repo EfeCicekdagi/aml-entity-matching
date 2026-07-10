@@ -14,11 +14,11 @@ class FinalScorer:
     def _load_weights(self):
         conn = self.repo.get_connection()
         weights = {
-            "fuzzy_weight": 0.30,
-            "vector_weight": 0.20,
-            "acronym_weight": 0.10,
-            "rule_weight": 0.10,
-            "reranker_weight": 0.30
+            "fuzzy_weight": 0.0,
+            "vector_weight": 0.30,
+            "acronym_weight": 0.0,
+            "rule_weight": 0.0,
+            "reranker_weight": 0.70
         }
         if not conn:
             return weights
@@ -77,10 +77,7 @@ class FinalScorer:
         fuzzy_score, vector_score, acronym_score, rule_score, reranker_score
         """
         final_score = (
-            scores.get("fuzzy_score", 0.0) * self.weights["fuzzy_weight"] +
             scores.get("vector_score", 0.0) * self.weights["vector_weight"] +
-            scores.get("acronym_score", 0.0) * self.weights["acronym_weight"] +
-            scores.get("rule_score", 0.0) * self.weights["rule_weight"] +
             scores.get("reranker_score", 0.0) * self.weights["reranker_weight"]
         )
         return min(max(final_score, 0.0), 1.0)

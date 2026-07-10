@@ -68,20 +68,15 @@ def main():
     # 4. Orchestrate the Run
     run_id   = f"RUN-{uuid.uuid4().hex[:8].upper()}"
     batch_id = f"BATCH-{uuid.uuid4().hex[:8].upper()}"
-    eft_file_path = "data/bank_efts.csv" # Müşterinin 113bin satırlık asıl datası
     
-    if not os.path.exists(eft_file_path):
-        logger.error(f"Input file not found: {eft_file_path}")
-        sys.exit(1)
-
     logger.info(f"Generated RUN_ID: {run_id}")
     
-    # 5. Process File
-    # (In a real scenario, we might have an Airflow job triggering this)
-    processor.process_file_in_chunks(
-        file_path=eft_file_path, 
+    # 5. Process Table
+    # Reads from bronze_eft_raw in chunks and inserts alerts
+    processor.process_db_table_in_chunks(
         run_id=run_id, 
         batch_id=batch_id, 
+        table_name="bronze_eft_raw",
         chunk_size=10000
     )
     
