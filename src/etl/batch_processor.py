@@ -11,6 +11,7 @@ from sentence_transformers import SentenceTransformer
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from alias_utils import generate_acronym
 from text_utils import normalize_text, remove_company_suffixes
+from utils.ner_extractor import NERExtractor
 
 logger = logging.getLogger(__name__)
 
@@ -103,6 +104,15 @@ class BatchProcessor:
             self.config.get("retrieval", {}).get("reranker_prefilter_score", 0.60)
         )
 
+        # NER Initialization
+        self.ner_enabled = self.config.get("ner", {}).get("enabled", False)
+        self.ner_extractor = None
+        if self.ner_enabled:
+            ner_model = self.config.get("ner", {}).get("model_name", "savasy/bert-base-turkish-ner-cased")
+            ner_dev = self.config.get("ner", {}).get("device", "auto")
+            dev_id = 0 if (ner_dev == "auto" and torch.cuda.is_available()) or ner_dev == "cuda" else -1
+            self.ner_extractor = NERExtractor(model_name=ner_model, device=dev_id)
+
     def _load_embedding_model(self):
         if not self.embedding_model:
             logger.info(f"Loading embedding model: {self.embedding_model_name} on {self.device}")
@@ -148,10 +158,21 @@ class BatchProcessor:
                 chunk['normalized_explanation'] = chunk['description'].astype(str).str.lower()
                 chunk_start_idx = chunk.index[0]
 
-                # ── STEP 2: Batch embed the entire chunk in one GPU/CPU call ──
+                # ── STEP 1.5: Extract Entities (NER) ──────────────────────────
                 explanations = chunk['normalized_explanation'].tolist()
+                extracted_entities = [None] * len(explanations)
+                if self.ner_enabled and self.ner_extractor:
+                    extracted_entities = self.ner_extractor.batch_extract_entities(explanations)
+                
+                # Determine search queries: Use extracted entity if found, else full explanation
+                search_queries = [
+                    ent.lower() if ent else exp 
+                    for ent, exp in zip(extracted_entities, explanations)
+                ]
+
+                # ── STEP 2: Batch embed the entire chunk in one GPU/CPU call ──
                 embeddings = self.embedding_model.encode(
-                    explanations,
+                    search_queries,
                     batch_size=self.batch_size,
                     show_progress_bar=False
                 )
@@ -159,14 +180,17 @@ class BatchProcessor:
                 # ── STEP 3: Build row list for batch DB query ─────────────────
                 rows_for_batch = []
                 for row_idx, row in chunk.iterrows():
+                    list_idx = row_idx - chunk_start_idx
                     rows_for_batch.append({
                         "row_id":                str(row_idx),
-                        "normalized_explanation": row["normalized_explanation"],
-                        "embedding":             embeddings[row_idx - chunk_start_idx].tolist(),
+                        "normalized_explanation": search_queries[list_idx],
+                        "embedding":             embeddings[list_idx].tolist(),
+                        "extracted_entity":      extracted_entities[list_idx]
                     })
 
                 # O(1) lookup dict: row_id → normalized_explanation
                 row_lookup = {r["row_id"]: r["normalized_explanation"] for r in rows_for_batch}
+                entity_lookup = {r["row_id"]: r["extracted_entity"] for r in rows_for_batch}
 
                 # ── STEP 4: ONE batch query → replaces 30,000 individual queries
                 all_candidates = self.retriever.batch_get_candidates(rows_for_batch)
@@ -194,6 +218,8 @@ class BatchProcessor:
 
                     strong = self.reranker.score_candidates(norm_exp, strong)
 
+                    extracted = entity_lookup.get(row_id, None)
+
                     for cand in strong:
                         fuzzy_score  = cand["candidate_score"] if cand["source"] in ["pg_trgm", "combined"] else 0.0
                         vector_score = cand["candidate_score"] if cand["source"] in ["pgvector", "combined"] else 0.0
@@ -220,6 +246,7 @@ class BatchProcessor:
                                 "variant_id":  cand["variant_id"],
                                 "final_score": final_score,
                                 "risk_level":  risk_level,
+                                "extracted_entity": extracted
                             })
 
                     return row_result

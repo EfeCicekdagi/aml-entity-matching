@@ -112,11 +112,12 @@ class AMLRepository:
         finally:
             self.release_connection(conn)
 
-    def insert_alert(self, run_id, eft_id, company_id, variant_id, final_score, risk_level):
+    def insert_alert(self, run_id, eft_id, company_id, variant_id, final_score, risk_level, extracted_entity=None):
         """Writes a single AML alert to the aml_alert table. Prefer insert_alerts_bulk for batch use."""
         self.insert_alerts_bulk([{
             "run_id": run_id, "eft_id": eft_id, "company_id": company_id,
-            "variant_id": variant_id, "final_score": final_score, "risk_level": risk_level
+            "variant_id": variant_id, "final_score": final_score, "risk_level": risk_level,
+            "extracted_entity": extracted_entity
         }])
 
     def insert_alerts_bulk(self, alerts: list):
@@ -134,12 +135,12 @@ class AMLRepository:
             with conn.cursor() as cur:
                 execute_values(cur, """
                     INSERT INTO aml_alert
-                        (run_id, eft_id, company_id, variant_id, final_score, risk_level, alert_status)
+                        (run_id, eft_id, company_id, variant_id, final_score, risk_level, alert_status, extracted_entity)
                     VALUES %s
                     ON CONFLICT DO NOTHING
                 """, [
                     (a["run_id"], a["eft_id"], a["company_id"],
-                     a["variant_id"], a["final_score"], a["risk_level"], "OPEN")
+                     a["variant_id"], a["final_score"], a["risk_level"], "OPEN", a.get("extracted_entity"))
                     for a in alerts
                 ])
             conn.commit()

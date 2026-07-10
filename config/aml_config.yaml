@@ -21,6 +21,10 @@ retrieval:
   min_vector_score: 0.45          # bge-m3 daha iyi recall — 0.50'den dusuruldu
   reranker_prefilter_score: 0.55  # bge-m3 ile 0.60'tan dusuruldu
 
+ner:
+  enabled: true
+  model_name: savasy/bert-base-turkish-ner-cased
+  device: auto          # "auto" = GPU if available, else CPU
 reranker:
   enabled: true
   model_name: BAAI/bge-reranker-v2-m3
