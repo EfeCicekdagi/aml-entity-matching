@@ -17,6 +17,7 @@ class Reranker:
         self.use_cache    = self.config.get("use_cache", True)
         self.model        = None
         self._lock        = threading.Lock()
+        self._predict_lock = threading.Lock()
 
         # Device selection: config > auto-detect
         cfg_device = self.config.get("device", "auto")
@@ -134,7 +135,8 @@ class Reranker:
         # ── Score missing pairs ─────────────────────────────────────────────────
         if pairs_to_score:
             try:
-                scores = self.model.predict(pairs_to_score, show_progress_bar=False)
+                with self._predict_lock:
+                    scores = self.model.predict(pairs_to_score, show_progress_bar=False)
 
                 import math
                 def sigmoid(x):
