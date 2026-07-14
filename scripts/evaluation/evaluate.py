@@ -13,6 +13,9 @@ def evaluate():
         print("Make sure you have run the main pipeline first.")
         return
 
+    results_df["eft_id"] = results_df["eft_id"].astype(str).apply(lambda x: x if x.startswith("EFT_") else f"EFT_{x.zfill(5)}")
+    gt_df["eft_id"] = gt_df["eft_id"].astype(str)
+
     # Merge results with ground truth on eft_id
     merged = pd.merge(gt_df, results_df, on="eft_id", how="left")
     

@@ -9,11 +9,11 @@ INSERT INTO aml_scoring_weight_config (
 )
 VALUES (
     'scoring_v2_reranker',
-    0.30,
+    0.15,
     0.20,
+    0.05,
     0.10,
-    0.10,
-    0.30,
+    0.50,
     true
 );
 
@@ -26,6 +26,6 @@ INSERT INTO aml_threshold_config (
 )
 VALUES
 ('threshold_v2_reranker', 'HIGH', 0.85, 1.00, true),
-('threshold_v2_reranker', 'MEDIUM', 0.75, 0.85, true),
-('threshold_v2_reranker', 'LOW', 0.65, 0.75, true),
-('threshold_v2_reranker', 'NO_MATCH', 0.00, 0.65, true);
+('threshold_v2_reranker', 'MEDIUM', 0.70, 0.85, true),
+('threshold_v2_reranker', 'LOW', 0.50, 0.70, true),
+('threshold_v2_reranker', 'NO_MATCH', 0.00, 0.50, true);

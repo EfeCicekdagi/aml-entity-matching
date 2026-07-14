@@ -4,13 +4,11 @@ database:
   name: aml_db
   user: postgres
   password: password
-
 embedding:
-  model_name: BAAI/bge-m3
+  model_name: intfloat/multilingual-e5-large
   dimension: 1024
-  batch_size: 32        # bge-m3 daha agir — batch_size kucultuldu
-  device: auto          # "auto" = GPU if available, else CPU
-
+  batch_size: 32
+  device: auto
 retrieval:
   pg_trgm_top_k: 20
   full_text_top_k: 20
@@ -18,21 +16,19 @@ retrieval:
   merged_top_k: 30
   reranker_top_k: 10
   min_trgm_score: 0.25
-  min_vector_score: 0.45          # bge-m3 daha iyi recall — 0.50'den dusuruldu
-  reranker_prefilter_score: 0.55  # bge-m3 ile 0.60'tan dusuruldu
-
+  min_vector_score: 0.45
+  reranker_prefilter_score: 0.40
 ner:
   enabled: true
   model_name: savasy/bert-base-turkish-ner-cased
-  device: auto          # "auto" = GPU if available, else CPU
+  device: auto
 reranker:
   enabled: true
   model_name: BAAI/bge-reranker-v2-m3
   model_version: v1
   batch_size: 32
   use_cache: true
-  device: auto   # "auto" = GPU if available, else CPU. Override with "cuda" or "cpu".
-
+  device: auto
 scoring:
   scoring_config_version: scoring_v2_reranker
-  threshold_config_version: threshold_v3_bge_m3  # bge-m3 icin kalibre edilmis
+  threshold_config_version: threshold_v3_bge_m3
