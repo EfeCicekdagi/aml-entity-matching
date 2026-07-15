@@ -104,6 +104,11 @@ class BatchProcessor:
             self.config.get("retrieval", {}).get("reranker_prefilter_score", 0.60)
         )
 
+        # EFT Pre-screening threshold (trigram min score to be considered suspicious)
+        self.min_trgm_score = (
+            self.config.get("retrieval", {}).get("min_trgm_score", 0.25)
+        )
+
         # NER Initialization
         self.ner_enabled = self.config.get("ner", {}).get("enabled", False)
         self.ner_extractor = None
@@ -122,18 +127,82 @@ class BatchProcessor:
             )
             logger.info(f"Embedding model loaded on {self.device}.")
 
-    def process_db_table_in_chunks(self, run_id: str, batch_id: str, table_name: str = "bronze_eft_raw", chunk_size: int = 10000):
+    def _prescreen_eft_chunk(self, norm_explanations: list, row_ids: list) -> set:
+        """
+        EFT PRE-SCREENING (Ön Eleme):
+        Embedding'den ÖNCE tek bir hızlı SQL trigram sorgusu çalıştırır.
+
+        Yöntem: Her EFT için şirket listesindeki en iyi eşleşmenin MAX trigram
+        skoru, min_trgm_score eşiğinin üzerindeyse EFT şüpheli sayılır.
+        Böylece çok zayıf benzerlikler (örn. tek bir harf örtüşmesi) olan
+        EFT'ler elenerek NER + Embedding + Reranker yükü azaltılır.
+
+        Returns:
+            Set of row_ids whose BEST company match score exceeds min_trgm_score.
+        """
+        if not norm_explanations:
+            return set()
+
+        conn = self.repo.get_connection()
+        if not conn:
+            return set(row_ids)  # Fail-safe: process all if DB unavailable
+
+        suspicious_ids = set()
+        try:
+            with conn.cursor() as cur:
+                # MAX score bazlı pre-screen:
+                # Her EFT için şirket listesindeki en yüksek trigram skoru bulunur.
+                # Sadece MAX skor >= min_trgm_score olan EFT'ler geçer.
+                prescreen_query = """
+                    SELECT input.row_id
+                    FROM (
+                        SELECT
+                            UNNEST(%s::text[]) AS norm_exp,
+                            UNNEST(%s::text[]) AS row_id
+                    ) AS input
+                    JOIN silver_company_variant v ON v.is_active = true
+                    GROUP BY input.row_id, input.norm_exp
+                    HAVING MAX(similarity(input.norm_exp, v.normalized_variant_name)) >= %s
+                """
+                cur.execute(prescreen_query, (
+                    norm_explanations,
+                    [str(rid) for rid in row_ids],
+                    self.min_trgm_score
+                ))
+                for row in cur.fetchall():
+                    suspicious_ids.add(row[0])
+        except Exception as e:
+            logger.warning(f"Pre-screening failed (will process all rows): {e}")
+            return set(str(rid) for rid in row_ids)  # Fail-safe
+        finally:
+            self.repo.release_connection(conn)
+
+        return suspicious_ids
+
+    def process_db_table_in_chunks(self, run_id: str, batch_id: str, table_name: str = "bronze_eft_raw", chunk_size: int = 2000):
         """Reads EFT records from PostgreSQL in chunks and processes each chunk."""
         self._load_embedding_model()
+
+        import time
+        start_time = time.time()
 
         metrics = {
             "input_row_count":     0,
             "processed_row_count": 0,
             "candidate_count":     0,
-            "alert_count":         0
+            "alert_count":         0,
+            "prescreen_skipped_count": 0
         }
 
-        self.repo.start_run_log(run_id, batch_id, pipeline_name="AML_Production_Pipeline")
+        embedding_model_name = self.config.get("embedding", {}).get("model_name", "UNKNOWN")
+        reranker_model_name = self.config.get("reranker", {}).get("model_name", "UNKNOWN")
+
+        self.repo.start_run_log(
+            run_id, batch_id, 
+            pipeline_name="AML_Production_Pipeline",
+            embedding_model=embedding_model_name,
+            reranker_model=reranker_model_name
+        )
 
         import concurrent.futures
 
@@ -175,40 +244,61 @@ class BatchProcessor:
                         metrics["input_row_count"] += len(chunk)
 
                         # ── STEP 1: Normalize text ────────────────────────────────────
-                        # Data from DB has 'explanation' column instead of 'description'
                         chunk['normalized_explanation'] = chunk['explanation'].astype(str).str.lower()
-                        chunk_start_idx = chunk.index[0]
-
-                        # ── STEP 1.5: Extract Entities (NER) ──────────────────────────
                         explanations = chunk['normalized_explanation'].tolist()
-                        extracted_entities = [None] * len(explanations)
-                        if self.ner_enabled and self.ner_extractor:
-                            extracted_entities = self.ner_extractor.batch_extract_entities(explanations)
-                
-                        # Determine search queries: ALWAYS use full explanation for robust vector search
-                        # NER is kept purely for dashboard info and safety-net
-                        search_queries = [
-                            exp for exp in explanations
-                        ]
+                        search_queries = explanations
 
-                        # ── STEP 2: Batch embed the entire chunk in one GPU/CPU call ──
+                        # ── STEP 1.5: EFT PRE-SCREENING (Ön Eleme) ──────────────────
+                        # NER'den ONCE çalıştır: Sadece şüpheli EFT'ler
+                        # sonraki ağır işlemlere (NER + Embedding + Reranker) taşınır.
+                        raw_row_ids = [
+                            str(row['eft_id']) if 'eft_id' in row else str(idx)
+                            for idx, (_, row) in enumerate(chunk.iterrows())
+                        ]
+                        suspicious_ids = self._prescreen_eft_chunk(search_queries, raw_row_ids)
+
+                        skipped = len(search_queries) - len(suspicious_ids)
+                        metrics["prescreen_skipped_count"] += skipped
+
+                        logger.info(
+                            f"  [Pre-Screen] {len(suspicious_ids)}/{len(search_queries)} EFT şüpheli "
+                            f"({skipped} EFT elendi — NER+Embedding atlandı 🚀)"
+                        )
+
+                        if not suspicious_ids:
+                            logger.info("  [Pre-Screen] Bu chunk'ta şüpheli EFT yok, atlandı.")
+                            metrics["processed_row_count"] += len(chunk)
+                            continue
+
+                        # Filtrele: sadece şüpheli EFT'lerin query'lerini al
+                        filtered_queries     = []
+                        filtered_raw_row_ids = []
+                        for i, rid in enumerate(raw_row_ids):
+                            if rid in suspicious_ids:
+                                filtered_queries.append(search_queries[i])
+                                filtered_raw_row_ids.append(rid)
+
+                        # ── STEP 1.9: NER ──────────────────────────────────
+                        # Sadece pre-screen'den geçen şüpheli EFT'lere uygulanır!
+                        filtered_entities = [None] * len(filtered_queries)
+                        if self.ner_enabled and self.ner_extractor:
+                            filtered_entities = self.ner_extractor.batch_extract_entities(filtered_queries)
+
+                        # ── STEP 2: Batch embed ONLY suspicious EFTs ──────────────────
                         embeddings = self.embedding_model.encode(
-                            search_queries,
+                            filtered_queries,
                             batch_size=self.batch_size,
                             show_progress_bar=False
                         )
 
                         # ── STEP 3: Build row list for batch DB query ─────────────────
                         rows_for_batch = []
-                        for list_idx, (row_idx, row) in enumerate(chunk.iterrows()):
-                            # Use actual eft_id from database if available, otherwise fallback to row_idx
-                            real_eft_id = str(row['eft_id']) if 'eft_id' in row else str(row_idx)
-                            
+                        for list_idx, rid in enumerate(filtered_raw_row_ids):
                             rows_for_batch.append({
-                                "row_id":                real_eft_id,
-                                "normalized_explanation": search_queries[list_idx],
+                                "row_id":                rid,
+                                "normalized_explanation": filtered_queries[list_idx],
                                 "embedding":             embeddings[list_idx].tolist(),
-                                "extracted_entity":      extracted_entities[list_idx]
+                                "extracted_entity":      filtered_entities[list_idx]
                             })
 
                         # O(1) lookup dict: row_id → normalized_explanation
@@ -294,7 +384,8 @@ class BatchProcessor:
                             self.repo.insert_alerts_bulk(chunk_alerts)
                             logger.info(f"  → {len(chunk_alerts)} alert(s) written to DB.")
 
-                self.repo.finish_run_log(run_id, metrics)
+                duration = time.time() - start_time
+                self.repo.finish_run_log(run_id, metrics, duration_seconds=duration)
                 logger.info(
                     f"Batch processing finished. "
                     f"Rows: {metrics['input_row_count']} | "

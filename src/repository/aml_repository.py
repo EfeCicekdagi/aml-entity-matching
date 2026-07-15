@@ -46,16 +46,16 @@ class AMLRepository:
         finally:
             self.release_connection(conn)
 
-    def start_run_log(self, run_id, batch_id, pipeline_name="AML_Pipeline"):
+    def start_run_log(self, run_id, batch_id, pipeline_name="AML_Pipeline", embedding_model=None, reranker_model=None):
         conn = self.get_connection()
         if not conn:
             return
         try:
             with conn.cursor() as cur:
                 cur.execute("""
-                    INSERT INTO aml_run_log (run_id, pipeline_name, batch_id, started_at, status)
-                    VALUES (%s, %s, %s, now(), 'STARTED')
-                """, (run_id, pipeline_name, batch_id))
+                    INSERT INTO aml_run_log (run_id, pipeline_name, batch_id, started_at, status, embedding_model, reranker_model)
+                    VALUES (%s, %s, %s, now(), 'STARTED', %s, %s)
+                """, (run_id, pipeline_name, batch_id, embedding_model, reranker_model))
             conn.commit()
         except Exception as e:
             logger.error(f"Error starting run log: {e}")
@@ -63,7 +63,7 @@ class AMLRepository:
         finally:
             self.release_connection(conn)
 
-    def finish_run_log(self, run_id, metrics):
+    def finish_run_log(self, run_id, metrics, duration_seconds=None):
         conn = self.get_connection()
         if not conn:
             return
@@ -76,6 +76,8 @@ class AMLRepository:
                         processed_row_count = %s,
                         candidate_count = %s,
                         alert_count = %s,
+                        prescreen_skipped_count = %s,
+                        duration_seconds = %s,
                         status = 'SUCCESS'
                     WHERE run_id = %s
                 """, (
@@ -83,11 +85,34 @@ class AMLRepository:
                     metrics.get("processed_row_count", 0),
                     metrics.get("candidate_count", 0),
                     metrics.get("alert_count", 0),
+                    metrics.get("prescreen_skipped_count", 0),
+                    duration_seconds,
                     run_id
                 ))
             conn.commit()
         except Exception as e:
             logger.error(f"Error finishing run log: {e}")
+            conn.rollback()
+        finally:
+            self.release_connection(conn)
+
+    def update_run_metrics(self, run_id, precision, recall, f1, exact_match):
+        conn = self.get_connection()
+        if not conn:
+            return
+        try:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    UPDATE aml_run_log 
+                    SET precision_score = %s,
+                        recall_score = %s,
+                        f1_score = %s,
+                        exact_match_score = %s
+                    WHERE run_id = %s
+                """, (precision, recall, f1, exact_match, run_id))
+            conn.commit()
+        except Exception as e:
+            logger.error(f"Error updating run metrics: {e}")
             conn.rollback()
         finally:
             self.release_connection(conn)

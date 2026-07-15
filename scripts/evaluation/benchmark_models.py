@@ -3,14 +3,12 @@ import sys
 import time
 import yaml
 import subprocess
-import pandas as pd
+import psycopg2
 from sklearn.metrics import precision_score, recall_score, f1_score
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
 CONFIG_FILE = "config/aml_config.yaml"
-RESULTS_FILE = "outputs/best_matches.csv"
-GROUND_TRUTH_FILE = "data/ground_truth.csv"
 OUTPUT_MD = "outputs/benchmark_results.md"
 
 MODELS_TO_TEST = [
@@ -56,35 +54,81 @@ def update_config(model_cfg):
     with open(CONFIG_FILE, "w", encoding="utf-8") as f:
         yaml.dump(config, f, default_flow_style=False, sort_keys=False)
         
-def evaluate_results():
-    if not os.path.exists(RESULTS_FILE):
-        return 0, 0, 0, 0
+def get_db_conn():
+    with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+        config = yaml.safe_load(f)
+    db = config["database"]
+    return psycopg2.connect(
+        host=db["host"], port=db["port"],
+        dbname=db["name"], user=db["user"], password=db["password"]
+    )
 
-    results_df = pd.read_csv(RESULTS_FILE)
-    gt_df = pd.read_csv(GROUND_TRUTH_FILE)
-    
-    results_df["eft_id"] = results_df["eft_id"].astype(str).apply(lambda x: x if x.startswith("EFT_") else f"EFT_{x.zfill(5)}")
-    gt_df["eft_id"] = gt_df["eft_id"].astype(str)
-    
-    merged = pd.merge(gt_df, results_df, on="eft_id", how="left")
-    merged["company_id"] = merged["company_id"].fillna(-1).astype(int)
-    
-    y_true, y_pred = [], []
-    for _, row in merged.iterrows():
-        is_known_true = 1 if row["true_company_id"] != -1 else 0
-        is_known_pred = 1 if (row["company_id"] != -1 and row["risk_level"] != "No Match") else 0
-        y_true.append(is_known_true)
-        y_pred.append(is_known_pred)
-        
-    precision = precision_score(y_true, y_pred, zero_division=0)
-    recall = recall_score(y_true, y_pred, zero_division=0)
-    f1 = f1_score(y_true, y_pred, zero_division=0)
-    
-    exact_matches = sum(1 for _, row in merged.iterrows() if row["true_company_id"] != -1 and row["true_company_id"] == row["company_id"])
-    total_known = sum(1 for _, row in merged.iterrows() if row["true_company_id"] != -1)
-    exact_accuracy = exact_matches / total_known if total_known > 0 else 0
-    
-    return precision, recall, f1, exact_accuracy
+def evaluate_results():
+    """PostgreSQL'den en son run'ın sonuçlarını değerlendirir."""
+    try:
+        conn = get_db_conn()
+        cur = conn.cursor()
+
+        # En son başarılı run_id'yi bul
+        cur.execute("""
+            SELECT run_id FROM aml_run_log
+            WHERE status = 'SUCCESS'
+            ORDER BY finished_at DESC LIMIT 1
+        """)
+        row = cur.fetchone()
+        if not row:
+            conn.close()
+            return 0, 0, 0, 0
+        run_id = row[0]
+
+        # Bu run'ın alertlerini çek
+        cur.execute("""
+            SELECT eft_id::TEXT, company_id, risk_level
+            FROM aml_alert WHERE run_id = %s
+        """, (run_id,))
+        results = {}
+        for eft_id, company_id, risk_level in cur.fetchall():
+            if not eft_id.startswith("EFT_"):
+                eft_id = f"EFT_{str(eft_id).zfill(5)}"
+            results[eft_id] = (company_id, risk_level)
+
+        # Ground truth tablosundan çek
+        cur.execute("SELECT eft_id, true_company_id FROM aml_ground_truth")
+        gt_rows = cur.fetchall()
+        conn.close()
+
+        if not gt_rows:
+            return 0, 0, 0, 0
+
+        y_true, y_pred = [], []
+        exact_matches = 0
+        total_known = 0
+
+        for eft_id, true_company_id in gt_rows:
+            is_match_true = 1 if true_company_id != -1 else 0
+            if is_match_true:
+                total_known += 1
+
+            pred = results.get(eft_id, (None, "No Match"))
+            pred_company_id, pred_risk = pred
+            is_match_pred = 1 if (pred_company_id is not None and pred_risk not in ["No Match", "LOW"]) else 0
+
+            y_true.append(is_match_true)
+            y_pred.append(is_match_pred)
+
+            if true_company_id != -1 and pred_company_id == true_company_id:
+                exact_matches += 1
+
+        precision = precision_score(y_true, y_pred, zero_division=0)
+        recall    = recall_score(y_true, y_pred, zero_division=0)
+        f1        = f1_score(y_true, y_pred, zero_division=0)
+        exact_acc = exact_matches / total_known if total_known > 0 else 0
+
+        return precision, recall, f1, exact_acc
+
+    except Exception as e:
+        print(f"Evaluation error: {e}")
+        return 0, 0, 0, 0
 
 def run_subprocess(cmd):
     print(f"Running: {cmd}")
@@ -96,14 +140,26 @@ def run_subprocess(cmd):
 def benchmark():
     os.makedirs(os.path.dirname(OUTPUT_MD), exist_ok=True)
     
-    with open(OUTPUT_MD, "w", encoding="utf-8") as f:
-        f.write("# Model Benchmark Results\n\n")
-        f.write("| Configuration | Precision | Recall | F1 Score | Exact Match Acc | Pipeline Time (s) |\n")
-        f.write("|--------------|-----------|--------|----------|-----------------|-------------------|\n")
+    existing_models = set()
+    if os.path.exists(OUTPUT_MD):
+        with open(OUTPUT_MD, "r", encoding="utf-8") as f:
+            for line in f:
+                if line.startswith("| ") and not line.startswith("| Configuration |") and not line.startswith("|--------------|"):
+                    model_name = line.split("|")[1].strip()
+                    existing_models.add(model_name)
+    else:
+        with open(OUTPUT_MD, "w", encoding="utf-8") as f:
+            f.write("# Model Benchmark Results\n\n")
+            f.write("| Configuration | Precision | Recall | F1 Score | Exact Match Acc | Pipeline Time (s) |\n")
+            f.write("|--------------|-----------|--------|----------|-----------------|-------------------|\n")
 
     current_embedding_model = None
 
     for cfg in MODELS_TO_TEST:
+        if cfg['name'] in existing_models:
+            print(f"Skipping {cfg['name']}, already benchmarked.")
+            continue
+            
         print(f"\n{'='*50}\nTesting configuration: {cfg['name']}\n{'='*50}")
         
         # 1. Update config

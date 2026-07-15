@@ -48,11 +48,18 @@ def seed_companies():
         model = SentenceTransformer(model_name)
         
         with conn.cursor() as cur:
+            # Eski verileri temizle (cascade ile embedding ve variant da silinir)
+            logger.info("Clearing existing company data from all tables...")
+            cur.execute("DELETE FROM gold_company_embedding;")
+            cur.execute("DELETE FROM silver_company_variant;")
+            cur.execute("DELETE FROM bronze_blacklist_company_raw;")
+            conn.commit()
+            logger.info("Old company data cleared.")
+
+        with conn.cursor() as cur:
             for idx, row in df.iterrows():
-                # In your real data, use the correct column names for company
-                # Assuming columns: company_id, company_name
-                comp_id_raw = row.get("company_id", idx + 1)
-                comp_name = str(row.get("company_name", row.iloc[0]))
+                # CSV kolonları: id, company_name
+                comp_name = str(row.get("company_name", row.iloc[1]))
                 norm_name = comp_name.lower().strip()
                 
                 # 1. Insert into bronze

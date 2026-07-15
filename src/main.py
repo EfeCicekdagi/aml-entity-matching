@@ -76,8 +76,7 @@ def main():
     processor.process_db_table_in_chunks(
         run_id=run_id, 
         batch_id=batch_id, 
-        table_name="bronze_eft_raw",
-        chunk_size=10000
+        table_name="bronze_eft_raw"
     )
     
     logger.info(f"Pipeline completed for RUN_ID: {run_id}. Check aml_run_log and aml_alert tables for results.")
