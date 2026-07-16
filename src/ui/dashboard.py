@@ -11,6 +11,8 @@ import plotly.express as px
 import plotly.graph_objects as go
 from src.utils.config_loader import ConfigLoader
 from src.repository.aml_repository import AMLRepository
+from src.utils.text_utils import normalize_text
+from src.etl.batch_processor import _acronym_score, _rule_score, _exact_name_score
 
 # ── Sayfa ayarlari ───────────────────────────────────────────────────────────
 st.set_page_config(
@@ -41,30 +43,70 @@ def get_repo():
 def load_runs():
     repo = get_repo()
     conn = repo.get_connection()
-    df = pd.read_sql("""
-        SELECT run_id, started_at, finished_at,
-               ROUND(EXTRACT(EPOCH FROM (finished_at-started_at))/60,1) AS sure_dk,
-               input_row_count, candidate_count, alert_count, status
-        FROM aml_run_log ORDER BY started_at DESC LIMIT 20
-    """, conn)
-    repo.release_connection(conn)
+    if conn is None:
+        return pd.DataFrame()
+    try:
+        df = pd.read_sql("""
+            SELECT run_id, started_at, finished_at,
+                   ROUND(EXTRACT(EPOCH FROM (finished_at-started_at))/60,1) AS sure_dk,
+                   input_row_count, candidate_count, alert_count, status
+            FROM aml_run_log ORDER BY started_at DESC LIMIT 20
+        """, conn)
+    finally:
+        repo.release_connection(conn)
     return df
 
 @st.cache_data(ttl=30)
 def load_alerts(run_id):
     repo = get_repo()
     conn = repo.get_connection()
-    df = pd.read_sql("""
-        SELECT a.alert_id, a.eft_id, v.original_company_name,
-               ROUND(a.final_score::numeric, 3) AS final_score,
-               a.risk_level, a.alert_status, a.extracted_entity, a.created_at
-        FROM aml_alert a
-        JOIN silver_company_variant v ON a.variant_id=v.variant_id
-        WHERE a.run_id = %(run_id)s
-        ORDER BY a.final_score DESC
-    """, conn, params={"run_id": run_id})
-    repo.release_connection(conn)
+    if conn is None:
+        return pd.DataFrame()
+    try:
+        df = pd.read_sql("""
+            SELECT a.alert_id, a.eft_id, v.original_company_name,
+                   ROUND(a.final_score::numeric, 3) AS final_score,
+                   a.risk_level, a.alert_status, a.extracted_entity, a.created_at
+            FROM aml_alert a
+            JOIN silver_company_variant v ON a.variant_id=v.variant_id
+            WHERE a.run_id = %(run_id)s
+            ORDER BY a.final_score DESC
+        """, conn, params={"run_id": run_id})
+    finally:
+        repo.release_connection(conn)
     return df
+
+@st.cache_resource
+def load_live_components():
+    import torch
+    from sentence_transformers import SentenceTransformer
+    from src.utils.ner_extractor import NERExtractor
+    from src.retrieval.postgres_candidate_retriever import PostgresCandidateRetriever
+    from src.reranker.reranker import Reranker
+    from src.scoring.final_scorer import FinalScorer
+    
+    config_loader = ConfigLoader()
+    config = config_loader.config
+    
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    
+    emb_model_name = config.get("embedding", {}).get("model_name", "BAAI/bge-m3")
+    emb_model = SentenceTransformer(emb_model_name, device=device)
+    
+    ner_model = config.get("ner", {}).get("model_name", "savasy/bert-base-turkish-ner-cased")
+    dev_id = 0 if device == "cuda" else -1
+    ner_extractor = NERExtractor(model_name=ner_model, device=dev_id)
+    
+    repo = get_repo()
+    retriever = PostgresCandidateRetriever(repo, config.get("retrieval", {}))
+    reranker = Reranker(repo, config.get("reranker", {}))
+    scorer = FinalScorer(
+        repo, 
+        config_version=config.get("scoring", {}).get("scoring_config_version", "scoring_v2_reranker"),
+        threshold_version=config.get("scoring", {}).get("threshold_config_version", "threshold_v2_reranker")
+    )
+    
+    return emb_model, ner_extractor, retriever, reranker, scorer
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
@@ -128,7 +170,7 @@ with col5:
 st.divider()
 
 # ── Grafikler ─────────────────────────────────────────────────────────────────
-tab1, tab2, tab3 = st.tabs(["📊 Dağılım Analizi", "📋 Alert Listesi", "🏢 Şirket Analizi"])
+tab1, tab2, tab3, tab4 = st.tabs(["📊 Dağılım Analizi", "📋 Alert Listesi", "🏢 Şirket Analizi", "⚡ Canlı Test"])
 
 with tab1:
     col_l, col_r = st.columns(2)
@@ -215,3 +257,89 @@ with tab3:
         'high_cnt':'HIGH',
         'medium_cnt':'MEDIUM'
     }), use_container_width=True)
+
+with tab4:
+    st.markdown("### ⚡ Canlı AML Testi")
+    st.write("EFT açıklamasını veya şirket adını girin. Sistem anlık olarak analiz edip eşleşmeleri bulacaktır.")
+    
+    user_input = st.text_area("Test Metni (EFT Açıklaması / İsim)", height=100)
+    
+    if st.button("🚀 Test Et", type="primary"):
+        if not user_input.strip():
+            st.warning("Lütfen test etmek için bir metin girin.")
+        else:
+            with st.spinner("Modeller yükleniyor ve metin analiz ediliyor..."):
+                emb_model, ner_extractor, retriever, reranker, scorer = load_live_components()
+                
+                # 1. Normalization & NER
+                norm_exp = normalize_text(user_input).lower()
+                entity = ner_extractor.extract_entity(user_input)
+                
+                st.markdown(f"**Çıkarılan Varlık (NER):** `{entity if entity else 'Bulunamadı'}`")
+                
+                # 2. Embedding
+                embedding = emb_model.encode([norm_exp], show_progress_bar=False)[0]
+                
+                # 3. Retrieval
+                row_data = [{
+                    "row_id": "live_test",
+                    "normalized_explanation": norm_exp,
+                    "embedding": embedding.tolist(),
+                    "extracted_entity": entity
+                }]
+                candidates_dict = retriever.batch_get_candidates(row_data)
+                candidates = candidates_dict.get("live_test", [])
+                
+                if not candidates:
+                    st.success("✅ Veritabanındaki yasaklı/şüpheli listesinde eşleşme bulunamadı. (Sıfır risk)")
+                else:
+                    # 4. Reranking
+                    strong = reranker.score_candidates(norm_exp, candidates)
+                    
+                    # 5. Scoring
+                    results = []
+                    for cand in strong:
+                        fuzzy_score  = cand["candidate_score"] if cand["source"] in ["pg_trgm", "combined"] else 0.0
+                        vector_score = cand["candidate_score"] if cand["source"] in ["pgvector", "combined"] else 0.0
+                        scores_dict = {
+                            "fuzzy_score":    fuzzy_score,
+                            "vector_score":   vector_score,
+                            "acronym_score":  _acronym_score(norm_exp, cand["variant_name"]),
+                            "rule_score":     max(
+                                _rule_score(norm_exp, cand["variant_name"]),
+                                _exact_name_score(norm_exp, cand["variant_name"])
+                            ),
+                            "reranker_score": cand.get("reranker_score", 0.0),
+                        }
+                        final_score = scorer.calculate_final_score(scores_dict)
+                        risk_level  = scorer.assign_risk_level(final_score)
+                        
+                        results.append({
+                            "Şirket": cand["company_name"],
+                            "Varyant": cand["variant_name"],
+                            "Risk": risk_level,
+                            "Final Skor": final_score,
+                            "Reranker Skor": scores_dict["reranker_score"],
+                            "Vektör Skor": scores_dict["vector_score"],
+                            "Fuzzy Skor": scores_dict["fuzzy_score"]
+                        })
+                    
+                    if not results:
+                        st.success("✅ Eşleşme bulundu ancak skorlar risk oluşturacak düzeyde değil.")
+                    else:
+                        res_df = pd.DataFrame(results).sort_values("Final Skor", ascending=False)
+                        
+                        # Risk badge fonksiyonu
+                        def format_risk(risk):
+                            if risk == "HIGH": return "🔴 HIGH"
+                            if risk == "MEDIUM": return "🟠 MEDIUM"
+                            return f"⚪ {risk}"
+                            
+                        res_df["Risk"] = res_df["Risk"].apply(format_risk)
+                        
+                        st.markdown("#### Bulunan Eşleşmeler")
+                        st.dataframe(res_df, use_container_width=True, column_config={
+                            "Final Skor": st.column_config.ProgressColumn(
+                                "Final Skor", min_value=0, max_value=1, format="%.3f"
+                            )
+                        })

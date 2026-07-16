@@ -77,8 +77,11 @@ class FinalScorer:
         fuzzy_score, vector_score, acronym_score, rule_score, reranker_score
         """
         final_score = (
-            scores.get("vector_score", 0.0) * self.weights["vector_weight"] +
-            scores.get("reranker_score", 0.0) * self.weights["reranker_weight"]
+            scores.get("fuzzy_score", 0.0) * self.weights.get("fuzzy_weight", 0.0) +
+            scores.get("vector_score", 0.0) * self.weights.get("vector_weight", 0.0) +
+            scores.get("acronym_score", 0.0) * self.weights.get("acronym_weight", 0.0) +
+            scores.get("rule_score", 0.0) * self.weights.get("rule_weight", 0.0) +
+            scores.get("reranker_score", 0.0) * self.weights.get("reranker_weight", 0.0)
         )
         return min(max(final_score, 0.0), 1.0)
 
