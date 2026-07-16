@@ -12,6 +12,7 @@ import plotly.graph_objects as go
 from src.utils.config_loader import ConfigLoader
 from src.repository.aml_repository import AMLRepository
 from src.utils.text_utils import normalize_text
+from src.config.db_tables import TABLES
 from src.etl.batch_processor import _acronym_score, _rule_score, _exact_name_score
 
 # ── Sayfa ayarlari ───────────────────────────────────────────────────────────
@@ -46,11 +47,11 @@ def load_runs():
     if conn is None:
         return pd.DataFrame()
     try:
-        df = pd.read_sql("""
+        df = pd.read_sql(f"""
             SELECT run_id, started_at, finished_at,
                    ROUND(EXTRACT(EPOCH FROM (finished_at-started_at))/60,1) AS sure_dk,
-                   input_row_count, candidate_count, alert_count, status
-            FROM aml_run_log ORDER BY started_at DESC LIMIT 20
+                   processed_row_count AS input_row_count, 0 AS candidate_count, alert_count, status
+            FROM {TABLES['run_log']} ORDER BY started_at DESC LIMIT 20
         """, conn)
     finally:
         repo.release_connection(conn)
@@ -63,12 +64,15 @@ def load_alerts(run_id):
     if conn is None:
         return pd.DataFrame()
     try:
-        df = pd.read_sql("""
+        df = pd.read_sql(f"""
             SELECT a.alert_id, a.eft_id, v.original_company_name,
                    ROUND(a.final_score::numeric, 3) AS final_score,
+                   ROUND(a.fuzzy_score::numeric, 3) AS fuzzy_score,
+                   ROUND(a.vector_score::numeric, 3) AS vector_score,
+                   ROUND(a.reranker_score::numeric, 3) AS reranker_score,
                    a.risk_level, a.alert_status, a.extracted_entity, a.created_at
-            FROM aml_alert a
-            JOIN silver_company_variant v ON a.variant_id=v.variant_id
+            FROM {TABLES['alert']} a
+            JOIN {TABLES['company_variant']} v ON a.variant_id=v.variant_id
             WHERE a.run_id = %(run_id)s
             ORDER BY a.final_score DESC
         """, conn, params={"run_id": run_id})
@@ -218,9 +222,9 @@ with tab2:
         colors = {"HIGH":"🔴","MEDIUM":"🟠","LOW":"⚪"}
         return f"{colors.get(risk,'')} {risk}"
 
-    display_df = filtered[['eft_id','original_company_name','extracted_entity','final_score','risk_level','alert_status','created_at']].copy()
+    display_df = filtered[['eft_id','original_company_name','extracted_entity','final_score','reranker_score','vector_score','fuzzy_score','risk_level','alert_status','created_at']].copy()
     display_df['risk_level'] = display_df['risk_level'].apply(badge)
-    display_df.columns = ['EFT ID','Şirket','Çıkarılan İsim (NER)','Final Score','Risk','Durum','Tarih']
+    display_df.columns = ['EFT ID','Şirket','Çıkarılan İsim (NER)','Final Score','Reranker','Vector','Fuzzy','Risk','Durum','Tarih']
 
     st.dataframe(display_df, use_container_width=True, height=500,
                  column_config={

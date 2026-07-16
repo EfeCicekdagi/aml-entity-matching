@@ -3,6 +3,7 @@ import hashlib
 import threading
 import torch
 from sentence_transformers import CrossEncoder
+from src.config.db_tables import TABLES
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +60,7 @@ class Reranker:
         try:
             with conn.cursor() as cur:
                 cur.execute(
-                    "SELECT cache_key, reranker_score FROM aml_reranker_cache WHERE cache_key = ANY(%s)",
+                    f"SELECT cache_key, reranker_score FROM {TABLES['reranker_cache']} WHERE cache_key = ANY(%s)",
                     (cache_keys,)
                 )
                 return {row[0]: float(row[1]) for row in cur.fetchall()}
@@ -81,8 +82,8 @@ class Reranker:
         try:
             with conn.cursor() as cur:
                 from psycopg2.extras import execute_values
-                execute_values(cur, """
-                    INSERT INTO aml_reranker_cache
+                execute_values(cur, f"""
+                    INSERT INTO {TABLES['reranker_cache']}
                         (cache_key, normalized_explanation, variant_id, reranker_score, reranker_model_version)
                     VALUES %s
                     ON CONFLICT (cache_key) DO NOTHING

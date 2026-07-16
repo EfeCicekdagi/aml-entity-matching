@@ -1,4 +1,5 @@
 import logging
+from src.config.db_tables import TABLES
 
 logger = logging.getLogger(__name__)
 
@@ -25,9 +26,9 @@ class FinalScorer:
             
         try:
             with conn.cursor() as cur:
-                cur.execute("""
+                cur.execute(f"""
                     SELECT fuzzy_weight, vector_weight, acronym_weight, rule_weight, reranker_weight
-                    FROM aml_scoring_weight_config
+                    FROM {TABLES['scoring_weight']}
                     WHERE config_version = %s AND is_active = true
                     ORDER BY created_at DESC LIMIT 1
                 """, (self.config_version,))
@@ -54,9 +55,9 @@ class FinalScorer:
             
         try:
             with conn.cursor() as cur:
-                cur.execute("""
+                cur.execute(f"""
                     SELECT risk_level, min_score, max_score
-                    FROM aml_threshold_config
+                    FROM {TABLES['threshold']}
                     WHERE config_version = %s AND is_active = true
                 """, (self.threshold_version,))
                 for row in cur.fetchall():

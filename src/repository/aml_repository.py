@@ -2,6 +2,7 @@ import psycopg2
 import logging
 from psycopg2.extras import execute_values
 from psycopg2.pool import ThreadedConnectionPool
+from src.config.db_tables import TABLES
 
 logger = logging.getLogger(__name__)
 
@@ -46,16 +47,16 @@ class AMLRepository:
         finally:
             self.release_connection(conn)
 
-    def start_run_log(self, run_id, batch_id, pipeline_name="AML_Pipeline", embedding_model=None, reranker_model=None):
+    def start_run_log(self, run_id, pipeline_name="AML_Pipeline", embedding_model=None, reranker_model=None):
         conn = self.get_connection()
         if not conn:
             return
         try:
             with conn.cursor() as cur:
-                cur.execute("""
-                    INSERT INTO aml_run_log (run_id, pipeline_name, batch_id, started_at, status, embedding_model, reranker_model)
-                    VALUES (%s, %s, %s, now(), 'STARTED', %s, %s)
-                """, (run_id, pipeline_name, batch_id, embedding_model, reranker_model))
+                cur.execute(f"""
+                    INSERT INTO {TABLES['run_log']} (run_id, pipeline_name, started_at, status, embedding_model, reranker_model)
+                    VALUES (%s, %s, now(), 'STARTED', %s, %s)
+                """, (run_id, pipeline_name, embedding_model, reranker_model))
             conn.commit()
         except Exception as e:
             logger.error(f"Error starting run log: {e}")
@@ -69,24 +70,16 @@ class AMLRepository:
             return
         try:
             with conn.cursor() as cur:
-                cur.execute("""
-                    UPDATE aml_run_log 
+                cur.execute(f"""
+                    UPDATE {TABLES['run_log']} 
                     SET finished_at = now(),
-                        input_row_count = %s,
                         processed_row_count = %s,
-                        candidate_count = %s,
                         alert_count = %s,
-                        prescreen_skipped_count = %s,
-                        duration_seconds = %s,
                         status = 'SUCCESS'
                     WHERE run_id = %s
                 """, (
-                    metrics.get("input_row_count", 0),
                     metrics.get("processed_row_count", 0),
-                    metrics.get("candidate_count", 0),
                     metrics.get("alert_count", 0),
-                    metrics.get("prescreen_skipped_count", 0),
-                    duration_seconds,
                     run_id
                 ))
             conn.commit()
@@ -102,8 +95,8 @@ class AMLRepository:
             return
         try:
             with conn.cursor() as cur:
-                cur.execute("""
-                    UPDATE aml_run_log 
+                cur.execute(f"""
+                    UPDATE {TABLES['run_log']} 
                     SET precision_score = %s,
                         recall_score = %s,
                         f1_score = %s,
@@ -123,8 +116,8 @@ class AMLRepository:
             return
         try:
             with conn.cursor() as cur:
-                cur.execute("""
-                    UPDATE aml_run_log 
+                cur.execute(f"""
+                    UPDATE {TABLES['run_log']} 
                     SET finished_at = now(),
                         status = 'FAILED',
                         error_message = %s
@@ -158,14 +151,15 @@ class AMLRepository:
             return
         try:
             with conn.cursor() as cur:
-                execute_values(cur, """
-                    INSERT INTO aml_alert
-                        (run_id, eft_id, company_id, variant_id, final_score, risk_level, alert_status, extracted_entity)
+                execute_values(cur, f"""
+                    INSERT INTO {TABLES['alert']}
+                        (run_id, eft_id, company_id, variant_id, final_score, fuzzy_score, vector_score, reranker_score, risk_level, alert_status, extracted_entity)
                     VALUES %s
                     ON CONFLICT DO NOTHING
                 """, [
                     (a["run_id"], a["eft_id"], a["company_id"],
-                     a["variant_id"], a["final_score"], a["risk_level"], "OPEN", a.get("extracted_entity"))
+                     a["variant_id"], a["final_score"], a.get("fuzzy_score", 0), a.get("vector_score", 0), a.get("reranker_score", 0),
+                     a["risk_level"], "OPEN", a.get("extracted_entity"))
                     for a in alerts
                 ])
             conn.commit()

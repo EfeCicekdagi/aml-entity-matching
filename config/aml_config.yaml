@@ -5,9 +5,9 @@ database:
   user: postgres
   password: password
 embedding:
-  model_name: sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
+  model_name: sentence-transformers/all-MiniLM-L6-v2
   dimension: 384
-  batch_size: 64
+  batch_size: 32
   device: auto
 retrieval:
   pg_trgm_top_k: 5
@@ -24,8 +24,8 @@ ner:
   device: auto
 reranker:
   enabled: true
-  model_name: BAAI/bge-reranker-v2-m3
-  model_version: v1
+  model_name: cross-encoder/mmarco-mMiniLMv2-L12-H384-v1
+  model_version: mmarco-v1
   batch_size: 32
   use_cache: true
   device: auto

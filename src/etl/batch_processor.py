@@ -12,6 +12,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from src.utils.alias_utils import generate_acronym
 from src.utils.text_utils import normalize_text, remove_company_suffixes
 from src.utils.ner_extractor import NERExtractor
+from src.config.db_tables import TABLES
 
 logger = logging.getLogger(__name__)
 
@@ -153,16 +154,20 @@ class BatchProcessor:
                 # MAX score bazlı pre-screen:
                 # Her EFT için şirket listesindeki en yüksek trigram skoru bulunur.
                 # Sadece MAX skor >= min_trgm_score olan EFT'ler geçer.
-                prescreen_query = """
+                prescreen_query = f"""
                     SELECT input.row_id
                     FROM (
                         SELECT
                             UNNEST(%s::text[]) AS norm_exp,
                             UNNEST(%s::text[]) AS row_id
                     ) AS input
-                    JOIN silver_company_variant v ON v.is_active = true
-                    GROUP BY input.row_id, input.norm_exp
-                    HAVING MAX(similarity(input.norm_exp, v.normalized_variant_name)) >= %s
+                    JOIN LATERAL (
+                        SELECT similarity(input.norm_exp, v.normalized_variant_name) AS sim
+                        FROM {TABLES['company_variant']} v
+                        WHERE v.is_active = true
+                        ORDER BY input.norm_exp <-> v.normalized_variant_name
+                        LIMIT 1
+                    ) AS nearest ON nearest.sim >= %s
                 """
                 cur.execute(prescreen_query, (
                     norm_explanations,
@@ -179,8 +184,11 @@ class BatchProcessor:
 
         return suspicious_ids
 
-    def process_db_table_in_chunks(self, run_id: str, batch_id: str, table_name: str = "bronze_eft_raw", chunk_size: int = 2000):
+    def process_db_table_in_chunks(self, run_id: str, batch_id: str, table_name: str = None, chunk_size: int = 2000):
         """Reads EFT records from PostgreSQL in chunks and processes each chunk."""
+        if table_name is None:
+            table_name = TABLES["eft_input"]
+            
         self._load_embedding_model()
 
         import time
@@ -198,7 +206,7 @@ class BatchProcessor:
         reranker_model_name = self.config.get("reranker", {}).get("model_name", "UNKNOWN")
 
         self.repo.start_run_log(
-            run_id, batch_id, 
+            run_id, 
             pipeline_name="AML_Production_Pipeline",
             embedding_model=embedding_model_name,
             reranker_model=reranker_model_name
@@ -358,6 +366,9 @@ class BatchProcessor:
                                         "company_id":  cand["company_id"],
                                         "variant_id":  cand["variant_id"],
                                         "final_score": final_score,
+                                        "fuzzy_score": scores_dict["fuzzy_score"],
+                                        "vector_score": scores_dict["vector_score"],
+                                        "reranker_score": scores_dict["reranker_score"],
                                         "risk_level":  risk_level,
                                         "extracted_entity": extracted
                                     })

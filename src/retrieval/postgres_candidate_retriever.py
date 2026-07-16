@@ -1,4 +1,5 @@
 import logging
+from src.config.db_tables import TABLES
 
 logger = logging.getLogger(__name__)
 
@@ -23,14 +24,14 @@ class PostgresCandidateRetriever:
         candidates = []
         try:
             with conn.cursor() as cur:
-                query = """
+                query = f"""
                     SELECT 
                         v.company_id,
                         v.variant_id,
                         similarity(%s, v.normalized_variant_name) AS candidate_score,
                         v.original_company_name,
                         v.normalized_variant_name
-                    FROM silver_company_variant v
+                    FROM {TABLES['company_variant']} v
                     WHERE v.is_active = true
                       AND similarity(%s, v.normalized_variant_name) >= %s
                     ORDER BY candidate_score DESC
@@ -61,7 +62,7 @@ class PostgresCandidateRetriever:
         candidates = []
         try:
             with conn.cursor() as cur:
-                query = """
+                query = f"""
                     SELECT 
                         v.company_id,
                         v.variant_id,
@@ -71,7 +72,7 @@ class PostgresCandidateRetriever:
                         ) AS candidate_score,
                         v.original_company_name,
                         v.normalized_variant_name
-                    FROM silver_company_variant v
+                    FROM {TABLES['company_variant']} v
                     WHERE v.is_active = true
                       AND to_tsvector('simple', v.normalized_variant_name) @@ plainto_tsquery('simple', %s)
                     ORDER BY candidate_score DESC
@@ -105,15 +106,15 @@ class PostgresCandidateRetriever:
         candidates = []
         try:
             with conn.cursor() as cur:
-                query = """
+                query = f"""
                     SELECT
                         e.company_id,
                         e.variant_id,
                         1 - (e.embedding <=> %s::vector) AS candidate_score,
                         v.original_company_name,
                         v.normalized_variant_name
-                    FROM gold_company_embedding e
-                    JOIN silver_company_variant v ON e.variant_id = v.variant_id
+                    FROM {TABLES['company_embedding']} e
+                    JOIN {TABLES['company_variant']} v ON e.variant_id = v.variant_id
                     WHERE v.is_active = true
                     ORDER BY e.embedding <=> %s::vector
                     LIMIT %s;
@@ -190,7 +191,7 @@ class PostgresCandidateRetriever:
             with conn.cursor() as cur:
                 # ── QUERY 1: Batch Trigram + Full-Text ──────────────────────────
                 # UNNEST lets us send all 10,000 texts in a single round-trip.
-                trgm_query = """
+                trgm_query = f"""
                     SELECT
                         input.row_id,
                         v.company_id,
@@ -202,7 +203,7 @@ class PostgresCandidateRetriever:
                     FROM
                         (SELECT UNNEST(%s::text[]) AS norm_exp,
                                 UNNEST(%s::text[]) AS row_id) AS input
-                    JOIN silver_company_variant v ON v.is_active = true
+                    JOIN {TABLES['company_variant']} v ON v.is_active = true
                     WHERE similarity(input.norm_exp, v.normalized_variant_name) >= %s
                     ORDER BY candidate_score DESC;
                 """
@@ -236,7 +237,7 @@ class PostgresCandidateRetriever:
                     for r in rows
                 ]
 
-                vec_batch_query = """
+                vec_batch_query = f"""
                     SELECT
                         input.row_id,
                         nearest.company_id,
@@ -256,8 +257,8 @@ class PostgresCandidateRetriever:
                             1 - (e.embedding <=> input.emb) AS candidate_score,
                             v.original_company_name        AS company_name,
                             v.normalized_variant_name      AS variant_name
-                        FROM gold_company_embedding e
-                        JOIN silver_company_variant v
+                        FROM {TABLES['company_embedding']} e
+                        JOIN {TABLES['company_variant']} v
                           ON e.variant_id = v.variant_id
                         WHERE v.is_active = true
                           AND 1 - (e.embedding <=> input.emb) >= %s
