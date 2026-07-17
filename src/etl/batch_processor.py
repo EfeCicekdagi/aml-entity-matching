@@ -152,7 +152,7 @@ class BatchProcessor:
         try:
             with conn.cursor() as cur:
                 # MAX score bazlı pre-screen:
-                # Her EFT için şirket listesindeki en yüksek trigram skoru bulunur.
+                # Her EFT için şirket listesindeki en yüksek kelime benzerliği (word_similarity) bulunur.
                 # Sadece MAX skor >= min_trgm_score olan EFT'ler geçer.
                 prescreen_query = f"""
                     SELECT input.row_id
@@ -162,10 +162,10 @@ class BatchProcessor:
                             UNNEST(%s::text[]) AS row_id
                     ) AS input
                     JOIN LATERAL (
-                        SELECT similarity(input.norm_exp, v.normalized_variant_name) AS sim
+                        SELECT word_similarity(v.normalized_variant_name, input.norm_exp) AS sim
                         FROM {TABLES['company_variant']} v
                         WHERE v.is_active = true
-                        ORDER BY input.norm_exp <-> v.normalized_variant_name
+                        ORDER BY v.normalized_variant_name <<-> input.norm_exp
                         LIMIT 1
                     ) AS nearest ON nearest.sim >= %s
                 """
@@ -374,9 +374,20 @@ class BatchProcessor:
                                     ),
                                     "reranker_score": cand.get("reranker_score", 0.0),
                                 }
+
+                                if extracted:
+                                    import difflib
+                                    fuzzy_ext = difflib.SequenceMatcher(None, extracted.lower(), cand["variant_name"].lower()).ratio()
+                                    scores_dict["fuzzy_score"] = max(scores_dict["fuzzy_score"], fuzzy_ext)
+                                    
+                                    acronym_ext = _acronym_score(extracted, cand["variant_name"])
+                                    scores_dict["acronym_score"] = max(scores_dict["acronym_score"], acronym_ext)
+                                    
+                                    rule_ext = max(_rule_score(extracted, cand["variant_name"]), _exact_name_score(extracted, cand["variant_name"]))
+                                    scores_dict["rule_score"] = max(scores_dict["rule_score"], rule_ext)
                                 final_score = self.scorer.calculate_final_score(scores_dict)
                                 risk_level  = self.scorer.assign_risk_level(final_score)
-                                if risk_level in ["HIGH", "MEDIUM"]:
+                                if risk_level in ["HIGH", "MEDIUM", "LOW"]:
                                     row_result["alert_count"] += 1
                                     row_result["alerts"].append({
                                         "run_id":      run_id_closure,

@@ -246,6 +246,18 @@ if page == "🏠 Ana Sayfa":
                             ),
                             "reranker_score": cand.get("reranker_score", 0.0),
                         }
+                        
+                        if entity:
+                            import difflib
+                            fuzzy_ext = difflib.SequenceMatcher(None, entity.lower(), cand["variant_name"].lower()).ratio()
+                            scores_dict["fuzzy_score"] = max(scores_dict["fuzzy_score"], fuzzy_ext)
+                            
+                            acronym_ext = _acronym_score(entity, cand["variant_name"])
+                            scores_dict["acronym_score"] = max(scores_dict["acronym_score"], acronym_ext)
+                            
+                            rule_ext = max(_rule_score(entity, cand["variant_name"]), _exact_name_score(entity, cand["variant_name"]))
+                            scores_dict["rule_score"] = max(scores_dict["rule_score"], rule_ext)
+                            
                         final_score = scorer.calculate_final_score(scores_dict)
                         risk_level  = scorer.assign_risk_level(final_score)
                         
