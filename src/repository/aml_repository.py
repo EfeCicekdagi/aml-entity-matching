@@ -155,13 +155,13 @@ class AMLRepository:
             with conn.cursor() as cur:
                 execute_values(cur, f"""
                     INSERT INTO {TABLES['alert']}
-                        (run_id, eft_id, company_id, variant_id, final_score, fuzzy_score, vector_score, reranker_score, risk_level, alert_status, extracted_entity)
+                        (run_id, eft_id, company_id, variant_id, final_score, fuzzy_score, vector_score, reranker_score, risk_level, alert_status, extracted_entity, match_reason)
                     VALUES %s
                     ON CONFLICT DO NOTHING
                 """, [
                     (a["run_id"], a["eft_id"], a["company_id"],
                      a["variant_id"], a["final_score"], a.get("fuzzy_score", 0), a.get("vector_score", 0), a.get("reranker_score", 0),
-                     a["risk_level"], "OPEN", a.get("extracted_entity"))
+                     a["risk_level"], "OPEN", a.get("extracted_entity"), a.get("match_reason"))
                     for a in alerts
                 ])
             conn.commit()

@@ -11,7 +11,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from src.utils.config_loader import ConfigLoader
 from src.repository.aml_repository import AMLRepository
-from src.utils.text_utils import normalize_text
+from src.utils.text_utils import normalize_text, get_normalized_core_name
 from src.config.db_tables import TABLES
 from src.etl.batch_processor import _acronym_score, _rule_score, _exact_name_score
 
@@ -80,7 +80,7 @@ def load_alerts(run_id):
                    ROUND(a.fuzzy_score::numeric, 3) AS fuzzy_score,
                    ROUND(a.vector_score::numeric, 3) AS vector_score,
                    ROUND(a.reranker_score::numeric, 3) AS reranker_score,
-                   a.risk_level, a.alert_status, a.extracted_entity, a.created_at
+                   a.risk_level, a.alert_status, a.extracted_entity, a.match_reason, a.created_at
             FROM {TABLES['alert']} a
             JOIN {TABLES['company_variant']} v ON a.variant_id=v.variant_id
             LEFT JOIN {TABLES['eft_input']} e1 ON a.eft_id = e1.eft_id
@@ -236,6 +236,19 @@ if page == "🏠 Ana Sayfa":
                     for cand in strong:
                         fuzzy_score  = cand["candidate_score"] if "pg_trgm" in cand.get("sources", []) else 0.0
                         vector_score = cand["candidate_score"] if "pgvector" in cand.get("sources", []) else 0.0
+                        norm_cand = normalize_text(cand["variant_name"])
+                        core_query = get_normalized_core_name(norm_exp)
+                        core_cand = get_normalized_core_name(cand["variant_name"])
+                        
+                        query_token_count = len(norm_exp.split())
+                        
+                        exact_normalized_match = (norm_exp == norm_cand and bool(norm_exp))
+                        exact_core_match = (core_query == core_cand and bool(core_query))
+                        legal_suffix_only_difference = exact_core_match and not exact_normalized_match
+                        
+                        query_is_contained = (norm_exp in norm_cand and bool(norm_exp))
+                        cand_is_contained = (norm_cand in norm_exp and bool(norm_cand))
+
                         scores_dict = {
                             "fuzzy_score":    fuzzy_score,
                             "vector_score":   vector_score,
@@ -245,6 +258,12 @@ if page == "🏠 Ana Sayfa":
                                 _exact_name_score(norm_exp, cand["variant_name"])
                             ),
                             "reranker_score": cand.get("reranker_score", 0.0),
+                            "query_token_count": query_token_count,
+                            "exact_normalized_match": exact_normalized_match,
+                            "exact_core_match": exact_core_match,
+                            "legal_suffix_only_difference": legal_suffix_only_difference,
+                            "query_is_contained_in_candidate": query_is_contained,
+                            "candidate_is_contained_in_query": cand_is_contained
                         }
                         
                         if entity:
@@ -258,13 +277,14 @@ if page == "🏠 Ana Sayfa":
                             rule_ext = max(_rule_score(entity, cand["variant_name"]), _exact_name_score(entity, cand["variant_name"]))
                             scores_dict["rule_score"] = max(scores_dict["rule_score"], rule_ext)
                             
-                        final_score = scorer.calculate_final_score(scores_dict)
+                        final_score, match_reason = scorer.calculate_final_score(scores_dict)
                         risk_level  = scorer.assign_risk_level(final_score)
                         
                         results.append({
                             "Şirket": cand["company_name"],
                             "Varyant": cand["variant_name"],
                             "Risk": risk_level,
+                            "Sebep": match_reason,
                             "Final Skor": final_score,
                             "Reranker Skor": scores_dict["reranker_score"],
                             "Vektör Skor": scores_dict["vector_score"],

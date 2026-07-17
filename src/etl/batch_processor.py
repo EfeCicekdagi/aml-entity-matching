@@ -10,7 +10,7 @@ from sentence_transformers import SentenceTransformer
 # alias_utils & text_utils: fix import path when running from project root
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from src.utils.alias_utils import generate_acronym
-from src.utils.text_utils import normalize_text, remove_company_suffixes
+from src.utils.text_utils import normalize_text, remove_company_suffixes, get_normalized_core_name
 from src.utils.ner_extractor import NERExtractor
 from src.config.db_tables import TABLES
 
@@ -362,17 +362,34 @@ class BatchProcessor:
                                 
                                 logger.debug(f"Candidate: {cand['company_name']} - Sources: {cand.get('sources', [])}, TRGM: {fuzzy_score:.4f}, Vector: {vector_score:.4f}, RawReranker: {raw_reranker:.4f}, NormReranker: {norm_reranker:.4f}")
 
+                                norm_cand = normalize_text(cand["variant_name"])
+                                core_query = get_normalized_core_name(norm_exp)
+                                core_cand = get_normalized_core_name(cand["variant_name"])
+                                
+                                query_token_count = len(norm_exp.split())
+                                
+                                exact_normalized_match = (norm_exp == norm_cand and bool(norm_exp))
+                                exact_core_match = (core_query == core_cand and bool(core_query))
+                                legal_suffix_only_difference = exact_core_match and not exact_normalized_match
+                                
+                                query_is_contained = (norm_exp in norm_cand and bool(norm_exp))
+                                cand_is_contained = (norm_cand in norm_exp and bool(norm_cand))
+
                                 scores_dict = {
                                     "fuzzy_score":    fuzzy_score,
                                     "vector_score":   vector_score,
                                     "acronym_score":  _acronym_score(norm_exp, cand["variant_name"]),
-                                    # rule_score: filtered token overlap (no generic words)
-                                    # exact_name_score folded into rule_score as max
                                     "rule_score":     max(
                                         _rule_score(norm_exp, cand["variant_name"]),
                                         _exact_name_score(norm_exp, cand["variant_name"])
                                     ),
                                     "reranker_score": cand.get("reranker_score", 0.0),
+                                    "query_token_count": query_token_count,
+                                    "exact_normalized_match": exact_normalized_match,
+                                    "exact_core_match": exact_core_match,
+                                    "legal_suffix_only_difference": legal_suffix_only_difference,
+                                    "query_is_contained_in_candidate": query_is_contained,
+                                    "candidate_is_contained_in_query": cand_is_contained
                                 }
 
                                 if extracted:
@@ -385,9 +402,10 @@ class BatchProcessor:
                                     
                                     rule_ext = max(_rule_score(extracted, cand["variant_name"]), _exact_name_score(extracted, cand["variant_name"]))
                                     scores_dict["rule_score"] = max(scores_dict["rule_score"], rule_ext)
-                                final_score = self.scorer.calculate_final_score(scores_dict)
+                                    
+                                final_score, match_reason = self.scorer.calculate_final_score(scores_dict)
                                 risk_level  = self.scorer.assign_risk_level(final_score)
-                                if risk_level in ["HIGH", "MEDIUM", "LOW"]:
+                                if risk_level in ["HIGH", "MEDIUM", "LOW", "MATCH", "REVIEW"]:
                                     row_result["alert_count"] += 1
                                     row_result["alerts"].append({
                                         "run_id":      run_id_closure,
@@ -399,7 +417,8 @@ class BatchProcessor:
                                         "vector_score": scores_dict["vector_score"],
                                         "reranker_score": scores_dict["reranker_score"],
                                         "risk_level":  risk_level,
-                                        "extracted_entity": extracted
+                                        "extracted_entity": extracted,
+                                        "match_reason": match_reason
                                     })
 
                             return row_result
