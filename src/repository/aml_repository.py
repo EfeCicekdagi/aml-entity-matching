@@ -74,11 +74,13 @@ class AMLRepository:
                     UPDATE {TABLES['run_log']} 
                     SET finished_at = now(),
                         processed_row_count = %s,
+                        candidate_count = %s,
                         alert_count = %s,
                         status = 'SUCCESS'
                     WHERE run_id = %s
                 """, (
                     metrics.get("processed_row_count", 0),
+                    metrics.get("candidate_count", 0),
                     metrics.get("alert_count", 0),
                     run_id
                 ))

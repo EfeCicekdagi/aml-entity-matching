@@ -19,7 +19,14 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+import argparse
+
 def main():
+    parser = argparse.ArgumentParser(description="Run AML Entity Matching Pipeline")
+    parser.add_argument("--input-table", type=str, default="bronze_eft_raw",
+                        help="The input table to process (e.g., bronze_eft_raw or aml_source.test_eft_input)")
+    args = parser.parse_args()
+
     logger.info("Starting AML Entity Matching Pipeline...")
     
     # 1. Load Configuration
@@ -70,13 +77,13 @@ def main():
     batch_id = f"BATCH-{uuid.uuid4().hex[:8].upper()}"
     
     logger.info(f"Generated RUN_ID: {run_id}")
+    logger.info(f"Using Input Table: {args.input_table}")
     
     # 5. Process Table
-    # Reads from bronze_eft_raw in chunks and inserts alerts
     processor.process_db_table_in_chunks(
         run_id=run_id, 
         batch_id=batch_id, 
-        table_name="bronze_eft_raw"
+        table_name=args.input_table
     )
     
     logger.info(f"Pipeline completed for RUN_ID: {run_id}. Check aml_run_log and aml_alert tables for results.")

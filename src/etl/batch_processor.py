@@ -315,7 +315,20 @@ class BatchProcessor:
 
                         # ── STEP 4: ONE batch query → replaces 30,000 individual queries
                         all_candidates = self.retriever.batch_get_candidates(rows_for_batch)
-                        metrics["candidate_count"] += sum(len(v) for v in all_candidates.values())
+                        
+                        trgm_count, vector_count, combined_count, total_count = 0, 0, 0, sum(len(v) for v in all_candidates.values())
+                        for cands in all_candidates.values():
+                            for c in cands:
+                                srcs = c.get("sources", [])
+                                if "pg_trgm" in srcs and "pgvector" in srcs:
+                                    combined_count += 1
+                                elif "pg_trgm" in srcs:
+                                    trgm_count += 1
+                                elif "pgvector" in srcs:
+                                    vector_count += 1
+                                    
+                        logger.info(f"Retrieved Candidates - Total Merged: {total_count}, TRGM-only: {trgm_count}, Vector-only: {vector_count}, Both: {combined_count}")
+                        metrics["candidate_count"] += total_count
 
                         # ── STEP 5: Rerank only the strong survivors (parallel) ───────
                         run_id_closure = run_id  # closure-safe reference
@@ -342,8 +355,13 @@ class BatchProcessor:
                             extracted = entity_lookup.get(row_id, None)
 
                             for cand in strong:
-                                fuzzy_score  = cand["candidate_score"] if cand["source"] in ["pg_trgm", "combined"] else 0.0
-                                vector_score = cand["candidate_score"] if cand["source"] in ["pgvector", "combined"] else 0.0
+                                fuzzy_score  = cand.get("trgm_score", 0.0)
+                                vector_score = cand.get("vector_score", 0.0)
+                                raw_reranker = cand.get("raw_reranker_score", 0.0)
+                                norm_reranker = cand.get("normalized_reranker_score", 0.0)
+                                
+                                logger.debug(f"Candidate: {cand['company_name']} - Sources: {cand.get('sources', [])}, TRGM: {fuzzy_score:.4f}, Vector: {vector_score:.4f}, RawReranker: {raw_reranker:.4f}, NormReranker: {norm_reranker:.4f}")
+
                                 scores_dict = {
                                     "fuzzy_score":    fuzzy_score,
                                     "vector_score":   vector_score,

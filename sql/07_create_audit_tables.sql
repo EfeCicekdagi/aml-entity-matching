@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS aml_audit.run_log (
     finished_at TIMESTAMP,
     status TEXT,
     processed_row_count INT,
+    candidate_count INT DEFAULT 0,
     alert_count INT,
     embedding_model TEXT,
     reranker_model TEXT,

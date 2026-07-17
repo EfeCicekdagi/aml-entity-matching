@@ -42,10 +42,10 @@ class PostgresCandidateRetriever:
                     candidates.append({
                         "company_id": row[0],
                         "variant_id": row[1],
-                        "candidate_score": float(row[2]),
+                        "trgm_score": float(row[2]),
                         "company_name": row[3],
                         "variant_name": row[4],
-                        "source": "pg_trgm"
+                        "sources": ["pg_trgm"]
                     })
         except Exception as e:
             logger.error(f"Error in trgm retrieval: {e}")
@@ -83,10 +83,10 @@ class PostgresCandidateRetriever:
                     candidates.append({
                         "company_id": row[0],
                         "variant_id": row[1],
-                        "candidate_score": float(row[2]),
+                        "full_text_score": float(row[2]),
                         "company_name": row[3],
                         "variant_name": row[4],
-                        "source": "full_text"
+                        "sources": ["full_text"]
                     })
         except Exception as e:
             logger.error(f"Error in full-text retrieval: {e}")
@@ -126,10 +126,10 @@ class PostgresCandidateRetriever:
                         candidates.append({
                             "company_id": row[0],
                             "variant_id": row[1],
-                            "candidate_score": score,
+                            "vector_score": score,
                             "company_name": row[3],
                             "variant_name": row[4],
-                            "source": "pgvector"
+                            "sources": ["pgvector"]
                         })
         except Exception as e:
             logger.error(f"Error in vector retrieval: {e}")
@@ -155,12 +155,19 @@ class PostgresCandidateRetriever:
             if key not in merged:
                 merged[key] = cand
             else:
-                # Update source to combined if found in multiple sources
-                merged[key]["source"] = "combined"
-                # Keep the max score
-                if cand["candidate_score"] > merged[key]["candidate_score"]:
-                    merged[key]["candidate_score"] = cand["candidate_score"]
+                for src in cand.get("sources", []):
+                    if src not in merged[key]["sources"]:
+                        merged[key]["sources"].append(src)
+                if "trgm_score" in cand:
+                    merged[key]["trgm_score"] = max(merged[key].get("trgm_score", 0.0), cand["trgm_score"])
+                if "vector_score" in cand:
+                    merged[key]["vector_score"] = max(merged[key].get("vector_score", 0.0), cand["vector_score"])
+                if "full_text_score" in cand:
+                    merged[key]["full_text_score"] = max(merged[key].get("full_text_score", 0.0), cand["full_text_score"])
                     
+        for m in merged.values():
+            m["candidate_score"] = max(m.get("trgm_score", 0.0), m.get("vector_score", 0.0), m.get("full_text_score", 0.0))
+            
         # Sort by score descending
         sorted_candidates = sorted(merged.values(), key=lambda x: x["candidate_score"], reverse=True)
         
@@ -217,10 +224,10 @@ class PostgresCandidateRetriever:
                         results[row_id].append({
                             "company_id":    row[1],
                             "variant_id":    row[2],
-                            "candidate_score": float(row[3]),
+                            "trgm_score":    float(row[3]),
                             "company_name":  row[4],
                             "variant_name":  row[5],
-                            "source":        row[6],
+                            "sources":       [row[6]],
                         })
 
                 # ── QUERY 2: Batch Vector Search (LATERAL JOIN) ─────────────────
@@ -276,10 +283,10 @@ class PostgresCandidateRetriever:
                         results[rid].append({
                             "company_id":      vrow[1],
                             "variant_id":      vrow[2],
-                            "candidate_score": float(vrow[3]),
+                            "vector_score":    float(vrow[3]),
                             "company_name":    vrow[4],
                             "variant_name":    vrow[5],
-                            "source":          "pgvector",
+                            "sources":         ["pgvector"],
                         })
 
         except Exception as e:
@@ -296,9 +303,19 @@ class PostgresCandidateRetriever:
                 if key not in merged:
                     merged[key] = cand
                 else:
-                    merged[key]["source"] = "combined"
-                    if cand["candidate_score"] > merged[key]["candidate_score"]:
-                        merged[key]["candidate_score"] = cand["candidate_score"]
+                    for src in cand.get("sources", []):
+                        if src not in merged[key]["sources"]:
+                            merged[key]["sources"].append(src)
+                    if "trgm_score" in cand:
+                        merged[key]["trgm_score"] = max(merged[key].get("trgm_score", 0.0), cand["trgm_score"])
+                    if "vector_score" in cand:
+                        merged[key]["vector_score"] = max(merged[key].get("vector_score", 0.0), cand["vector_score"])
+                    if "full_text_score" in cand:
+                        merged[key]["full_text_score"] = max(merged[key].get("full_text_score", 0.0), cand["full_text_score"])
+                        
+            for m in merged.values():
+                m["candidate_score"] = max(m.get("trgm_score", 0.0), m.get("vector_score", 0.0), m.get("full_text_score", 0.0))
+                
             sorted_cands = sorted(merged.values(), key=lambda x: x["candidate_score"], reverse=True)
             merged_results[rid] = sorted_cands[:self.merged_top_k]
 

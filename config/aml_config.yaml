@@ -5,27 +5,27 @@ database:
   user: postgres
   password: password
 embedding:
-  model_name: sentence-transformers/all-MiniLM-L6-v2
-  dimension: 384
+  model_name: BAAI/bge-m3
+  dimension: 1024
   batch_size: 32
   device: auto
 retrieval:
-  pg_trgm_top_k: 5
-  full_text_top_k: 5
-  pgvector_top_k: 5
-  merged_top_k: 5
-  reranker_top_k: 3
-  min_trgm_score: 0.25
-  min_vector_score: 0.45
-  reranker_prefilter_score: 0.4
+  pg_trgm_top_k: 20
+  full_text_top_k: 15
+  pgvector_top_k: 20
+  merged_top_k: 25
+  reranker_top_k: 10
+  min_trgm_score: 0.20
+  min_vector_score: 0.40
+  reranker_prefilter_score: 0.30
 ner:
   enabled: true
   model_name: savasy/bert-base-turkish-ner-cased
   device: auto
 reranker:
   enabled: true
-  model_name: cross-encoder/mmarco-mMiniLMv2-L12-H384-v1
-  model_version: mmarco-v1
+  model_name: BAAI/bge-reranker-v2-m3
+  model_version: bge-reranker-v2-m3
   batch_size: 32
   use_cache: true
   device: auto

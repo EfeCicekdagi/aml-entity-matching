@@ -59,6 +59,7 @@ class FinalScorer:
                     SELECT risk_level, min_score, max_score
                     FROM {TABLES['threshold']}
                     WHERE config_version = %s AND is_active = true
+                    ORDER BY min_score ASC
                 """, (self.threshold_version,))
                 for row in cur.fetchall():
                     thresholds.append({
@@ -77,17 +78,32 @@ class FinalScorer:
         scores dict must contain:
         fuzzy_score, vector_score, acronym_score, rule_score, reranker_score
         """
-        final_score = (
-            scores.get("fuzzy_score", 0.0) * self.weights.get("fuzzy_weight", 0.0) +
-            scores.get("vector_score", 0.0) * self.weights.get("vector_weight", 0.0) +
-            scores.get("acronym_score", 0.0) * self.weights.get("acronym_weight", 0.0) +
-            scores.get("rule_score", 0.0) * self.weights.get("rule_weight", 0.0) +
-            scores.get("reranker_score", 0.0) * self.weights.get("reranker_weight", 0.0)
-        )
-        return min(max(final_score, 0.0), 1.0)
+        total_weight = sum(self.weights.values())
+        if abs(total_weight - 1.0) > 0.001:
+            logger.warning(f"Scoring weights do not sum to 1.0! Total weight: {total_weight}. Normalizing...")
+            weight_factor = 1.0 / total_weight if total_weight > 0 else 1.0
+        else:
+            weight_factor = 1.0
+
+        fuzzy_contrib = scores.get("fuzzy_score", 0.0) * self.weights.get("fuzzy_weight", 0.0) * weight_factor
+        vector_contrib = scores.get("vector_score", 0.0) * self.weights.get("vector_weight", 0.0) * weight_factor
+        acronym_contrib = scores.get("acronym_score", 0.0) * self.weights.get("acronym_weight", 0.0) * weight_factor
+        rule_contrib = scores.get("rule_score", 0.0) * self.weights.get("rule_weight", 0.0) * weight_factor
+        reranker_contrib = scores.get("reranker_score", 0.0) * self.weights.get("reranker_weight", 0.0) * weight_factor
+
+        logger.debug(f"Score contributions - Fuzzy: {fuzzy_contrib:.4f}, Vector: {vector_contrib:.4f}, "
+                     f"Acronym: {acronym_contrib:.4f}, Rule: {rule_contrib:.4f}, Reranker: {reranker_contrib:.4f}")
+
+        final_score = fuzzy_contrib + vector_contrib + acronym_contrib + rule_contrib + reranker_contrib
+        return float(min(max(final_score, 0.0), 1.0))
 
     def assign_risk_level(self, final_score: float):
-        for t in self.thresholds:
-            if t["min_score"] <= final_score <= t["max_score"]:
-                return t["risk_level"]
+        for i, t in enumerate(self.thresholds):
+            is_last = (i == len(self.thresholds) - 1)
+            if is_last:
+                if t["min_score"] <= final_score <= t["max_score"]:
+                    return t["risk_level"]
+            else:
+                if t["min_score"] <= final_score < t["max_score"]:
+                    return t["risk_level"]
         return "NO_MATCH"

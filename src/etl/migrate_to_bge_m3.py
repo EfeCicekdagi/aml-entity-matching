@@ -12,6 +12,7 @@ import psycopg2
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 from src.utils.config_loader import ConfigLoader
 from src.repository.aml_repository import AMLRepository
+from src.config.db_tables import TABLES
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -31,19 +32,8 @@ def run():
         logger.error("DB baglantisi basarisiz.")
         sys.exit(1)
 
-    # ── STEP 1: Schema migration ──────────────────────────────────────────────
-    logger.info("STEP 1: Schema migration (VECTOR(384) -> VECTOR(1024))...")
-    migration_sql = open("sql/05_migrate_embedding_dim.sql", encoding="utf-8").read()
-    try:
-        with conn.cursor() as cur:
-            cur.execute(migration_sql)
-        conn.commit()
-        logger.info("Migration tamamlandi.")
-    except Exception as e:
-        logger.error(f"Migration hatasi: {e}")
-        conn.rollback()
-        repo.release_connection(conn)
-        sys.exit(1)
+    # ── STEP 1: Schema migration (Skipped) ──────────────────────────────────────────────
+    logger.info("STEP 1: Schema migration skipped (already vector 1024).")
 
     # ── STEP 2: Load bge-m3 model ─────────────────────────────────────────────
     model_name = emb_cfg.get("model_name", "BAAI/bge-m3")
@@ -57,9 +47,9 @@ def run():
     # ── STEP 3: Fetch all active variants ────────────────────────────────────
     logger.info("STEP 3: Aktif variant'lar cekiliyor...")
     with conn.cursor() as cur:
-        cur.execute("""
+        cur.execute(f"""
             SELECT variant_id, company_id, normalized_variant_name
-            FROM silver_company_variant
+            FROM {TABLES['company_variant']}
             WHERE is_active = true
             ORDER BY variant_id
         """)
@@ -89,8 +79,8 @@ def run():
         rows.append((vid, cid, vec_str, model_name))
 
     with conn.cursor() as cur:
-        execute_values(cur, """
-            INSERT INTO gold_company_embedding
+        execute_values(cur, f"""
+            INSERT INTO {TABLES['company_embedding']}
                 (variant_id, company_id, embedding, embedding_model_name)
             VALUES %s
         """, rows, template="(%s, %s, %s::vector, %s)")

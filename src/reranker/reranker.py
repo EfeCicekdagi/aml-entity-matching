@@ -60,10 +60,10 @@ class Reranker:
         try:
             with conn.cursor() as cur:
                 cur.execute(
-                    f"SELECT cache_key, reranker_score FROM {TABLES['reranker_cache']} WHERE cache_key = ANY(%s)",
+                    f"SELECT cache_key, raw_reranker_score, normalized_reranker_score FROM {TABLES['reranker_cache']} WHERE cache_key = ANY(%s)",
                     (cache_keys,)
                 )
-                return {row[0]: float(row[1]) for row in cur.fetchall()}
+                return {row[0]: {"raw": float(row[1]) if row[1] is not None else 0.0, "norm": float(row[2]) if row[2] is not None else 0.0} for row in cur.fetchall()}
         except Exception as e:
             logger.error(f"Error batch-reading reranker cache: {e}")
             return {}
@@ -84,12 +84,12 @@ class Reranker:
                 from psycopg2.extras import execute_values
                 execute_values(cur, f"""
                     INSERT INTO {TABLES['reranker_cache']}
-                        (cache_key, normalized_explanation, variant_id, reranker_score, reranker_model_version)
+                        (cache_key, normalized_explanation, variant_id, raw_reranker_score, normalized_reranker_score, reranker_model_version)
                     VALUES %s
                     ON CONFLICT (cache_key) DO NOTHING
                 """, [
                     (e["cache_key"], e["norm_exp"], e["variant_id"],
-                     e["score"], self.model_version)
+                     e["raw_score"], e["norm_score"], self.model_version)
                     for e in entries
                 ])
             conn.commit()
@@ -107,12 +107,16 @@ class Reranker:
         """
         if not self.enabled or not candidates:
             for cand in candidates:
+                cand['raw_reranker_score'] = 0.0
+                cand['normalized_reranker_score'] = 0.0
                 cand['reranker_score'] = 0.0
             return candidates
 
         self._load_model()
         if not self.model:
             for cand in candidates:
+                cand['raw_reranker_score'] = 0.0
+                cand['normalized_reranker_score'] = 0.0
                 cand['reranker_score'] = 0.0
             return candidates
 
@@ -128,7 +132,9 @@ class Reranker:
 
         for idx, (cand, cache_key) in enumerate(zip(candidates, cache_keys)):
             if cache_key in cached_map:
-                cand['reranker_score'] = cached_map[cache_key]
+                cand['raw_reranker_score'] = cached_map[cache_key]["raw"]
+                cand['normalized_reranker_score'] = cached_map[cache_key]["norm"]
+                cand['reranker_score'] = cached_map[cache_key]["norm"]
             else:
                 pairs_to_score.append((normalized_explanation, cand["variant_name"]))
                 indices_to_score.append((idx, cache_key, cand["variant_id"]))
@@ -139,19 +145,24 @@ class Reranker:
                 with self._predict_lock:
                     scores = self.model.predict(pairs_to_score, show_progress_bar=False)
 
-                import math
-                def sigmoid(x):
-                    return 1 / (1 + math.exp(-x))
-
                 new_cache_entries = []
                 for score, (idx, cache_key, variant_id) in zip(scores, indices_to_score):
-                    normalized_score = float(sigmoid(score))
+                    raw_score = float(score)
+                    # BGE-M3 Reranker via CrossEncoder predict() already returns probabilities (0-1).
+                    # Applying sigmoid again compresses the scores (e.g., 0.999 -> 0.73, 0 -> 0.5).
+                    normalized_score = raw_score
+                    logger.debug(f"Reranker computed - raw_score: {raw_score:.5f}, normalized_score: {normalized_score:.5f}")
+                    
+                    candidates[idx]['raw_reranker_score'] = raw_score
+                    candidates[idx]['normalized_reranker_score'] = normalized_score
                     candidates[idx]['reranker_score'] = normalized_score
+                    
                     new_cache_entries.append({
                         "cache_key":  cache_key,
                         "norm_exp":   normalized_explanation,
                         "variant_id": variant_id,
-                        "score":      normalized_score,
+                        "raw_score":  raw_score,
+                        "norm_score": normalized_score,
                     })
 
                 # ── Bulk-write cache entries (single SQL round-trip) ────────────
@@ -160,6 +171,8 @@ class Reranker:
             except Exception as e:
                 logger.error(f"Error scoring candidates with reranker: {e}")
                 for idx, _, _ in indices_to_score:
+                    candidates[idx]['raw_reranker_score'] = 0.0
+                    candidates[idx]['normalized_reranker_score'] = 0.0
                     candidates[idx]['reranker_score'] = 0.0
 
         return candidates

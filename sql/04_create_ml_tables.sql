@@ -23,6 +23,8 @@ CREATE TABLE IF NOT EXISTS aml_ml.reranker_cache (
     cache_key TEXT PRIMARY KEY,
     normalized_explanation TEXT,
     variant_id BIGINT REFERENCES aml_stage.company_variant(variant_id) ON DELETE CASCADE,
+    raw_reranker_score NUMERIC(8,5),
+    normalized_reranker_score NUMERIC(8,5),
     reranker_score NUMERIC(8,5),
     reranker_model_version TEXT,
     created_at TIMESTAMP DEFAULT now()
