@@ -21,7 +21,7 @@ def migrate():
         password=db_config.get("password")
     )
     
-    script_path = os.path.join(os.path.dirname(__file__), '..', 'sql', '11_add_match_reason_to_alerts.sql')
+    script_path = os.path.join(os.path.dirname(__file__), '..', 'sql', '12_update_alert_structure.sql')
     repo.execute_script(script_path)
     logger.info("Migration completed.")
 

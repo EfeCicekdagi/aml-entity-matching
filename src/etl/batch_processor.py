@@ -209,7 +209,10 @@ class BatchProcessor:
             run_id, 
             pipeline_name="AML_Production_Pipeline",
             embedding_model=embedding_model_name,
-            reranker_model=reranker_model_name
+            reranker_model=reranker_model_name,
+            scoring_config_version=self.config.get("scoring", {}).get("scoring_config_version", "scoring_v2_reranker"),
+            threshold_version=self.config.get("scoring", {}).get("threshold_config_version", "threshold_v2_reranker"),
+            pipeline_version="aml_pipeline_v1"
         )
 
         import concurrent.futures
@@ -375,6 +378,13 @@ class BatchProcessor:
                                 query_is_contained = (norm_exp in norm_cand and bool(norm_exp))
                                 cand_is_contained = (norm_cand in norm_exp and bool(norm_cand))
 
+                                alert_extracted = extracted
+                                alert_entity_status = "EXTRACTED" if extracted else "NOT_EXTRACTED"
+                                
+                                if not alert_extracted and cand_is_contained:
+                                    alert_extracted = cand["variant_name"]
+                                    alert_entity_status = "FALLBACK_MATCHED_VARIANT"
+
                                 scores_dict = {
                                     "fuzzy_score":    fuzzy_score,
                                     "vector_score":   vector_score,
@@ -392,15 +402,15 @@ class BatchProcessor:
                                     "candidate_is_contained_in_query": cand_is_contained
                                 }
 
-                                if extracted:
+                                if alert_extracted:
                                     import difflib
-                                    fuzzy_ext = difflib.SequenceMatcher(None, extracted.lower(), cand["variant_name"].lower()).ratio()
+                                    fuzzy_ext = difflib.SequenceMatcher(None, alert_extracted.lower(), cand["variant_name"].lower()).ratio()
                                     scores_dict["fuzzy_score"] = max(scores_dict["fuzzy_score"], fuzzy_ext)
                                     
-                                    acronym_ext = _acronym_score(extracted, cand["variant_name"])
+                                    acronym_ext = _acronym_score(alert_extracted, cand["variant_name"])
                                     scores_dict["acronym_score"] = max(scores_dict["acronym_score"], acronym_ext)
                                     
-                                    rule_ext = max(_rule_score(extracted, cand["variant_name"]), _exact_name_score(extracted, cand["variant_name"]))
+                                    rule_ext = max(_rule_score(alert_extracted, cand["variant_name"]), _exact_name_score(alert_extracted, cand["variant_name"]))
                                     scores_dict["rule_score"] = max(scores_dict["rule_score"], rule_ext)
                                     
                                 final_score, match_reason = self.scorer.calculate_final_score(scores_dict)
@@ -417,8 +427,12 @@ class BatchProcessor:
                                         "vector_score": scores_dict["vector_score"],
                                         "reranker_score": scores_dict["reranker_score"],
                                         "risk_level":  risk_level,
-                                        "extracted_entity": extracted,
-                                        "match_reason": match_reason
+                                        "extracted_entity": alert_extracted,
+                                        "match_reason": match_reason,
+                                        "entity_extraction_status": alert_entity_status,
+                                        "matched_variant_name": cand["variant_name"],
+                                        "variant_type": cand.get("variant_type", "UNKNOWN"),
+                                        "watchlist_company_name": cand.get("company_name", "UNKNOWN")
                                     })
 
                             return row_result

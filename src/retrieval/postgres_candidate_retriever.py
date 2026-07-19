@@ -30,7 +30,8 @@ class PostgresCandidateRetriever:
                         v.variant_id,
                         similarity(%s, v.normalized_variant_name) AS candidate_score,
                         v.original_company_name,
-                        v.normalized_variant_name
+                        v.normalized_variant_name,
+                        v.variant_type
                     FROM {TABLES['company_variant']} v
                     WHERE v.is_active = true
                       AND similarity(%s, v.normalized_variant_name) >= %s
@@ -45,6 +46,7 @@ class PostgresCandidateRetriever:
                         "trgm_score": float(row[2]),
                         "company_name": row[3],
                         "variant_name": row[4],
+                        "variant_type": row[5],
                         "sources": ["pg_trgm"]
                     })
         except Exception as e:
@@ -71,7 +73,8 @@ class PostgresCandidateRetriever:
                             plainto_tsquery('simple', %s)
                         ) AS candidate_score,
                         v.original_company_name,
-                        v.normalized_variant_name
+                        v.normalized_variant_name,
+                        v.variant_type
                     FROM {TABLES['company_variant']} v
                     WHERE v.is_active = true
                       AND to_tsvector('simple', v.normalized_variant_name) @@ plainto_tsquery('simple', %s)
@@ -86,6 +89,7 @@ class PostgresCandidateRetriever:
                         "full_text_score": float(row[2]),
                         "company_name": row[3],
                         "variant_name": row[4],
+                        "variant_type": row[5],
                         "sources": ["full_text"]
                     })
         except Exception as e:
@@ -112,7 +116,8 @@ class PostgresCandidateRetriever:
                         e.variant_id,
                         1 - (e.embedding <=> %s::vector) AS candidate_score,
                         v.original_company_name,
-                        v.normalized_variant_name
+                        v.normalized_variant_name,
+                        v.variant_type
                     FROM {TABLES['company_embedding']} e
                     JOIN {TABLES['company_variant']} v ON e.variant_id = v.variant_id
                     WHERE v.is_active = true
@@ -129,6 +134,7 @@ class PostgresCandidateRetriever:
                             "vector_score": score,
                             "company_name": row[3],
                             "variant_name": row[4],
+                            "variant_type": row[5],
                             "sources": ["pgvector"]
                         })
         except Exception as e:
@@ -206,6 +212,7 @@ class PostgresCandidateRetriever:
                         similarity(input.norm_exp, v.normalized_variant_name) AS candidate_score,
                         v.original_company_name,
                         v.normalized_variant_name,
+                        v.variant_type,
                         'pg_trgm' AS source
                     FROM
                         (SELECT UNNEST(%s::text[]) AS norm_exp,
@@ -227,7 +234,8 @@ class PostgresCandidateRetriever:
                             "trgm_score":    float(row[3]),
                             "company_name":  row[4],
                             "variant_name":  row[5],
-                            "sources":       [row[6]],
+                            "variant_type":  row[6],
+                            "sources":       [row[7]],
                         })
 
                 # ── QUERY 2: Batch Vector Search (LATERAL JOIN) ─────────────────
@@ -251,7 +259,8 @@ class PostgresCandidateRetriever:
                         nearest.variant_id,
                         nearest.candidate_score,
                         nearest.company_name,
-                        nearest.variant_name
+                        nearest.variant_name,
+                        nearest.variant_type
                     FROM
                         (SELECT
                              UNNEST(%s::text[])           AS row_id,
@@ -263,7 +272,8 @@ class PostgresCandidateRetriever:
                             e.variant_id,
                             1 - (e.embedding <=> input.emb) AS candidate_score,
                             v.original_company_name        AS company_name,
-                            v.normalized_variant_name      AS variant_name
+                            v.normalized_variant_name      AS variant_name,
+                            v.variant_type                 AS variant_type
                         FROM {TABLES['company_embedding']} e
                         JOIN {TABLES['company_variant']} v
                           ON e.variant_id = v.variant_id
@@ -286,6 +296,7 @@ class PostgresCandidateRetriever:
                             "vector_score":    float(vrow[3]),
                             "company_name":    vrow[4],
                             "variant_name":    vrow[5],
+                            "variant_type":    vrow[6],
                             "sources":         ["pgvector"],
                         })
 

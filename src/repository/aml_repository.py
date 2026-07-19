@@ -47,16 +47,19 @@ class AMLRepository:
         finally:
             self.release_connection(conn)
 
-    def start_run_log(self, run_id, pipeline_name="AML_Pipeline", embedding_model=None, reranker_model=None):
+    def start_run_log(self, run_id, pipeline_name="AML_Pipeline", embedding_model=None, reranker_model=None,
+                      scoring_config_version=None, threshold_version=None, pipeline_version=None):
         conn = self.get_connection()
         if not conn:
             return
         try:
             with conn.cursor() as cur:
                 cur.execute(f"""
-                    INSERT INTO {TABLES['run_log']} (run_id, pipeline_name, started_at, status, embedding_model, reranker_model)
-                    VALUES (%s, %s, now(), 'STARTED', %s, %s)
-                """, (run_id, pipeline_name, embedding_model, reranker_model))
+                    INSERT INTO {TABLES['run_log']} (run_id, pipeline_name, started_at, status, embedding_model, reranker_model,
+                                                     scoring_config_version, threshold_version, pipeline_version, embedding_model_version, reranker_model_version)
+                    VALUES (%s, %s, now(), 'STARTED', %s, %s, %s, %s, %s, %s, %s)
+                """, (run_id, pipeline_name, embedding_model, reranker_model,
+                      scoring_config_version, threshold_version, pipeline_version, embedding_model, reranker_model))
             conn.commit()
         except Exception as e:
             logger.error(f"Error starting run log: {e}")
@@ -155,19 +158,46 @@ class AMLRepository:
             with conn.cursor() as cur:
                 execute_values(cur, f"""
                     INSERT INTO {TABLES['alert']}
-                        (run_id, eft_id, company_id, variant_id, final_score, fuzzy_score, vector_score, reranker_score, risk_level, alert_status, extracted_entity, match_reason)
+                        (run_id, eft_id, company_id, variant_id, final_score, fuzzy_score, vector_score, reranker_score, risk_level, alert_status, extracted_entity, match_reason,
+                         entity_extraction_status, matched_variant_name, variant_type, watchlist_company_name)
                     VALUES %s
                     ON CONFLICT DO NOTHING
                 """, [
                     (a["run_id"], a["eft_id"], a["company_id"],
                      a["variant_id"], a["final_score"], a.get("fuzzy_score", 0), a.get("vector_score", 0), a.get("reranker_score", 0),
-                     a["risk_level"], "OPEN", a.get("extracted_entity"), a.get("match_reason"))
+                     a["risk_level"], "OPEN", a.get("extracted_entity"), a.get("match_reason"),
+                     a.get("entity_extraction_status"), a.get("matched_variant_name"), a.get("variant_type"), a.get("watchlist_company_name"))
                     for a in alerts
                 ])
             conn.commit()
             logger.debug(f"Bulk inserted {len(alerts)} alerts.")
         except Exception as e:
             logger.error(f"Error bulk inserting alerts: {e}")
+            conn.rollback()
+        finally:
+            self.release_connection(conn)
+
+    def update_alert_status(self, alert_id, status, reviewed_by=None, review_result=None, analyst_note=None, false_positive_reason=None):
+        conn = self.get_connection()
+        if not conn:
+            return
+        try:
+            with conn.cursor() as cur:
+                cur.execute(f"""
+                    UPDATE {TABLES['alert']}
+                    SET alert_status = %s,
+                        reviewed_by = %s,
+                        reviewed_at = now(),
+                        status_updated_at = now(),
+                        review_result = %s,
+                        analyst_note = %s,
+                        false_positive_reason = %s
+                    WHERE alert_id = %s
+                """, (status, reviewed_by, review_result, analyst_note, false_positive_reason, alert_id))
+            conn.commit()
+            logger.info(f"Updated status for alert_id {alert_id} to {status}")
+        except Exception as e:
+            logger.error(f"Error updating alert status: {e}")
             conn.rollback()
         finally:
             self.release_connection(conn)
