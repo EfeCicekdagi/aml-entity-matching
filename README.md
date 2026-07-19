@@ -11,7 +11,7 @@ Geleneksel anahtar kelime eşleştirme sistemlerinden farklı olarak, bulanık m
 Sistem, verinin veritabanına girmesinden analist ekranında görüntülenmesine kadar aşağıdaki katmanlardan oluşur:
 
 ### 1. Veri Hazırlığı ve Ön İşleme (Pre-processing)
-- **Metin Temizleme:** Gelen EFT açıklamalarındaki gereksiz noktalama işaretleri, özel karakterler, rakamlar ve bankacılık terimleri (Örn: "TRANSFER", "IBAN") normalize edilir.
+- **Metin Temizleme ve Standardizasyon:** Gelen EFT açıklamalarındaki noktalama işaretleri boşluğa çevrilir, her şey küçük harfe dönüştürülür. Ayrıca şirket yapı ekleri (örn: `ltd.`, `corp.`, `inc`) sistemin her yerinde ortak bir standarda oturtulması için açık hallerine (`limited`, `corporation`, `incorporated`) çevrilir. (`src/utils/text_utils.py` içinde tanımlanmıştır).
 - **Varyant Üretimi:** Kara listeye (Blacklist) alınan şirketlerin isimlerinden otomatik olarak varyantlar üretilir (Örn: `APPLE INC` -> `APPLE INCORPORATED`, `APLE INC`, `APPLE`). Bu varyantlar veritabanına kaydedilir ve vektörleri (`pgvector` ile) oluşturulur.
 
 ### 2. Aday Çıkarma (Candidate Retrieval - Faz 1)
@@ -32,12 +32,18 @@ EFT açıklamasının tamamını şirketin adıyla karşılaştırmak yerine, me
 - **Cross-Encoder Model:** `BAAI/bge-reranker-v2-m3` kullanılarak metinler arası en hassas benzerlik puanı (`reranker_score`) üretilir. Bu model tipografik hataları ve bağlamı insan düzeyinde anlayabilir.
 
 ### 5. Final Skorlama (Ensemble Scoring)
-Sadece yapay zeka modelinin sonucuna güvenmek yerine, kuruma özel yapılandırılabilir bir skorlama konfigürasyonu (`scoring_config.yaml`) ile nihai bir "Risk Skoru" hesaplanır:
-- Reranker Skoru (Ağırlık: %45)
-- Vektör Skoru (Ağırlık: %20)
-- Trigram Skoru (Ağırlık: %20)
-- Fuzzy Skor (Levenshtein) (Ağırlık: %15)
-- Tam Eşleşme, Kısaltma gibi özel durumlarda skora kural tabanlı bonuslar / cezalar eklenir.
+Sadece tek bir modelin sonucuna güvenmek yerine, kuruma özel yapılandırılabilir bir skorlama mekanizması ile nihai bir "Risk Skoru" hesaplanır.
+
+Standart durumlarda ağırlıklar (varsayılan):
+- **Reranker Skoru:** %70 (Bağlamsal anlama)
+- **Vektör Skoru:** %30 (Anlamsal yakınlık)
+
+**Dinamik Ağırlıklandırma (Kısa Sorgular İçin):** Eğer şüpheli metin 2 kelime veya daha kısaysa, anlamsal modellerden ziyade harfsel/kural tabanlı eşleşmeye güvenilir. Bu durumda ağırlıklar otomatik olarak; Reranker (%40), Fuzzy/Levenshtein (%30), Kural Skoru (%20) ve Vektör (%10) şeklinde güncellenir.
+
+**Kural Tabanlı Yaptırımlar (Overrides):**
+- *Tam Eşleşme (Exact Match):* Skor doğrudan **1.0** yapılır.
+- *Kök Eşleşmesi (Exact Core Match):* Skor en az **0.95** yapılır.
+- *Sadece Şirket Türü Farkı (Legal Suffix):* Skor en az **0.92** yapılır.
 
 ### 6. Karar ve Eşik Değerler (Thresholding)
 Hesaplanan `final_score`'a göre alarmın (alert) risk seviyesi belirlenir (`thresholds.yaml`):
