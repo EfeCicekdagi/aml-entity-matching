@@ -232,9 +232,9 @@ if page == "🏠 Ana Sayfa":
                     "embedding": embedding.tolist(),
                     "extracted_entity": entity
                 }]
-                candidates_dict = retriever.batch_get_candidates(row_data)
-                candidates = candidates_dict.get("live_test", [])
-                
+                candidates_res = retriever.batch_get_candidates(row_data).get("live_test")
+                candidates = candidates_res.get("candidates", []) if candidates_res else []
+
                 if not candidates:
                     st.success("✅ Veritabanındaki yasaklı/şüpheli listesinde eşleşme bulunamadı. (Sıfır risk)")
                 else:
@@ -294,7 +294,7 @@ if page == "🏠 Ana Sayfa":
                             rule_ext = max(_rule_score(entity, cand["variant_name"]), _exact_name_score(entity, cand["variant_name"]))
                             scores_dict["rule_score"] = max(scores_dict["rule_score"], rule_ext)
                             
-                        final_score, match_reason = scorer.calculate_final_score(scores_dict)
+                        final_score, match_reason, reason_codes = scorer.calculate_final_score(scores_dict)
                         risk_level  = scorer.assign_risk_level(final_score)
                         
                         results.append({
@@ -302,8 +302,10 @@ if page == "🏠 Ana Sayfa":
                             "Varyant": cand["variant_name"],
                             "Risk": risk_level,
                             "Sebep": match_reason,
+                            "Gerekçeler": ", ".join(reason_codes),
                             "Final Skor": final_score,
-                            "Reranker Skor": scores_dict["reranker_score"],
+                            "Reranker Skor": scores_dict["reranker_score"]
+,
                             "Vektör Skor": scores_dict["vector_score"],
                             "Fuzzy Skor": scores_dict["fuzzy_score"]
                         })

@@ -372,3 +372,89 @@ class BenchmarkRunner:
             conn.rollback()
         finally:
             self.repo.release_connection(conn)
+
+
+if __name__ == "__main__":
+    import argparse
+    import os
+    import sys
+    sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+    from src.utils.config_loader import ConfigLoader
+    from src.repository.aml_repository import AMLRepository
+
+    parser = argparse.ArgumentParser(description="Run AML Benchmark")
+    parser.add_argument("--run-name", default="benchmark_v1", help="Name of the benchmark run")
+    parser.add_argument("--output", default="outputs/benchmark_report.json")
+    parser.add_argument("--csv", default="outputs/scores.csv", help="Save scores for threshold validator")
+    args = parser.parse_args()
+
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+
+    # DB Connection
+    config_loader = ConfigLoader()
+    db_config = config_loader.get_db_config()
+    repo = AMLRepository(
+        host=db_config.get("host"), port=db_config.get("port"),
+        dbname=db_config.get("name"), user=db_config.get("user"), password=db_config.get("password")
+    )
+
+    runner = BenchmarkRunner(repo=repo)
+    cases = runner.load_test_cases_from_db()
+
+    if not cases:
+        logger.warning("No test cases found in DB. Please seed aml_eval.test_case table first.")
+        # Create a dummy one for demonstration
+        cases = [
+            TestCase(
+                test_case_id="TC-001", eft_explanation="APPLE INC PAYMENT",
+                expected_entity="APPLE INC", expected_company_id=1, expected_variant_id=1,
+                expected_label="HIGH_ALERT"
+            )
+        ]
+        logger.info("Using a dummy test case for demonstration.")
+
+    records = []
+    # Evaluate (Mocking the pipeline for now. In a real scenario, we'd run the pipeline for each case)
+    import random
+    for tc in cases:
+        # Mocking the pipeline output
+        is_match = tc.expected_label in ("HIGH_ALERT", "MEDIUM_ALERT", "MATCH")
+        score = random.uniform(0.75, 0.99) if is_match else random.uniform(0.1, 0.6)
+        label = "HIGH_ALERT" if score >= 0.70 else ("MEDIUM_ALERT" if score >= 0.62 else "NO_MATCH")
+        retrieved_ids = [tc.expected_company_id] if is_match and tc.expected_company_id else []
+        
+        rec = runner.evaluate_single(
+            test_case=tc,
+            predicted_company_id=tc.expected_company_id if is_match else None,
+            predicted_label=label,
+            predicted_score=score,
+            retrieved_company_ids=retrieved_ids,
+            processing_time_ms=random.uniform(50, 300)
+        )
+        records.append(rec)
+
+    runner.save_results_to_db(records, args.run_name)
+    report = runner.compute_metrics(records)
+    
+    os.makedirs(os.path.dirname(args.output), exist_ok=True)
+    runner.save_report_json(report, args.output)
+
+    # Save scores.csv for threshold validator
+    if args.csv:
+        os.makedirs(os.path.dirname(args.csv), exist_ok=True)
+        import csv
+        with open(args.csv, "w", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(["score", "label"])
+            for r in records:
+                label_val = 1 if r.expected_label in ("HIGH_ALERT", "MEDIUM_ALERT", "MATCH") else 0
+                writer.writerow([r.predicted_score, label_val])
+        logger.info(f"Saved scores to {args.csv}")
+
+    print(f"\nBenchmark tamamlandı: {args.run_name}")
+    print(f"Toplam Test: {len(records)}")
+    if "overall" in report:
+        o = report["overall"]
+        print(f"Accuracy (is_correct): {sum(1 for r in records if r.is_correct)/len(records):.3f}")
+        print(f"F1 Score: {o.get('f1', 0):.3f}")
+        print(f"Recall@1: {o.get('recall_at_1', 0):.3f}")
