@@ -10,7 +10,7 @@ from sentence_transformers import SentenceTransformer
 # alias_utils & text_utils: fix import path when running from project root
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from src.utils.alias_utils import generate_acronym
-from src.utils.text_utils import normalize_text, remove_company_suffixes, get_normalized_core_name
+from src.utils.text_utils import normalize_text, remove_company_suffixes, get_normalized_core_name, is_consonant_match
 from src.utils.ner_extractor import NERExtractor
 from src.config.db_tables import TABLES
 
@@ -399,13 +399,20 @@ class BatchProcessor:
                                     "exact_core_match": exact_core_match,
                                     "legal_suffix_only_difference": legal_suffix_only_difference,
                                     "query_is_contained_in_candidate": query_is_contained,
-                                    "candidate_is_contained_in_query": cand_is_contained
+                                    "candidate_is_contained_in_query": cand_is_contained,
+                                    "consonant_match": is_consonant_match(core_query, core_cand)
                                 }
 
                                 if alert_extracted:
                                     import difflib
                                     fuzzy_ext = difflib.SequenceMatcher(None, alert_extracted.lower(), cand["variant_name"].lower()).ratio()
+                                    if core_cand:
+                                        fuzzy_ext_core = difflib.SequenceMatcher(None, alert_extracted.lower(), core_cand.lower()).ratio()
+                                        fuzzy_ext = max(fuzzy_ext, fuzzy_ext_core)
                                     scores_dict["fuzzy_score"] = max(scores_dict["fuzzy_score"], fuzzy_ext)
+                                    
+                                    if is_consonant_match(alert_extracted, core_cand):
+                                        scores_dict["consonant_match"] = True
                                     
                                     acronym_ext = _acronym_score(alert_extracted, cand["variant_name"])
                                     scores_dict["acronym_score"] = max(scores_dict["acronym_score"], acronym_ext)

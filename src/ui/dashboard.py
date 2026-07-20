@@ -11,7 +11,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from src.utils.config_loader import ConfigLoader
 from src.repository.aml_repository import AMLRepository
-from src.utils.text_utils import normalize_text, get_normalized_core_name
+from src.utils.text_utils import normalize_text, get_normalized_core_name, is_consonant_match
 from src.config.db_tables import TABLES
 from src.etl.batch_processor import _acronym_score, _rule_score, _exact_name_score
 
@@ -256,13 +256,20 @@ if page == "🏠 Ana Sayfa":
                             "exact_core_match": exact_core_match,
                             "legal_suffix_only_difference": legal_suffix_only_difference,
                             "query_is_contained_in_candidate": query_is_contained,
-                            "candidate_is_contained_in_query": cand_is_contained
+                            "candidate_is_contained_in_query": cand_is_contained,
+                            "consonant_match": is_consonant_match(core_query, core_cand)
                         }
                         
                         if entity:
                             import difflib
                             fuzzy_ext = difflib.SequenceMatcher(None, entity.lower(), cand["variant_name"].lower()).ratio()
+                            if core_cand:
+                                fuzzy_ext_core = difflib.SequenceMatcher(None, entity.lower(), core_cand.lower()).ratio()
+                                fuzzy_ext = max(fuzzy_ext, fuzzy_ext_core)
                             scores_dict["fuzzy_score"] = max(scores_dict["fuzzy_score"], fuzzy_ext)
+                            
+                            if is_consonant_match(entity, core_cand):
+                                scores_dict["consonant_match"] = True
                             
                             acronym_ext = _acronym_score(entity, cand["variant_name"])
                             scores_dict["acronym_score"] = max(scores_dict["acronym_score"], acronym_ext)

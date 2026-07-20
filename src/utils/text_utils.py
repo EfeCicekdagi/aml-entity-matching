@@ -75,3 +75,23 @@ def get_normalized_core_name(text: str) -> str:
         'Apple Incorporated' -> 'apple'
     """
     return remove_company_suffixes(text)
+
+
+def is_consonant_match(text1: str, text2: str) -> bool:
+    """
+    Checks if two strings are identical after removing all vowels.
+    This helps match abbreviations like 'mcrsft' with 'microsoft'.
+    Ignores matches that are too short (less than 3 consonants).
+    """
+    if not text1 or not text2:
+        return False
+        
+    def _strip_vowels(s: str) -> str:
+        return "".join([c for c in s if c not in "aeiou"])
+        
+    c1 = _strip_vowels(text1)
+    c2 = _strip_vowels(text2)
+    
+    if c1 == c2 and len(c1) >= 3:
+        return True
+    return False

@@ -119,6 +119,10 @@ class FinalScorer:
             match_reason = "HIGH_FUZZY_MATCH"
             
         # Apply Overrides (Deterministic rules)
+        if scores.get("consonant_match"):
+            final_score = max(final_score, 0.85)
+            match_reason = "CONSONANT_ONLY_MATCH"
+            
         if scores.get("legal_suffix_only_difference"):
             final_score = max(final_score, 0.92)
             match_reason = "LEGAL_SUFFIX_ONLY_DIFFERENCE"

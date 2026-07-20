@@ -35,7 +35,13 @@ class NERExtractor:
         # The pipeline returns a list of dicts:
         # [{'entity_group': 'ORG', 'score': 0.99, 'word': 'XYZ Sirketi', 'start': 10, 'end': 21}]
         try:
-            results = self.ner_pipeline(text)
+            # Title case the text to help the cased NER model if it's all lowercase
+            if text.islower():
+                text_to_process = text.title()
+            else:
+                text_to_process = text
+
+            results = self.ner_pipeline(text_to_process)
             
             entities = [
                 res['word'] for res in results 
@@ -45,8 +51,13 @@ class NERExtractor:
             if entities:
                 # Often the first extracted ORG/PER is the main one in an EFT.
                 # We join them if they are split, but simple strategy already groups them.
-                # Let's return the longest one to be safe (captures full names better)
-                return max(entities, key=len)
+                # Clean up WordPiece artifacts like ## from the tokens
+                cleaned_entities = [ent.replace("##", "").strip() for ent in entities]
+                cleaned_entities = [ent for ent in cleaned_entities if ent]
+                
+                if cleaned_entities:
+                    # Let's return the longest one to be safe (captures full names better)
+                    return max(cleaned_entities, key=len)
             
             return None
         except Exception as e:
