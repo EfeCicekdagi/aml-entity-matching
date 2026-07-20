@@ -3,25 +3,37 @@ database:
   port: 5433
   name: aml_db
   user: postgres
+  # Güvenlik: Şifreyi env var'dan oku. Eğer boş bırakılırsa AML_DB_PASSWORD env var'ına bakılır.
   password: password
+  # password: ${AML_DB_PASSWORD}  # production için env var kullanın
+
 embedding:
   model_name: BAAI/bge-m3
   dimension: 1024
   batch_size: 32
   device: auto
+
 retrieval:
   pg_trgm_top_k: 20
   full_text_top_k: 15
   pgvector_top_k: 20
   merged_top_k: 25
   reranker_top_k: 10
-  min_trgm_score: 0.20
+  min_trgm_score: 0.20          # Pre-screen eşiği (artık BLOKLAYICI DEĞİL, sadece istatistik)
   min_vector_score: 0.40
   reranker_prefilter_score: 0.30
+
 ner:
   enabled: true
   model_name: savasy/bert-base-turkish-ner-cased
   device: auto
+
+entity_extraction:
+  # Çok katmanlı extraction yapılandırması
+  min_entity_length: 3
+  max_entity_length: 100
+  use_full_text_fallback: false  # True: son çare olarak tüm metin kullanılır
+
 reranker:
   enabled: true
   model_name: BAAI/bge-reranker-v2-m3
@@ -29,6 +41,61 @@ reranker:
   batch_size: 32
   use_cache: true
   device: auto
+
 scoring:
   scoring_config_version: scoring_v2_reranker
   threshold_config_version: threshold_v3_bge_m3
+  # Fallback thresholds (DB'den yüklenemezse kullanılır)
+  high_threshold: 0.70
+  medium_threshold: 0.62
+  # LOW ve NO_MATCH artık alert tablosuna yazılmaz — sadece match_result'a
+
+calibration:
+  # Kalibrasyon modeli mevcut değilse sistem eski normalize skoru kullanır
+  # (calibration_applied=False olarak işaretlenir)
+  enabled: false
+  model_path: null              # "models/calibration/platt_v1.pkl"
+  method: null                  # PLATT_SCALING veya ISOTONIC_REGRESSION
+  version: null                 # "platt_v1"
+
+normalization:
+  version: "text_utils_v2"
+  unicode_form: NFKC
+  use_casefold: true
+
+watchlist:
+  version: "v1"                 # Aktif watchlist versiyonu
+  auto_transliterate: true      # Yeni alias eklenince transliteration üret
+  alias_confidence:
+    official: 1.0
+    former_name: 0.7
+    transliteration: 0.5
+    abbreviation: 0.4
+    generated_typo: 0.3
+
+benchmark:
+  test_cases_table: aml_eval.test_case
+  results_table: aml_eval.benchmark_result
+  breakdown_dims:
+    - case_type
+    - difficulty_level
+    - language
+    - script
+    - entity_type
+
+security:
+  # PII masking: log çıktısında hassas veriler maskelenir
+  enable_pii_masking_in_logs: true
+  # DB TLS bağlantısı (production için aktif edin)
+  db_sslmode: prefer            # disable, allow, prefer, require, verify-ca, verify-full
+  # Audit log
+  enable_audit_trail: true
+  append_only_history: true
+
+operational_metrics:
+  # Pipeline aşaması süre ölçümü
+  track_phase_durations: true
+  # Latency percentiles
+  track_latency_percentiles: true
+  # Per-row latency
+  track_per_row_latency: true

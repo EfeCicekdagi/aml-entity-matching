@@ -1,4 +1,15 @@
+"""
+aml_repository.py — AML veritabanı erişim katmanı.
+
+Değişiklikler (v2):
+  - insert_match_results_bulk(): tüm eşleştirme sonuçları
+  - insert_alert_status_history(): append-only analist kararları
+  - start_run_log() / finish_run_log() genişletildi (model hash, watchlist version, latency)
+  - insert_alerts_bulk() geriye uyumlu korundu; sadece HIGH/MEDIUM kayıtlar için çağrılmalı
+"""
+
 import psycopg2
+import json
 import logging
 from psycopg2.extras import execute_values
 from psycopg2.pool import ThreadedConnectionPool
@@ -6,8 +17,11 @@ from src.config.db_tables import TABLES
 
 logger = logging.getLogger(__name__)
 
+
 class AMLRepository:
-    def __init__(self, host, port, dbname, user, password):
+    """PostgreSQL bağlantı havuzu ve veri erişim operasyonları."""
+
+    def __init__(self, host: str, port: int, dbname: str, user: str, password: str):
         try:
             self.pool = ThreadedConnectionPool(
                 minconn=1, maxconn=50,
@@ -18,6 +32,7 @@ class AMLRepository:
             self.pool = None
 
     def get_connection(self):
+        """Havuzdan bağlantı al."""
         if self.pool:
             try:
                 return self.pool.getconn()
@@ -25,15 +40,16 @@ class AMLRepository:
                 logger.error(f"Failed to get connection from pool: {e}")
         return None
 
-    def release_connection(self, conn):
+    def release_connection(self, conn) -> None:
+        """Bağlantıyı havuza geri ver."""
         if self.pool and conn:
             self.pool.putconn(conn)
 
-    def execute_script(self, script_path):
+    def execute_script(self, script_path: str) -> None:
+        """SQL script dosyasını çalıştırır."""
         conn = self.get_connection()
         if not conn:
             return
-        
         try:
             with open(script_path, "r", encoding="utf-8") as f:
                 sql = f.read()
@@ -47,19 +63,56 @@ class AMLRepository:
         finally:
             self.release_connection(conn)
 
-    def start_run_log(self, run_id, pipeline_name="AML_Pipeline", embedding_model=None, reranker_model=None,
-                      scoring_config_version=None, threshold_version=None, pipeline_version=None):
+    # ── Run Log ───────────────────────────────────────────────────────────────
+
+    def start_run_log(
+        self,
+        run_id: str,
+        pipeline_name: str = "AML_Pipeline",
+        embedding_model: str = None,
+        reranker_model: str = None,
+        scoring_config_version: str = None,
+        threshold_version: str = None,
+        pipeline_version: str = None,
+        # Yeni alanlar
+        embedding_model_hash: str = None,
+        reranker_model_hash: str = None,
+        ner_model_name: str = None,
+        ner_model_version: str = None,
+        calibration_version: str = None,
+        normalization_version: str = None,
+        watchlist_version: str = None,
+        git_commit_hash: str = None,
+    ) -> None:
+        """Run log kaydını başlatır."""
         conn = self.get_connection()
         if not conn:
             return
         try:
             with conn.cursor() as cur:
                 cur.execute(f"""
-                    INSERT INTO {TABLES['run_log']} (run_id, pipeline_name, started_at, status, embedding_model, reranker_model,
-                                                     scoring_config_version, threshold_version, pipeline_version, embedding_model_version, reranker_model_version)
-                    VALUES (%s, %s, now(), 'STARTED', %s, %s, %s, %s, %s, %s, %s)
-                """, (run_id, pipeline_name, embedding_model, reranker_model,
-                      scoring_config_version, threshold_version, pipeline_version, embedding_model, reranker_model))
+                    INSERT INTO {TABLES['run_log']} (
+                        run_id, pipeline_name, started_at, status,
+                        embedding_model, reranker_model,
+                        scoring_config_version, threshold_version, pipeline_version,
+                        embedding_model_version, reranker_model_version,
+                        embedding_model_hash, reranker_model_hash,
+                        ner_model_name, ner_model_version,
+                        calibration_version, normalization_version,
+                        watchlist_version, git_commit_hash
+                    )
+                    VALUES (%s, %s, now(), 'STARTED', %s, %s, %s, %s, %s, %s, %s,
+                            %s, %s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (run_id) DO NOTHING
+                """, (
+                    run_id, pipeline_name, embedding_model, reranker_model,
+                    scoring_config_version, threshold_version, pipeline_version,
+                    embedding_model, reranker_model,
+                    embedding_model_hash, reranker_model_hash,
+                    ner_model_name, ner_model_version,
+                    calibration_version, normalization_version,
+                    watchlist_version, git_commit_hash
+                ))
             conn.commit()
         except Exception as e:
             logger.error(f"Error starting run log: {e}")
@@ -67,24 +120,62 @@ class AMLRepository:
         finally:
             self.release_connection(conn)
 
-    def finish_run_log(self, run_id, metrics, duration_seconds=None):
+    def finish_run_log(self, run_id: str, metrics: dict, duration_seconds: float = None) -> None:
+        """Run log kaydını tamamlandı olarak günceller."""
         conn = self.get_connection()
         if not conn:
             return
         try:
             with conn.cursor() as cur:
                 cur.execute(f"""
-                    UPDATE {TABLES['run_log']} 
-                    SET finished_at = now(),
-                        processed_row_count = %s,
-                        candidate_count = %s,
-                        alert_count = %s,
-                        status = 'SUCCESS'
+                    UPDATE {TABLES['run_log']}
+                    SET finished_at              = now(),
+                        completed_at             = now(),
+                        processed_row_count      = %s,
+                        candidate_count          = %s,
+                        alert_count              = %s,
+                        input_count              = %s,
+                        match_result_count       = %s,
+                        high_alert_count         = %s,
+                        medium_alert_count       = %s,
+                        no_match_count           = %s,
+                        no_candidate_count       = %s,
+                        error_count              = %s,
+                        prescreen_skipped_count  = %s,
+                        total_duration_s         = %s,
+                        ner_duration_s           = %s,
+                        retrieval_duration_s     = %s,
+                        reranker_duration_s      = %s,
+                        scoring_duration_s       = %s,
+                        p50_latency_ms           = %s,
+                        p95_latency_ms           = %s,
+                        p99_latency_ms           = %s,
+                        rows_per_second          = %s,
+                        avg_candidate_per_row    = %s,
+                        status                   = 'SUCCESS'
                     WHERE run_id = %s
                 """, (
                     metrics.get("processed_row_count", 0),
                     metrics.get("candidate_count", 0),
                     metrics.get("alert_count", 0),
+                    metrics.get("input_count", 0),
+                    metrics.get("match_result_count", 0),
+                    metrics.get("high_alert_count", 0),
+                    metrics.get("medium_alert_count", 0),
+                    metrics.get("no_match_count", 0),
+                    metrics.get("no_candidate_count", 0),
+                    metrics.get("error_count", 0),
+                    metrics.get("prescreen_skipped_count", 0),
+                    duration_seconds,
+                    metrics.get("ner_duration_s"),
+                    metrics.get("retrieval_duration_s"),
+                    metrics.get("reranker_duration_s"),
+                    metrics.get("scoring_duration_s"),
+                    metrics.get("p50_latency_ms"),
+                    metrics.get("p95_latency_ms"),
+                    metrics.get("p99_latency_ms"),
+                    metrics.get("rows_per_second"),
+                    metrics.get("avg_candidate_per_row"),
                     run_id
                 ))
             conn.commit()
@@ -94,17 +185,19 @@ class AMLRepository:
         finally:
             self.release_connection(conn)
 
-    def update_run_metrics(self, run_id, precision, recall, f1, exact_match):
+    def update_run_metrics(self, run_id: str, precision: float, recall: float,
+                           f1: float, exact_match: float) -> None:
+        """Benchmark metriklerini run log'a günceller."""
         conn = self.get_connection()
         if not conn:
             return
         try:
             with conn.cursor() as cur:
                 cur.execute(f"""
-                    UPDATE {TABLES['run_log']} 
+                    UPDATE {TABLES['run_log']}
                     SET precision_score = %s,
-                        recall_score = %s,
-                        f1_score = %s,
+                        recall_score    = %s,
+                        f1_score        = %s,
                         exact_match_score = %s
                     WHERE run_id = %s
                 """, (precision, recall, f1, exact_match, run_id))
@@ -115,19 +208,21 @@ class AMLRepository:
         finally:
             self.release_connection(conn)
 
-    def fail_run_log(self, run_id, error_message):
+    def fail_run_log(self, run_id: str, error_message: str) -> None:
+        """Run log kaydını hata ile günceller."""
         conn = self.get_connection()
         if not conn:
             return
         try:
             with conn.cursor() as cur:
                 cur.execute(f"""
-                    UPDATE {TABLES['run_log']} 
-                    SET finished_at = now(),
-                        status = 'FAILED',
+                    UPDATE {TABLES['run_log']}
+                    SET finished_at   = now(),
+                        completed_at  = now(),
+                        status        = 'FAILED',
                         error_message = %s
                     WHERE run_id = %s
-                """, (str(error_message), run_id))
+                """, (str(error_message)[:2000], run_id))
             conn.commit()
         except Exception as e:
             logger.error(f"Error failing run log: {e}")
@@ -135,38 +230,159 @@ class AMLRepository:
         finally:
             self.release_connection(conn)
 
-    def insert_alert(self, run_id, eft_id, company_id, variant_id, final_score, risk_level, extracted_entity=None):
-        """Writes a single AML alert to the aml_alert table. Prefer insert_alerts_bulk for batch use."""
-        self.insert_alerts_bulk([{
-            "run_id": run_id, "eft_id": eft_id, "company_id": company_id,
-            "variant_id": variant_id, "final_score": final_score, "risk_level": risk_level,
-            "extracted_entity": extracted_entity
-        }])
+    # ── Match Result (tüm sonuçlar) ───────────────────────────────────────────
 
-    def insert_alerts_bulk(self, alerts: list):
+    def insert_match_results_bulk(self, results: list) -> None:
         """
-        Bulk-inserts a list of alert dicts in a single transaction.
-        Each dict must have: run_id, eft_id, company_id, variant_id, final_score, risk_level.
-        Much faster than calling insert_alert() per row — avoids one commit per alert.
+        Tüm eşleştirme sonuçlarını toplu olarak match_result tablosuna yazar.
+        HIGH, MEDIUM, NO_MATCH, NO_CANDIDATE_FOUND hepsi buraya yazılır.
+
+        Her dict en az şu anahtarları içermelidir:
+          run_id, eft_id, decision_status
         """
-        if not alerts:
+        if not results:
             return
+
         conn = self.get_connection()
         if not conn:
             return
+
         try:
             with conn.cursor() as cur:
                 execute_values(cur, f"""
-                    INSERT INTO {TABLES['alert']}
-                        (run_id, eft_id, company_id, variant_id, final_score, fuzzy_score, vector_score, reranker_score, risk_level, alert_status, extracted_entity, match_reason,
-                         entity_extraction_status, matched_variant_name, variant_type, watchlist_company_name)
+                    INSERT INTO {TABLES['match_result']} (
+                        run_id, eft_id, candidate_company_id, variant_id,
+                        extracted_entity, entity_type, extraction_method,
+                        extraction_confidence, entity_extraction_status,
+                        trigram_score, full_text_score, vector_score, fuzzy_score,
+                        reranker_raw_score, reranker_normalized_score,
+                        calibrated_probability, calibration_applied,
+                        calibration_method, calibration_version,
+                        final_score, pipeline_status, no_candidate_reason,
+                        decision_status, candidate_count,
+                        reason_codes, human_explanation,
+                        retrieval_sources, candidate_rank,
+                        matched_variant_name, variant_type, watchlist_company_name
+                    )
                     VALUES %s
                     ON CONFLICT DO NOTHING
                 """, [
-                    (a["run_id"], a["eft_id"], a["company_id"],
-                     a["variant_id"], a["final_score"], a.get("fuzzy_score", 0), a.get("vector_score", 0), a.get("reranker_score", 0),
-                     a["risk_level"], "OPEN", a.get("extracted_entity"), a.get("match_reason"),
-                     a.get("entity_extraction_status"), a.get("matched_variant_name"), a.get("variant_type"), a.get("watchlist_company_name"))
+                    (
+                        r["run_id"],
+                        r["eft_id"],
+                        r.get("candidate_company_id"),
+                        r.get("variant_id"),
+                        r.get("extracted_entity"),
+                        r.get("entity_type", "UNKNOWN"),
+                        r.get("extraction_method"),
+                        r.get("extraction_confidence"),
+                        r.get("entity_extraction_status"),
+                        r.get("trigram_score"),
+                        r.get("full_text_score"),
+                        r.get("vector_score"),
+                        r.get("fuzzy_score"),
+                        r.get("reranker_raw_score"),
+                        r.get("reranker_normalized_score"),
+                        r.get("calibrated_probability"),
+                        r.get("calibration_applied", False),
+                        r.get("calibration_method"),
+                        r.get("calibration_version"),
+                        r.get("final_score"),
+                        r.get("pipeline_status"),
+                        r.get("no_candidate_reason"),
+                        r["decision_status"],
+                        r.get("candidate_count", 0),
+                        json.dumps(r.get("reason_codes", [])) if r.get("reason_codes") else None,
+                        r.get("human_explanation"),
+                        json.dumps(r.get("retrieval_sources", {})) if r.get("retrieval_sources") else None,
+                        r.get("candidate_rank"),
+                        r.get("matched_variant_name"),
+                        r.get("variant_type"),
+                        r.get("watchlist_company_name"),
+                    )
+                    for r in results
+                ])
+            conn.commit()
+            logger.debug(f"Bulk inserted {len(results)} match results.")
+        except Exception as e:
+            logger.error(f"Error bulk inserting match results: {e}")
+            conn.rollback()
+        finally:
+            self.release_connection(conn)
+
+    # ── Alert (sadece HIGH/MEDIUM) ────────────────────────────────────────────
+
+    def insert_alert(self, run_id: str, eft_id: int, company_id: int,
+                     variant_id: int, final_score: float, risk_level: str,
+                     extracted_entity: str = None) -> None:
+        """Tekil alert yazar. Toplu kullanım için insert_alerts_bulk tercih edilmeli."""
+        self.insert_alerts_bulk([{
+            "run_id": run_id, "eft_id": eft_id, "company_id": company_id,
+            "variant_id": variant_id, "final_score": final_score,
+            "risk_level": risk_level, "extracted_entity": extracted_entity
+        }])
+
+    def insert_alerts_bulk(self, alerts: list) -> None:
+        """
+        HIGH ve MEDIUM alertleri toplu olarak alert tablosuna yazar.
+        LOW ve NO_MATCH kayıtlar bu metoda gönderilmemeli.
+
+        Her dict en az şu anahtarları içermelidir:
+          run_id, eft_id, company_id, variant_id, final_score, risk_level
+        """
+        if not alerts:
+            return
+
+        conn = self.get_connection()
+        if not conn:
+            return
+
+        try:
+            with conn.cursor() as cur:
+                execute_values(cur, f"""
+                    INSERT INTO {TABLES['alert']} (
+                        run_id, eft_id, company_id, variant_id,
+                        final_score, fuzzy_score, vector_score, reranker_score,
+                        risk_level, alert_status,
+                        extracted_entity, match_reason,
+                        entity_extraction_status, matched_variant_name,
+                        variant_type, watchlist_company_name,
+                        decision_status, reason_codes, human_explanation,
+                        reranker_raw_score, reranker_normalized_score,
+                        calibrated_probability, calibration_applied,
+                        calibration_method, calibration_version,
+                        entity_type, extraction_method, extraction_confidence,
+                        retrieval_sources, candidate_rank, candidate_count
+                    )
+                    VALUES %s
+                    ON CONFLICT DO NOTHING
+                """, [
+                    (
+                        a["run_id"], a["eft_id"], a["company_id"],
+                        a["variant_id"], a["final_score"],
+                        a.get("fuzzy_score", 0), a.get("vector_score", 0),
+                        a.get("reranker_score", 0),
+                        a["risk_level"], "OPEN",
+                        a.get("extracted_entity"), a.get("match_reason"),
+                        a.get("entity_extraction_status"),
+                        a.get("matched_variant_name"),
+                        a.get("variant_type"), a.get("watchlist_company_name"),
+                        a.get("decision_status"),
+                        json.dumps(a.get("reason_codes", [])) if a.get("reason_codes") else None,
+                        a.get("human_explanation"),
+                        a.get("reranker_raw_score"),
+                        a.get("reranker_normalized_score"),
+                        a.get("calibrated_probability"),
+                        a.get("calibration_applied", False),
+                        a.get("calibration_method"),
+                        a.get("calibration_version"),
+                        a.get("entity_type"),
+                        a.get("extraction_method"),
+                        a.get("extraction_confidence"),
+                        json.dumps(a.get("retrieval_sources", {})) if a.get("retrieval_sources") else None,
+                        a.get("candidate_rank"),
+                        a.get("candidate_count", 0),
+                    )
                     for a in alerts
                 ])
             conn.commit()
@@ -177,27 +393,113 @@ class AMLRepository:
         finally:
             self.release_connection(conn)
 
-    def update_alert_status(self, alert_id, status, reviewed_by=None, review_result=None, analyst_note=None, false_positive_reason=None):
+    # ── Alert status güncelleme + history ─────────────────────────────────────
+
+    def update_alert_status(
+        self,
+        alert_id: int,
+        status: str,
+        reviewed_by: str = None,
+        review_result: str = None,
+        analyst_note: str = None,
+        false_positive_reason: str = None,
+        decision_reason: str = None,
+        confidence: float = None,
+        false_positive_category: str = None,
+        escalation_reason: str = None,
+    ) -> None:
+        """
+        Alert durumunu günceller ve append-only history tablosuna kaydeder.
+        """
+        conn = self.get_connection()
+        if not conn:
+            return
+
+        try:
+            with conn.cursor() as cur:
+                # Mevcut durumu al
+                cur.execute(
+                    f"SELECT alert_status, run_id FROM {TABLES['alert']} WHERE alert_id = %s",
+                    (alert_id,)
+                )
+                row = cur.fetchone()
+                previous_status = row[0] if row else None
+                run_id = row[1] if row else None
+
+                # Alert tablosunu güncelle
+                cur.execute(f"""
+                    UPDATE {TABLES['alert']}
+                    SET alert_status          = %s,
+                        reviewed_by           = %s,
+                        reviewed_at           = now(),
+                        status_updated_at     = now(),
+                        review_result         = %s,
+                        analyst_note          = %s,
+                        false_positive_reason = %s,
+                        decision_reason       = %s
+                    WHERE alert_id = %s
+                """, (status, reviewed_by, review_result,
+                      analyst_note, false_positive_reason,
+                      decision_reason, alert_id))
+
+                # History tablosuna append
+                cur.execute(f"""
+                    INSERT INTO {TABLES['alert_history']} (
+                        alert_id, run_id, reviewed_by, reviewed_at,
+                        previous_status, new_status, analyst_status,
+                        analyst_note, decision_reason,
+                        confidence, false_positive_category,
+                        escalation_reason, final_analyst_label
+                    )
+                    VALUES (%s, %s, %s, now(), %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """, (
+                    alert_id, run_id, reviewed_by,
+                    previous_status, status, status,
+                    analyst_note, decision_reason,
+                    confidence, false_positive_category,
+                    escalation_reason, status
+                ))
+
+            conn.commit()
+            logger.info(f"Updated alert {alert_id}: {previous_status} → {status}")
+        except Exception as e:
+            logger.error(f"Error updating alert status: {e}")
+            conn.rollback()
+        finally:
+            self.release_connection(conn)
+
+    def insert_alert_status_history(self, history_record: dict) -> None:
+        """
+        Tek bir history kaydı yazar (opsiyonel, direkt kullanım için).
+
+        Args:
+            history_record: History alanlarını içeren dict
+        """
         conn = self.get_connection()
         if not conn:
             return
         try:
             with conn.cursor() as cur:
                 cur.execute(f"""
-                    UPDATE {TABLES['alert']}
-                    SET alert_status = %s,
-                        reviewed_by = %s,
-                        reviewed_at = now(),
-                        status_updated_at = now(),
-                        review_result = %s,
-                        analyst_note = %s,
-                        false_positive_reason = %s
-                    WHERE alert_id = %s
-                """, (status, reviewed_by, review_result, analyst_note, false_positive_reason, alert_id))
+                    INSERT INTO {TABLES['alert_history']} (
+                        alert_id, run_id, reviewed_by,
+                        previous_status, new_status, analyst_note,
+                        decision_reason, final_analyst_label
+                    )
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                """, (
+                    history_record.get("alert_id"),
+                    history_record.get("run_id"),
+                    history_record.get("reviewed_by"),
+                    history_record.get("previous_status"),
+                    history_record.get("new_status"),
+                    history_record.get("analyst_note"),
+                    history_record.get("decision_reason"),
+                    history_record.get("final_analyst_label"),
+                ))
             conn.commit()
-            logger.info(f"Updated status for alert_id {alert_id} to {status}")
         except Exception as e:
-            logger.error(f"Error updating alert status: {e}")
+            logger.error(f"Error inserting alert history: {e}")
             conn.rollback()
         finally:
             self.release_connection(conn)

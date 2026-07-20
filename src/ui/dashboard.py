@@ -55,7 +55,16 @@ def load_runs():
                    r.candidate_count, 
                    r.alert_count, r.status,
                    r.scoring_config_version, r.threshold_version, r.pipeline_version,
-                   r.embedding_model_version, r.reranker_model_version
+                   r.embedding_model_version, r.reranker_model_version,
+                   COALESCE(r.high_alert_count, 0) AS high_alert_count,
+                   COALESCE(r.medium_alert_count, 0) AS medium_alert_count,
+                   COALESCE(r.no_candidate_count, 0) AS no_candidate_count,
+                   COALESCE(r.match_result_count, 0) AS match_result_count,
+                   COALESCE(r.p50_latency_ms, 0) AS p50_latency_ms,
+                   COALESCE(r.p95_latency_ms, 0) AS p95_latency_ms,
+                   COALESCE(r.p99_latency_ms, 0) AS p99_latency_ms,
+                   r.watchlist_version, r.calibration_version,
+                   r.embedding_model_hash, r.reranker_model_hash
             FROM {TABLES['run_log']} r ORDER BY r.started_at DESC LIMIT 20
         """, conn)
     finally:
@@ -86,7 +95,15 @@ def load_alerts(run_id):
                    a.risk_level, a.alert_status, a.extracted_entity, a.match_reason, a.created_at,
                    a.entity_extraction_status, a.matched_variant_name, a.variant_type,
                    a.watchlist_company_name, a.reviewed_by, a.reviewed_at, a.review_result,
-                   a.analyst_note, a.false_positive_reason, a.status_updated_at
+                   a.analyst_note, a.false_positive_reason, a.status_updated_at,
+                   COALESCE(a.decision_status, a.risk_level) AS decision_status,
+                   a.reason_codes,
+                   ROUND(COALESCE(a.calibrated_probability, a.reranker_score)::numeric, 3) AS calibrated_probability,
+                   COALESCE(a.calibration_applied, false) AS calibration_applied,
+                   a.entity_type, a.extraction_method,
+                   COALESCE(a.candidate_count, 0) AS candidate_count,
+                   a.human_explanation,
+                   a.retrieval_sources
             FROM {TABLES['alert']} a
             JOIN {TABLES['company_variant']} v ON a.variant_id=v.variant_id
             LEFT JOIN {TABLES['eft_input']} e1 ON a.eft_id = e1.eft_id
@@ -136,7 +153,7 @@ with st.sidebar:
     st.title("🚨 AML Dashboard")
     st.divider()
     
-    page = st.radio("Menü", ["🏠 Ana Sayfa", "📈 Run Detayları"])
+    page = st.radio("Menü", ["🏠 Ana Sayfa", "📈 Run Detayları", "🧪 Benchmark"])
     st.divider()
 
     runs_df = load_runs()
@@ -339,7 +356,7 @@ elif page == "📈 Run Detayları":
     ]
 
     # ── KPI Metrikleri ────────────────────────────────────────────────────────────
-    col1, col2, col3, col4, col5, col6 = st.columns(6)
+    col1, col2, col3, col4, col5, col6, col7 = st.columns(7)
     with col1:
         st.metric("Toplam Alert", f"{len(alerts_df):,}")
     with col2:
@@ -349,12 +366,16 @@ elif page == "📈 Run Detayları":
         med_cnt = len(alerts_df[alerts_df['risk_level']=='MEDIUM']) if not alerts_df.empty else 0
         st.metric("🟠 MEDIUM", f"{med_cnt:,}")
     with col4:
-        low_cnt = len(alerts_df[alerts_df['risk_level']=='LOW']) if not alerts_df.empty else 0
-        st.metric("⚪ LOW", f"{low_cnt:,}")
-    with col5:
         avg_score = alerts_df['final_score'].mean() if not alerts_df.empty else 0.0
         st.metric("Ortalama Skor", f"{avg_score:.3f}")
+    with col5:
+        run_row = runs_df[runs_df['run_id'] == selected_run].iloc[0]
+        no_cand = int(run_row.get('no_candidate_count', 0)) if not runs_df.empty else 0
+        st.metric("⚫ No Candidate", f"{no_cand:,}")
     with col6:
+        p95 = run_row.get('p95_latency_ms', None) if not runs_df.empty else None
+        st.metric("P95 Latency", f"{p95:.0f} ms" if p95 and p95 > 0 else "N/A")
+    with col7:
         st.metric("Gösterilen", f"{len(filtered):,}")
 
     st.divider()
@@ -443,9 +464,46 @@ elif page == "📈 Run Detayları":
                 
                 with st.expander(f"Alert Detayları - {selected_alert_id}", expanded=True):
                     st.write(f"**EFT Açıklaması:** {selected_alert['original_explanation']}")
-                    st.write(f"**Çıkarılan Entity:** {selected_alert['extracted_entity']} ({selected_alert['entity_extraction_status']})")
-                    st.write(f"**Eşleşen Varyant:** {selected_alert['matched_variant_name']} (Tip: {selected_alert['variant_type']}) -> Ana Şirket: {selected_alert['original_company_name']}")
-                    st.write(f"**Match Reason:** {selected_alert['match_reason']}")
+                    st.write(f"**Çıkarılan Entity:** {selected_alert.get('extracted_entity', '-')} ({selected_alert.get('entity_extraction_status', '-')})")
+                    st.write(f"**Entity Türü:** {selected_alert.get('entity_type', '-')} | Extraction Yöntemi: {selected_alert.get('extraction_method', '-')}")
+                    st.write(f"**Eşleşen Varyant:** {selected_alert.get('matched_variant_name', '-')} (Tip: {selected_alert.get('variant_type', '-')}) -> Ana Şirket: {selected_alert.get('original_company_name', '-')}")
+                    st.write(f"**Match Reason:** {selected_alert.get('match_reason', '-')}")
+                    st.write(f"**Decision Status:** {selected_alert.get('decision_status', '-')}")
+                    # Kalibrasyon bilgisi
+                    cal_prob = selected_alert.get('calibrated_probability')
+                    cal_applied = selected_alert.get('calibration_applied', False)
+                    if cal_prob is not None:
+                        cal_label = '✅ Kalibre Edildi' if cal_applied else '⚠️ Ham Skor'
+                        st.write(f"**Kalibre Olasılık:** {float(cal_prob):.3f} ({cal_label})")
+                    # Reason codes
+                    reason_codes = selected_alert.get('reason_codes')
+                    if reason_codes:
+                        import json as _json
+                        try:
+                            codes = _json.loads(reason_codes) if isinstance(reason_codes, str) else reason_codes
+                            if codes:
+                                st.markdown("**Karar Gerekçeleri:**")
+                                for code in codes:
+                                    st.markdown(f"  - `{code}`")
+                        except Exception:
+                            pass
+                    # Retrieval detayları
+                    retrieval_sources = selected_alert.get('retrieval_sources')
+                    if retrieval_sources:
+                        import json as _json
+                        try:
+                            src = _json.loads(retrieval_sources) if isinstance(retrieval_sources, str) else retrieval_sources
+                            if src:
+                                trgm_n = src.get('trgm', 0)
+                                fts_n  = src.get('fts', 0)
+                                vec_n  = src.get('vector', 0)
+                                st.write(f"**Retrieval Kanalları:** Trigram={trgm_n} | FTS={fts_n} | Vector={vec_n} | Toplam Aday={selected_alert.get('candidate_count', '-')}")
+                        except Exception:
+                            pass
+                    # Human explanation
+                    human_exp = selected_alert.get('human_explanation')
+                    if human_exp:
+                        st.info(f"💬 **Sistem Açıklaması:** {human_exp}")
                     
                     with st.form(f"alert_review_form_{selected_alert_id}"):
                         analyst_name = st.text_input("Analist Adı", value=selected_alert.get('reviewed_by') or "")
@@ -496,3 +554,81 @@ elif page == "📈 Run Detayları":
                 'medium_cnt':'MEDIUM'
             }), use_container_width=True)
 
+
+# ── Benchmark sayfası ─────────────────────────────────────────────────────────
+elif page == "🧪 Benchmark":
+    st.title("🧪 Benchmark & Threshold Analizi")
+    st.markdown("Pipeline performansını ölçmek ve threshold optimizasyonu yapmak için bu ekranı kullanın.")
+    st.divider()
+
+    tab_bm, tab_thresh = st.tabs(["📊 Benchmark Sonuçları", "📐 Threshold Analizi"])
+
+    with tab_bm:
+        st.subheader("📊 Benchmark Özeti")
+        try:
+            _repo = get_repo()
+            _conn = _repo.get_connection()
+            bm_df = pd.read_sql(f"""
+                SELECT benchmark_run_name,
+                       COUNT(*) AS n,
+                       ROUND(AVG(CASE WHEN is_correct THEN 1.0 ELSE 0.0 END)::numeric, 3) AS accuracy,
+                       ROUND(AVG(CASE WHEN recall_at_1 THEN 1.0 ELSE 0.0 END)::numeric, 3) AS recall_at_1,
+                       ROUND(AVG(CASE WHEN recall_at_5 THEN 1.0 ELSE 0.0 END)::numeric, 3) AS recall_at_5,
+                       ROUND(AVG(CASE WHEN recall_at_10 THEN 1.0 ELSE 0.0 END)::numeric, 3) AS recall_at_10,
+                       ROUND(AVG(reciprocal_rank)::numeric, 3) AS mrr,
+                       ROUND(AVG(processing_time_ms)::numeric, 1) AS avg_ms,
+                       MAX(created_at) AS last_run
+                FROM {TABLES['benchmark_result']}
+                GROUP BY benchmark_run_name
+                ORDER BY last_run DESC LIMIT 20
+            """, _conn)
+        except Exception:
+            bm_df = pd.DataFrame()
+        finally:
+            try: _repo.release_connection(_conn)
+            except: pass
+
+        if bm_df.empty:
+            st.info("Henüz benchmark sonucu yok. `src/evaluation/benchmark.py` ile çalıştırın.")
+        else:
+            st.dataframe(bm_df, use_container_width=True)
+            recall_cols = ['recall_at_1', 'recall_at_5', 'recall_at_10']
+            if all(c in bm_df.columns for c in recall_cols):
+                fig_recall = px.bar(
+                    bm_df, x='benchmark_run_name', y=recall_cols,
+                    barmode='group',
+                    title="Recall@K Karşılaştırması",
+                    labels={'value': 'Recall', 'variable': 'K'},
+                )
+                fig_recall.update_layout(height=400)
+                st.plotly_chart(fig_recall, use_container_width=True)
+
+    with tab_thresh:
+        st.subheader("📐 Threshold Analizi")
+        st.info(
+            "Threshold validasyonu için önce validator scriptini çalıştırın:\n\n"
+            "`python -m src.evaluation.threshold_validator --scores outputs/scores.csv --output outputs/threshold_report.json`"
+        )
+        uploaded_report = st.file_uploader("Threshold Raporu Yükle (JSON)", type="json")
+        if uploaded_report:
+            import json as _json
+            report = _json.load(uploaded_report)
+            st.markdown(
+                f"**Dataset:** {report.get('validation_dataset', 'N/A')} | "
+                f"**N:** {report.get('n_samples', 0):,}"
+            )
+            cm = report.get('current_metrics', {})
+            if cm:
+                curr = report.get('current_thresholds', {})
+                c1, c2, c3, c4 = st.columns(4)
+                c1.metric(f"Mevcut HIGH ({curr.get('high_threshold', '?')})", f"F1={cm.get('f1', 0):.3f}")
+                c2.metric("Precision", f"{cm.get('precision', 0):.3f}")
+                c3.metric("Recall", f"{cm.get('recall', 0):.3f}")
+                c4.metric("FPR", f"{cm.get('fpr', 0):.3f}")
+            best_f1 = report.get('recommendations', {}).get('best_f1', {})
+            if best_f1:
+                st.success(
+                    f"**Önerilen (F1 Bazlı):** HIGH={best_f1.get('high_threshold')}, "
+                    f"MEDIUM={best_f1.get('medium_threshold')} → F1={best_f1.get('f1', 0):.3f}"
+                )
+            st.warning(report.get('note', ''))
