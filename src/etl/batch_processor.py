@@ -135,9 +135,9 @@ class BatchProcessor:
             config.get("retrieval", {}).get("reranker_prefilter_score", 0.60)
         )
 
-        # Pre-screening için trigram eşiği — artık CLEAN kararı için değil,
-        # sadece prescreen_skipped_count istatistiği için
+        # Pre-screening eşiği ve bloklama ayarı
         self.min_trgm_score = config.get("retrieval", {}).get("min_trgm_score", 0.25)
+        self.enable_blocking_prescreen = config.get("retrieval", {}).get("enable_blocking_prescreen", False)
 
         # Multi-layer entity extractor
         self.ner_extractor = None
@@ -396,14 +396,81 @@ class BatchProcessor:
             for idx, (_, row) in enumerate(chunk.iterrows())
         ]
 
-        # ── 1.5 Pre-screen (istatistik, bloklayıcı DEĞİL) ──────────────────
+        # ── 1.5 Pre-screen (Opsiyonel Bloklayıcı) ────────────────────────────
         suspicious_ids = self._prescreen_eft_chunk(explanations, raw_row_ids)
         prescreen_skipped = len(raw_row_ids) - len(suspicious_ids)
         metrics["prescreen_skipped_count"] += prescreen_skipped
-        logger.info(
-            f"  [Pre-Screen] {len(suspicious_ids)}/{len(raw_row_ids)} trigram eşiği üstünde "
-            f"({prescreen_skipped} düşük trigram — FTS+Vector yine çalışacak)"
-        )
+        
+        if self.enable_blocking_prescreen:
+            logger.info(
+                f"  [Pre-Screen] {len(suspicious_ids)}/{len(raw_row_ids)} kayıt devam ediyor. "
+                f"({prescreen_skipped} kayıt CLEAN olarak atlandı - BLOKLAYICI MOD AKTİF)"
+            )
+            # CLEAN kayıtları match_result içine yaz
+            for idx, (_, row) in enumerate(chunk.iterrows()):
+                rid = str(row.get("eft_id", "")) if "eft_id" in row else str(idx)
+                if rid not in suspicious_ids:
+                    chunk_match_results.append({
+                        "run_id":              run_id,
+                        "eft_id":              int(row.get("eft_id", 0)),
+                        "candidate_company_id": None,
+                        "variant_id":          None,
+                        "extracted_entity":    None,
+                        "entity_type":         "UNKNOWN",
+                        "extraction_method":   None,
+                        "extraction_confidence": 0.0,
+                        "entity_extraction_status": "SKIPPED",
+                        "trigram_score":       0.0,
+                        "full_text_score":     0.0,
+                        "vector_score":        0.0,
+                        "fuzzy_score":         0.0,
+                        "reranker_raw_score":  0.0,
+                        "reranker_normalized_score": 0.0,
+                        "calibrated_probability": None,
+                        "calibration_applied": False,
+                        "calibration_method":  None,
+                        "calibration_version": None,
+                        "final_score":         0.0,
+                        "pipeline_status":     "PRESCREEN_SKIPPED",
+                        "no_candidate_reason": "BELOW_TRIGRAM_THRESHOLD",
+                        "decision_status":     "CLEAN",
+                        "candidate_count":     0,
+                        "reason_codes":        [ReasonCode.NO_CANDIDATE_FOUND.value],
+                        "human_explanation":   "Harf benzerliği çok düşük olduğu için detaylı yapay zeka incelemesi atlandı (Temiz İşlem).",
+                        "retrieval_sources":   {},
+                        "candidate_rank":      1,
+                        "matched_variant_name": None,
+                        "variant_type":        None,
+                        "watchlist_company_name": None,
+                    })
+                    metrics["no_candidate_count"] += 1
+                    metrics["processed_row_count"] += 1
+
+            if suspicious_ids:
+                # Sadece şüpheli olanları filtrele
+                chunk = chunk[
+                    chunk.apply(
+                        lambda r: (str(r.get("eft_id", "")) if "eft_id" in r else str(r.name)) in suspicious_ids,
+                        axis=1
+                    )
+                ]
+                explanations = chunk["normalized_explanation"].tolist()
+                raw_row_ids = [
+                    str(row["eft_id"]) if "eft_id" in row else str(idx)
+                    for idx, (_, row) in enumerate(chunk.iterrows())
+                ]
+            else:
+                chunk = pd.DataFrame()
+                explanations = []
+                raw_row_ids = []
+        else:
+            logger.info(
+                f"  [Pre-Screen] {len(suspicious_ids)}/{len(raw_row_ids)} trigram eşiği üstünde "
+                f"({prescreen_skipped} düşük trigram — FTS+Vector yine çalışacak)"
+            )
+
+        if len(chunk) == 0:
+            return  # Her şey CLEAN olarak elendi, sonraki adımları atla.
 
         # ── 2. NER + Entity Extraction ───────────────────────────────────────
         ner_start = time.time()

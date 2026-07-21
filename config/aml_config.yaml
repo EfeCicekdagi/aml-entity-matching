@@ -19,8 +19,9 @@ retrieval:
   pgvector_top_k: 20
   merged_top_k: 25
   reranker_top_k: 10
-  min_trgm_score: 0.20          # Pre-screen eşiği (artık BLOKLAYICI DEĞİL, sadece istatistik)
+  min_trgm_score: 0.20          # Pre-screen eşiği
   min_vector_score: 0.40
+  enable_blocking_prescreen: true # Eşik altındakileri CLEAN yapıp yapay zekaya GÖNDERMEZ
   reranker_prefilter_score: 0.30
 
 ner:

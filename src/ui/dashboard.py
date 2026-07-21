@@ -357,28 +357,49 @@ elif page == "📈 Run Detayları":
         (alerts_df['final_score'] >= score_min)
     ]
 
-    # ── KPI Metrikleri ────────────────────────────────────────────────────────────
-    col1, col2, col3, col4, col5, col6, col7 = st.columns(7)
+    # ── KPI Metrikleri (EFT Bazlı) ────────────────────────────────────────────────
+    run_row = runs_df[runs_df['run_id'] == selected_run].iloc[0]
+    total_efts = int(run_row.get('input_row_count', 0))
+    no_cand_efts = int(run_row.get('no_candidate_count', 0))
+    
+    # Alert alan EFT'lerin benzersiz sayılarını bul (Öncelik HIGH)
+    high_eft_ids = set(alerts_df[alerts_df['risk_level']=='HIGH']['eft_id']) if not alerts_df.empty else set()
+    med_eft_ids = set(alerts_df[alerts_df['risk_level']=='MEDIUM']['eft_id']) if not alerts_df.empty else set()
+    
+    # Eğer bir EFT hem HIGH hem MEDIUM alert aldıysa, onu sadece HIGH say!
+    med_eft_ids = med_eft_ids - high_eft_ids
+    
+    high_efts = len(high_eft_ids)
+    medium_efts = len(med_eft_ids)
+    
+    # LOW EFT = Toplam EFT - (HIGH + MEDIUM + No Candidate)
+    low_efts = max(0, total_efts - (high_efts + medium_efts + no_cand_efts))
+    
+    # İlk Satır (4 Kutu)
+    col1, col2, col3, col4 = st.columns(4)
     with col1:
-        st.metric("Toplam Alert", f"{len(alerts_df):,}")
+        st.metric("Toplam İşlenen EFT", f"{total_efts:,}")
     with col2:
-        high_cnt = len(alerts_df[alerts_df['risk_level']=='HIGH']) if not alerts_df.empty else 0
-        st.metric("🔴 HIGH", f"{high_cnt:,}")
+        st.metric("🔴 HIGH (EFT)", f"{high_efts:,}")
     with col3:
-        med_cnt = len(alerts_df[alerts_df['risk_level']=='MEDIUM']) if not alerts_df.empty else 0
-        st.metric("🟠 MEDIUM", f"{med_cnt:,}")
+        st.metric("🟠 MEDIUM (EFT)", f"{medium_efts:,}")
     with col4:
-        avg_score = alerts_df['final_score'].mean() if not alerts_df.empty else 0.0
-        st.metric("Ortalama Skor", f"{avg_score:.3f}")
+        st.metric("🟢 LOW (EFT)", f"{low_efts:,}")
+        
+    st.markdown("<br>", unsafe_allow_html=True) # Araya boşluk
+    
+    # İkinci Satır (4 Kutu)
+    col5, col6, col7, col8 = st.columns(4)
     with col5:
-        run_row = runs_df[runs_df['run_id'] == selected_run].iloc[0]
-        no_cand = int(run_row.get('no_candidate_count', 0)) if not runs_df.empty else 0
-        st.metric("⚫ No Candidate", f"{no_cand:,}")
+        avg_score = alerts_df['final_score'].mean() if not alerts_df.empty else 0.0
+        st.metric("Ortalama Alert Skoru", f"{avg_score:.3f}")
     with col6:
+        st.metric("⚫ No Candidate (EFT)", f"{no_cand_efts:,}")
+    with col7:
         p95 = run_row.get('p95_latency_ms', None) if not runs_df.empty else None
         st.metric("P95 Latency", f"{p95:.0f} ms" if p95 and p95 > 0 else "N/A")
-    with col7:
-        st.metric("Gösterilen", f"{len(filtered):,}")
+    with col8:
+        st.metric("Üretilen Toplam Alert", f"{len(filtered):,}")
 
     st.divider()
     
