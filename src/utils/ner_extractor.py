@@ -66,11 +66,48 @@ class NERExtractor:
 
     def batch_extract_entities(self, texts: list[str]) -> list[str]:
         """
-        Runs NER over a batch of texts.
+        Runs NER over a batch of texts using GPU batching.
         Returns a list of extracted entities (or None if not found) matching the input order.
         """
-        logger.debug(f"Running NER extraction for batch of {len(texts)} texts...")
-        results = []
-        for text in texts:
-            results.append(self.extract_entity(text))
-        return results
+        if not texts:
+            return []
+            
+        logger.debug(f"Running batched NER extraction for {len(texts)} texts...")
+        
+        # Preprocess text (title case if lower)
+        processed_texts = [text.title() if text and text.islower() else (text or "") for text in texts]
+        
+        try:
+            # Batch size 64 for good GPU utilization on 3060
+            batch_results = self.ner_pipeline(processed_texts, batch_size=64)
+        except Exception as e:
+            logger.error(f"Batched NER Extraction failed: {e}")
+            return [None] * len(texts)
+            
+        extracted = []
+        # If len(processed_texts) == 1, pipeline returns list[dict].
+        # If > 1, it returns list[list[dict]].
+        if len(processed_texts) == 1 and (not batch_results or isinstance(batch_results[0], dict)):
+            batch_results = [batch_results]
+            
+        for results in batch_results:
+            if not results:
+                extracted.append(None)
+                continue
+                
+            entities = [
+                res['word'] for res in results 
+                if isinstance(res, dict) and res.get('entity_group') in ['ORG', 'PER'] and res.get('score', 0) > 0.50
+            ]
+            
+            if entities:
+                cleaned = [ent.replace("##", "").strip() for ent in entities]
+                cleaned = [ent for ent in cleaned if ent]
+                if cleaned:
+                    extracted.append(max(cleaned, key=len))
+                else:
+                    extracted.append(None)
+            else:
+                extracted.append(None)
+                
+        return extracted

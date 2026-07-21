@@ -511,15 +511,38 @@ class BatchProcessor:
             rid = str(row.get("eft_id", ""))
             eft_id_lookup[rid] = int(row.get("eft_id", 0))
 
-        reranker_total_s = 0.0
+        # ── 5.1 Batched Reranking ───────────────────────────────────────────
+        reranker_start = time.time()
+        reranker_bulk_data = {}
+        
+        for rid, retrieval_data in all_retrieval_data.items():
+            candidates = retrieval_data.get("candidates", [])
+            norm_exp = row_lookup.get(rid, "")
+            
+            # Pre-filter strong candidates to send to reranker
+            strong = [
+                c for c in candidates
+                if c.get("candidate_score", 0.0) >= self.reranker_prefilter_score
+                or _exact_name_score(norm_exp, c.get("variant_name", "")) == 1.0
+            ]
+            if not strong and candidates:
+                strong = candidates
+                
+            reranker_bulk_data[rid] = {"norm_exp": norm_exp, "candidates": strong}
+            
+        self.reranker.score_candidates_bulk(reranker_bulk_data)
+        metrics["reranker_duration_s"] = metrics.get("reranker_duration_s", 0) + (time.time() - reranker_start)
+
         scoring_total_s  = 0.0
 
+        # ── 5.2 Parallel Scoring ─────────────────────────────────────────────
         with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
             future_map = {
                 executor.submit(
                     self._score_row,
                     rid,
                     retrieval_data,
+                    reranker_bulk_data[rid]["candidates"],
                     row_lookup,
                     extraction_lookup,
                     run_id,
@@ -533,7 +556,6 @@ class BatchProcessor:
                     row_result = future.result()
                     metrics["processed_row_count"] += 1
                     per_row_latencies.append(row_result.get("latency_ms", 0))
-                    reranker_total_s += row_result.get("reranker_s", 0)
                     scoring_total_s  += row_result.get("scoring_s", 0)
 
                     if row_result["no_candidate"]:
@@ -552,13 +574,13 @@ class BatchProcessor:
                     metrics["processed_row_count"] += 1
                     metrics["error_count"]         += 1
 
-        metrics["reranker_duration_s"] = metrics.get("reranker_duration_s", 0) + reranker_total_s
         metrics["scoring_duration_s"]  = metrics.get("scoring_duration_s", 0) + scoring_total_s
 
     def _score_row(
         self,
         row_id: str,
         retrieval_data: dict,
+        strong_candidates: list,
         row_lookup: dict,
         extraction_lookup: dict,
         run_id: str,
@@ -616,23 +638,15 @@ class BatchProcessor:
             return result
 
         # ── Pre-filter: reranker'a göndermeden önce zayıfları eleme ─────────
-        strong = [
-            c for c in candidates
-            if c.get("candidate_score", 0.0) >= self.reranker_prefilter_score
-            or _exact_name_score(norm_exp, c.get("variant_name", "")) == 1.0
-        ]
-
+        # (Artık sadece loglama veya fallback için strong_candidates üzerinden dönülüyor)
+        
         # ── Reranker ─────────────────────────────────────────────────────────
-        reranker_start = time.time()
-        if strong:
-            strong = self.reranker.score_candidates(norm_exp, strong)
-        else:
-            strong = candidates  # Hepsi düşükse yine de devam et
-        result["reranker_s"] = time.time() - reranker_start
+        # Reranker artık _score_row dışındaki toplu (batched) yapıda çalışıyor!
+        result["reranker_s"] = 0.0
 
         # ── Scoring ──────────────────────────────────────────────────────────
         scoring_start = time.time()
-        for rank_idx, cand in enumerate(strong):
+        for rank_idx, cand in enumerate(strong_candidates):
             self._process_candidate(
                 cand, rank_idx, norm_exp, extraction, eft_id, run_id,
                 pipeline_status, no_cand_reason, channel_counts, candidate_count,

@@ -176,3 +176,78 @@ class Reranker:
                     candidates[idx]['reranker_score'] = 0.0
 
         return candidates
+
+    def score_candidates_bulk(self, bulk_data: dict) -> dict:
+        """
+        Rerank a bulk set of candidates across multiple rows.
+        bulk_data: {row_id: {"norm_exp": "...", "candidates": [...]}}
+        Modifies candidates in-place to add 'reranker_score'.
+        """
+        if not self.enabled or not bulk_data:
+            return bulk_data
+
+        self._load_model()
+        if not self.model:
+            return bulk_data
+
+        flat_candidates = []
+        cache_keys = []
+        
+        for row_id, data in bulk_data.items():
+            norm_exp = data.get("norm_exp", "")
+            for cand in data.get("candidates", []):
+                flat_candidates.append((norm_exp, cand))
+                cache_keys.append(self._generate_cache_key(norm_exp, cand["variant_id"]))
+                
+        if not flat_candidates:
+            return bulk_data
+            
+        cached_map = self._get_cached_scores_batch(cache_keys)
+        
+        pairs_to_score = []
+        indices_to_score = [] 
+        
+        for i, (norm_exp, cand) in enumerate(flat_candidates):
+            ckey = cache_keys[i]
+            if ckey in cached_map:
+                cand['raw_reranker_score'] = cached_map[ckey]["raw"]
+                cand['normalized_reranker_score'] = cached_map[ckey]["norm"]
+                cand['reranker_score'] = cached_map[ckey]["norm"]
+            else:
+                pairs_to_score.append((norm_exp, cand["variant_name"]))
+                indices_to_score.append((i, ckey, norm_exp, cand["variant_id"]))
+                
+        if pairs_to_score:
+            try:
+                with self._predict_lock:
+                    scores = self.model.predict(pairs_to_score, batch_size=128, show_progress_bar=False)
+                    
+                new_cache_entries = []
+                for score, (i, ckey, norm_exp, variant_id) in zip(scores, indices_to_score):
+                    raw_score = float(score)
+                    norm_score = raw_score
+                    
+                    cand = flat_candidates[i][1]
+                    cand['raw_reranker_score'] = raw_score
+                    cand['normalized_reranker_score'] = norm_score
+                    cand['reranker_score'] = norm_score
+                    
+                    new_cache_entries.append({
+                        "cache_key": ckey,
+                        "norm_exp": norm_exp,
+                        "variant_id": variant_id,
+                        "raw_score": raw_score,
+                        "norm_score": norm_score
+                    })
+                    
+                self._save_cached_scores_batch(new_cache_entries)
+            except Exception as e:
+                logger.error(f"Error in bulk reranking: {e}")
+                for i, _, _, _ in indices_to_score:
+                    cand = flat_candidates[i][1]
+                    cand['raw_reranker_score'] = 0.0
+                    cand['normalized_reranker_score'] = 0.0
+                    cand['reranker_score'] = 0.0
+                    
+        return bulk_data
+
