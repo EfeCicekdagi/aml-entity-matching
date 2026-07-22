@@ -262,7 +262,9 @@ class AMLRepository:
                         decision_status, candidate_count,
                         reason_codes, human_explanation,
                         retrieval_sources, candidate_rank,
-                        matched_variant_name, variant_type, watchlist_company_name
+                        matched_variant_name, variant_type, watchlist_company_name,
+                        name_score, country_score, identifier_score, address_score,
+                        date_of_birth_score, entity_type_score, auxiliary_field_reason_codes
                     )
                     VALUES %s
                     ON CONFLICT DO NOTHING
@@ -299,6 +301,13 @@ class AMLRepository:
                         r.get("matched_variant_name"),
                         r.get("variant_type"),
                         r.get("watchlist_company_name"),
+                        r.get("name_score"),
+                        r.get("country_score"),
+                        r.get("identifier_score"),
+                        r.get("address_score"),
+                        r.get("date_of_birth_score"),
+                        r.get("entity_type_score"),
+                        json.dumps(r.get("auxiliary_field_reason_codes", {})) if r.get("auxiliary_field_reason_codes") else None,
                     )
                     for r in results
                 ])
@@ -392,6 +401,35 @@ class AMLRepository:
             conn.rollback()
         finally:
             self.release_connection(conn)
+
+    def populate_alert_export(self, run_id: str, input_table: str = None):
+        """
+        Bu fonksiyon her run bitiminde alert_export tablosunu ilgili run_id icin doldurur.
+        UI'daki agir JOIN operasyonlarindan kurtulmak amaciyla tum detay veriyi birlestirip buraya yazar.
+        """
+        if not input_table:
+            input_table = TABLES["eft_input"]
+            
+        with self.get_connection() as conn:
+            with conn.cursor() as cur:
+                # Eger ayni run_id onceden yazildiysa temizle (idempotency)
+                cur.execute(f"DELETE FROM {TABLES['alert_export']} WHERE run_id = %s", (run_id,))
+                
+                # Sadece mevcut run_id icin ilgili alert'leri ve EFT verilerini birlestirip bas
+                query = f"""
+                    INSERT INTO {TABLES['alert_export']} (
+                        alert_id, run_id, eft_id, transaction_date, amount, sender_account_id, receiver_account_id, original_explanation, source_system, batch_id, original_company_name, final_score, fuzzy_score, vector_score, reranker_score, risk_level, alert_status, extracted_entity, match_reason, created_at, entity_extraction_status, matched_variant_name, variant_type, watchlist_company_name, reviewed_by, reviewed_at, review_result, analyst_note, false_positive_reason, status_updated_at, decision_status, reason_codes, calibrated_probability, calibration_applied, entity_type, extraction_method, candidate_count, human_explanation, retrieval_sources
+                    )
+                    SELECT 
+                        a.alert_id, a.run_id, a.eft_id, v.transaction_date, v.amount, v.sender_account_id, v.receiver_account_id, v.explanation, v.source_system, v.batch_id, c.original_company_name, a.final_score, a.fuzzy_score, a.vector_score, a.reranker_score, a.risk_level, a.alert_status, a.extracted_entity, a.match_reason, a.created_at, a.entity_extraction_status, a.matched_variant_name, a.variant_type, a.watchlist_company_name, a.reviewed_by, a.reviewed_at, a.review_result, a.analyst_note, a.false_positive_reason, a.status_updated_at, a.decision_status, a.reason_codes, a.calibrated_probability, a.calibration_applied, a.entity_type, a.extraction_method, a.candidate_count, a.human_explanation, a.retrieval_sources
+                    FROM {TABLES['alert']} a
+                    LEFT JOIN {input_table} v ON a.eft_id = v.eft_id
+                    LEFT JOIN {TABLES['company_variant']} c ON a.variant_id = c.variant_id
+                    WHERE a.run_id = %s
+                """
+                cur.execute(query, (run_id,))
+            conn.commit()
+            logger.info(f"Populated alert_export flat table for run_id: {run_id}")
 
     # ── Alert status güncelleme + history ─────────────────────────────────────
 

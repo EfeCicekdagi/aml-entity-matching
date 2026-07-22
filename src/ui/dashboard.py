@@ -79,37 +79,10 @@ def load_alerts(run_id):
         return pd.DataFrame()
     try:
         df = pd.read_sql(f"""
-            SELECT a.alert_id, a.eft_id, 
-                   COALESCE(e1.transaction_date, e2.transaction_date) as transaction_date, 
-                   COALESCE(e1.amount, e2.amount) as amount, 
-                   COALESCE(e1.sender_account_id, e2.sender_account_id) as sender_account_id, 
-                   COALESCE(e1.receiver_account_id, e2.receiver_account_id) as receiver_account_id, 
-                   COALESCE(e1.explanation, e2.explanation) AS original_explanation, 
-                   COALESCE(e1.source_system, e2.source_system) as source_system, 
-                   COALESCE(e1.batch_id, e2.batch_id) as batch_id,
-                   v.original_company_name,
-                   ROUND(a.final_score::numeric, 3) AS final_score,
-                   ROUND(a.fuzzy_score::numeric, 3) AS fuzzy_score,
-                   ROUND(a.vector_score::numeric, 3) AS vector_score,
-                   ROUND(a.reranker_score::numeric, 3) AS reranker_score,
-                   a.risk_level, a.alert_status, a.extracted_entity, a.match_reason, a.created_at,
-                   a.entity_extraction_status, a.matched_variant_name, a.variant_type,
-                   a.watchlist_company_name, a.reviewed_by, a.reviewed_at, a.review_result,
-                   a.analyst_note, a.false_positive_reason, a.status_updated_at,
-                   COALESCE(a.decision_status, a.risk_level) AS decision_status,
-                   a.reason_codes,
-                   ROUND(COALESCE(a.calibrated_probability, a.reranker_score)::numeric, 3) AS calibrated_probability,
-                   COALESCE(a.calibration_applied, false) AS calibration_applied,
-                   a.entity_type, a.extraction_method,
-                   COALESCE(a.candidate_count, 0) AS candidate_count,
-                   a.human_explanation,
-                   a.retrieval_sources
-            FROM {TABLES['alert']} a
-            JOIN {TABLES['company_variant']} v ON a.variant_id=v.variant_id
-            LEFT JOIN {TABLES['eft_input']} e1 ON a.eft_id = e1.eft_id
-            LEFT JOIN aml_source.test_eft_input e2 ON a.eft_id = e2.eft_id
-            WHERE a.run_id = %(run_id)s
-            ORDER BY a.final_score DESC
+            SELECT *
+            FROM {TABLES['alert_export']}
+            WHERE run_id = %(run_id)s
+            ORDER BY final_score DESC
         """, conn, params={"run_id": run_id})
     finally:
         repo.release_connection(conn)

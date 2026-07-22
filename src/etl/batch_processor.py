@@ -360,6 +360,12 @@ class BatchProcessor:
             )
             # Latency percentiles ayrıca güncellenir
             self._update_latency_metrics(run_id, latency_stats)
+            
+            # Run bazli export tablosunu doldur (UI icin)
+            try:
+                self.repo.populate_alert_export(run_id, table_name)
+            except Exception as e:
+                logger.error(f"Error populating export table: {e}")
 
             logger.info(
                 f"Batch complete. Rows: {metrics['input_row_count']} | "

@@ -21,7 +21,7 @@ retrieval:
   reranker_top_k: 10
   min_trgm_score: 0.20          # Pre-screen eşiği
   min_vector_score: 0.40
-  enable_blocking_prescreen: true # Eşik altındakileri CLEAN yapıp yapay zekaya GÖNDERMEZ
+  enable_blocking_prescreen: false # Ön eleme (Trigram) filtresi KAPATILDI
   reranker_prefilter_score: 0.30
 
 ner:

@@ -29,6 +29,7 @@ MIGRATIONS = [
     "18_create_benchmark_tables.sql",
     "19_create_model_governance_table.sql",
     "20_create_auxiliary_entity_fields.sql",
+    "21_create_alert_export_table.sql",
 ]
 
 

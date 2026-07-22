@@ -25,11 +25,13 @@ TABLES = {
     "candidate_match":    "aml_core.candidate_match",   # Eski (uyumluluk)
     "scoring_result":     "aml_core.scoring_result",    # Eski (uyumluluk)
     "alert":              "aml_core.alert",             # Sadece HIGH/MEDIUM
+    "alert_export":       "aml_core.alert_export",      # YENİ (Flat export tablo)
 
     # Config
     "scoring_weight":     "aml_config.scoring_weight",
     "threshold":          "aml_config.threshold",
     "model_registry":     "aml_config.model_registry",          # YENİ
+    "model_governance":   "aml_eval.model_governance",          # YENİ
     "threshold_validation": "aml_config.threshold_validation",  # YENİ
     "calibration_model":  "aml_config.calibration_model",       # YENİ
 
