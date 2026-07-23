@@ -23,7 +23,7 @@
   "recommendations": {
     "best_f1": {
       "high_threshold": 0.55,
-      "medium_threshold": 0.54,
+      "medium_threshold": 0.45,
       "tp": 2,
       "fp": 0,
       "tn": 1,
@@ -38,7 +38,7 @@
     },
     "best_recall": {
       "high_threshold": 0.55,
-      "medium_threshold": 0.54,
+      "medium_threshold": 0.45,
       "tp": 2,
       "fp": 0,
       "tn": 1,

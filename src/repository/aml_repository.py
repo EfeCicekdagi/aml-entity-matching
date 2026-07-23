@@ -1,16 +1,17 @@
 """
 aml_repository.py — AML veritabanı erişim katmanı.
 
-Değişiklikler (v2):
-  - insert_match_results_bulk(): tüm eşleştirme sonuçları
-  - insert_alert_status_history(): append-only analist kararları
-  - start_run_log() / finish_run_log() genişletildi (model hash, watchlist version, latency)
-  - insert_alerts_bulk() geriye uyumlu korundu; sadece HIGH/MEDIUM kayıtlar için çağrılmalı
+Değişiklikler (v3):
+  - connection() context manager eklendi (pool connection leak önlemi).
+  - start_run_log / finish_run_log / insert_match_results_bulk /
+    insert_alerts_bulk artık exception'ı raise ediyor (P0).
+  - populate_alert_export context manager kullanıyor.
 """
 
 import psycopg2
 import json
 import logging
+from contextlib import contextmanager
 from psycopg2.extras import execute_values
 from psycopg2.pool import ThreadedConnectionPool
 from src.config.db_tables import TABLES
@@ -44,6 +45,30 @@ class AMLRepository:
         """Bağlantıyı havuza geri ver."""
         if self.pool and conn:
             self.pool.putconn(conn)
+
+    @contextmanager
+    def connection(self):
+        """
+        Context manager — pool bağlantısını güvenli şekilde alır ve geri verir.
+
+        Kullanım:
+            with self.repo.connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(...)
+                conn.commit()
+
+        Hata durumunda rollback otomatik yapılır ve bağlantı havuza döner.
+        """
+        conn = self.get_connection()
+        if conn is None:
+            raise RuntimeError("Database connection could not be acquired from pool")
+        try:
+            yield conn
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            self.release_connection(conn)
 
     def execute_script(self, script_path: str) -> None:
         """SQL script dosyasını çalıştırır."""
@@ -115,8 +140,9 @@ class AMLRepository:
                 ))
             conn.commit()
         except Exception as e:
-            logger.error(f"Error starting run log: {e}")
+            logger.exception("Error starting run log")
             conn.rollback()
+            raise
         finally:
             self.release_connection(conn)
 
@@ -180,8 +206,9 @@ class AMLRepository:
                 ))
             conn.commit()
         except Exception as e:
-            logger.error(f"Error finishing run log: {e}")
+            logger.exception("Error finishing run log")
             conn.rollback()
+            raise
         finally:
             self.release_connection(conn)
 
@@ -314,8 +341,9 @@ class AMLRepository:
             conn.commit()
             logger.debug(f"Bulk inserted {len(results)} match results.")
         except Exception as e:
-            logger.error(f"Error bulk inserting match results: {e}")
+            logger.exception("Error bulk inserting match results")
             conn.rollback()
+            raise
         finally:
             self.release_connection(conn)
 
@@ -397,8 +425,9 @@ class AMLRepository:
             conn.commit()
             logger.debug(f"Bulk inserted {len(alerts)} alerts.")
         except Exception as e:
-            logger.error(f"Error bulk inserting alerts: {e}")
+            logger.exception("Error bulk inserting alerts")
             conn.rollback()
+            raise
         finally:
             self.release_connection(conn)
 
@@ -406,21 +435,22 @@ class AMLRepository:
         """
         Bu fonksiyon her run bitiminde alert_export tablosunu ilgili run_id icin doldurur.
         UI'daki agir JOIN operasyonlarindan kurtulmak amaciyla tum detay veriyi birlestirip buraya yazar.
+        DELETE + INSERT ayni transaction icinde — idempotent (ayni run_id tekrar calisirsa duplicate uretmez).
         """
         if not input_table:
             input_table = TABLES["eft_input"]
-            
-        with self.get_connection() as conn:
+
+        with self.connection() as conn:
             with conn.cursor() as cur:
                 # Eger ayni run_id onceden yazildiysa temizle (idempotency)
                 cur.execute(f"DELETE FROM {TABLES['alert_export']} WHERE run_id = %s", (run_id,))
-                
+
                 # Sadece mevcut run_id icin ilgili alert'leri ve EFT verilerini birlestirip bas
                 query = f"""
                     INSERT INTO {TABLES['alert_export']} (
                         alert_id, run_id, eft_id, transaction_date, amount, sender_account_id, receiver_account_id, original_explanation, source_system, batch_id, original_company_name, final_score, fuzzy_score, vector_score, reranker_score, risk_level, alert_status, extracted_entity, match_reason, created_at, entity_extraction_status, matched_variant_name, variant_type, watchlist_company_name, reviewed_by, reviewed_at, review_result, analyst_note, false_positive_reason, status_updated_at, decision_status, reason_codes, calibrated_probability, calibration_applied, entity_type, extraction_method, candidate_count, human_explanation, retrieval_sources
                     )
-                    SELECT 
+                    SELECT
                         a.alert_id, a.run_id, a.eft_id, v.transaction_date, v.amount, v.sender_account_id, v.receiver_account_id, v.explanation, v.source_system, v.batch_id, c.original_company_name, a.final_score, a.fuzzy_score, a.vector_score, a.reranker_score, a.risk_level, a.alert_status, a.extracted_entity, a.match_reason, a.created_at, a.entity_extraction_status, a.matched_variant_name, a.variant_type, a.watchlist_company_name, a.reviewed_by, a.reviewed_at, a.review_result, a.analyst_note, a.false_positive_reason, a.status_updated_at, a.decision_status, a.reason_codes, a.calibrated_probability, a.calibration_applied, a.entity_type, a.extraction_method, a.candidate_count, a.human_explanation, a.retrieval_sources
                     FROM {TABLES['alert']} a
                     LEFT JOIN {input_table} v ON a.eft_id = v.eft_id
@@ -429,7 +459,8 @@ class AMLRepository:
                 """
                 cur.execute(query, (run_id,))
             conn.commit()
-            logger.info(f"Populated alert_export flat table for run_id: {run_id}")
+        logger.info(f"Populated alert_export flat table for run_id: {run_id}")
+
 
     # ── Alert status güncelleme + history ─────────────────────────────────────
 

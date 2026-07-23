@@ -9,11 +9,11 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from src.utils.config_loader import ConfigLoader
+from src.config.config_loader import ConfigLoader
 from src.repository.aml_repository import AMLRepository
 from src.utils.text_utils import normalize_text, get_normalized_core_name, is_consonant_match
 from src.config.db_tables import TABLES
-from src.etl.batch_processor import _acronym_score, _rule_score, _exact_name_score
+from src.pipeline.batch_processor import _acronym_score, _rule_score, _exact_name_score
 
 # ── Sayfa ayarlari ───────────────────────────────────────────────────────────
 st.set_page_config(
@@ -92,9 +92,9 @@ def load_alerts(run_id):
 def load_live_components():
     import torch
     from sentence_transformers import SentenceTransformer
-    from src.utils.ner_extractor import NERExtractor
+    from src.models.ner_extractor import NERExtractor
     from src.retrieval.postgres_candidate_retriever import PostgresCandidateRetriever
-    from src.reranker.reranker import Reranker
+    from src.models.reranker import Reranker
     from src.scoring.final_scorer import FinalScorer
     
     config_loader = ConfigLoader()

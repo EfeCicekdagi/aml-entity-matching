@@ -6,7 +6,8 @@ from sklearn.metrics import precision_score, recall_score, f1_score, accuracy_sc
 import numpy as np
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
-from src.utils.config_loader import ConfigLoader
+from src.config.config_loader import ConfigLoader
+from src.config.db_tables import TABLES
 from src.repository.aml_repository import AMLRepository
 from src.scoring.final_scorer import FinalScorer
 
@@ -127,3 +128,55 @@ if __name__ == "__main__":
     raw_scores = opt.load_cached_raw_scores()
     best_w = opt.get_best_weights()
     opt.grid_search_thresholds(raw_scores, best_w)
+    
+    # ── Threshold Recommendation Report ──────────────────────────────────────
+    # Production config OTOMATIK OLARAK DEĞİŞTİRİLMEZ.
+    # Aşağıdaki rapor yalnızca öneride bulunur.
+    conn = opt.repo.get_connection()
+    cur = conn.cursor()
+    
+    # A. En iyi Alert/No-Alert threshold'u (F1 bazında)
+    cur.execute("""
+        SELECT medium_threshold, high_threshold, f1_score, recall_score, precision_score, tp, fp, tn, fn
+        FROM aml_experiment.threshold_analysis
+        ORDER BY f1_score DESC LIMIT 1
+    """)
+    best_f1_row = cur.fetchone()
+    
+    # B. HIGH/MEDIUM ayrımı analizi (sadece alert olan örneklerde)
+    # Ground truth'ta HIGH/MEDIUM ayrımı yoksa bu bölüm atlanır.
+    print("\n" + "="*60)
+    print("THRESHOLD RECOMMENDATION REPORT")
+    print("="*60)
+    print("[!] Bu rapor yalnızca öneridir. Production config değiştirilmedi.")
+    print()
+    
+    if best_f1_row:
+        medium_thr, high_thr, f1, recall, precision, tp, fp, tn, fn = best_f1_row
+        fpr = fp / (fp + tn) if (fp + tn) > 0 else 0
+        fnr = fn / (fn + tp) if (fn + tp) > 0 else 0
+        alert_count = tp + fp
+        total = tp + fp + tn + fn
+        alerts_per_1k = (alert_count / total * 1000) if total > 0 else 0
+        print(f"[A] Alert/No-Alert Threshold Önerisi (Best F1):")
+        print(f"    medium_threshold : {medium_thr}")
+        print(f"    high_threshold   : {high_thr}")
+        print(f"    F1               : {f1:.4f}")
+        print(f"    Precision        : {precision:.4f}")
+        print(f"    Recall           : {recall:.4f}")
+        print(f"    FPR              : {fpr:.4f}")
+        print(f"    FNR              : {fnr:.4f}")
+        print(f"    Alert Count      : {alert_count}")
+        print(f"    Alerts/1000 tx   : {alerts_per_1k:.1f}")
+    
+    print()
+    print("[B] HIGH/MEDIUM Ayrımı:")
+    print("    Ground truth'ta HIGH ve MEDIUM etiketleri ayrı tanımlı değil.")
+    print("    Bu nedenle HIGH/MEDIUM ayrım eşiği yalnızca Alert olan kayıtlar üzerinde")
+    print("    iş kuralına göre belirlenebilir (örn. risk skoru >= 0.85 → HIGH).")
+    print("    Şu an için HIGH/MEDIUM ayrımı optimize edilememektedir.")
+    print("    Bu analiz P1 aşamasına bırakılmıştır.")
+    print("="*60)
+    
+    cur.close()
+    opt.repo.release_connection(conn)

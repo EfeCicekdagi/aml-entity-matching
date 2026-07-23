@@ -333,24 +333,38 @@ class PostgresCandidateRetriever:
                 norm_exps = [r["normalized_explanation"] for r in rows]
 
                 trgm_query = f"""
+                    WITH input AS (
+                        SELECT UNNEST(%s::text[]) AS norm_exp,
+                               UNNEST(%s::text[]) AS row_id
+                    )
                     SELECT
                         input.row_id,
-                        v.company_id,
-                        v.variant_id,
-                        similarity(input.norm_exp, v.normalized_variant_name) AS candidate_score,
-                        v.original_company_name,
-                        v.normalized_variant_name,
-                        v.variant_type,
-                        COALESCE(v.alias_confidence, 1.0),
+                        nearest.company_id,
+                        nearest.variant_id,
+                        nearest.candidate_score,
+                        nearest.original_company_name,
+                        nearest.normalized_variant_name,
+                        nearest.variant_type,
+                        nearest.alias_confidence,
                         'pg_trgm' AS source
-                    FROM
-                        (SELECT UNNEST(%s::text[]) AS norm_exp,
-                                UNNEST(%s::text[]) AS row_id) AS input
-                    JOIN {TABLES['company_variant']} v ON v.is_active = true
-                    WHERE similarity(input.norm_exp, v.normalized_variant_name) >= %s
-                    ORDER BY candidate_score DESC
+                    FROM input
+                    CROSS JOIN LATERAL (
+                        SELECT
+                            v.company_id,
+                            v.variant_id,
+                            similarity(input.norm_exp, v.normalized_variant_name) AS candidate_score,
+                            v.original_company_name,
+                            v.normalized_variant_name,
+                            v.variant_type,
+                            COALESCE(v.alias_confidence, 1.0) AS alias_confidence
+                        FROM {TABLES['company_variant']} v
+                        WHERE v.is_active = true
+                          AND similarity(input.norm_exp, v.normalized_variant_name) >= %s
+                        ORDER BY similarity(input.norm_exp, v.normalized_variant_name) DESC
+                        LIMIT %s
+                    ) nearest
                 """
-                cur.execute(trgm_query, (norm_exps, row_ids, self.min_trgm_score))
+                cur.execute(trgm_query, (norm_exps, row_ids, self.min_trgm_score, self.trgm_top_k))
 
                 for row in cur.fetchall():
                     rid = row[0]
@@ -372,27 +386,40 @@ class PostgresCandidateRetriever:
                 # Her norm_exp için FTS arama — UNNEST ile tek round-trip
                 # NOT: PostgreSQL'de plainto_tsquery ile LATERAL kullanmak gerekir
                 fts_query = f"""
+                    WITH input AS (
+                        SELECT UNNEST(%s::text[]) AS norm_exp,
+                               UNNEST(%s::text[]) AS row_id
+                    )
                     SELECT
                         input.row_id,
-                        v.company_id,
-                        v.variant_id,
-                        ts_rank(
-                            to_tsvector('simple', v.normalized_variant_name),
-                            plainto_tsquery('simple', input.norm_exp)
-                        ) AS candidate_score,
-                        v.original_company_name,
-                        v.normalized_variant_name,
-                        v.variant_type,
-                        COALESCE(v.alias_confidence, 1.0)
-                    FROM
-                        (SELECT UNNEST(%s::text[]) AS norm_exp,
-                                UNNEST(%s::text[]) AS row_id) AS input
-                    JOIN {TABLES['company_variant']} v ON v.is_active = true
-                    WHERE to_tsvector('simple', v.normalized_variant_name)
-                          @@ plainto_tsquery('simple', input.norm_exp)
-                    ORDER BY candidate_score DESC
+                        nearest.company_id,
+                        nearest.variant_id,
+                        nearest.candidate_score,
+                        nearest.original_company_name,
+                        nearest.normalized_variant_name,
+                        nearest.variant_type,
+                        nearest.alias_confidence
+                    FROM input
+                    CROSS JOIN LATERAL (
+                        SELECT
+                            v.company_id,
+                            v.variant_id,
+                            ts_rank(
+                                to_tsvector('simple', v.normalized_variant_name),
+                                plainto_tsquery('simple', input.norm_exp)
+                            ) AS candidate_score,
+                            v.original_company_name,
+                            v.normalized_variant_name,
+                            v.variant_type,
+                            COALESCE(v.alias_confidence, 1.0) AS alias_confidence
+                        FROM {TABLES['company_variant']} v
+                        WHERE v.is_active = true
+                          AND to_tsvector('simple', v.normalized_variant_name) @@ plainto_tsquery('simple', input.norm_exp)
+                        ORDER BY ts_rank(to_tsvector('simple', v.normalized_variant_name), plainto_tsquery('simple', input.norm_exp)) DESC
+                        LIMIT %s
+                    ) nearest
                 """
-                cur.execute(fts_query, (norm_exps, row_ids))
+                cur.execute(fts_query, (norm_exps, row_ids, self.full_text_top_k))
 
                 for row in cur.fetchall():
                     rid = row[0]

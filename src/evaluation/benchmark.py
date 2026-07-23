@@ -379,9 +379,7 @@ if __name__ == "__main__":
     import os
     import sys
     sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
-    from src.utils.config_loader import ConfigLoader
-    from src.repository.aml_repository import AMLRepository
-
+    from src.config.config_loader import ConfigLoader
     parser = argparse.ArgumentParser(description="Run AML Benchmark")
     parser.add_argument("--run-name", default="benchmark_v1", help="Name of the benchmark run")
     parser.add_argument("--output", default="outputs/benchmark_report.json")
@@ -397,54 +395,127 @@ if __name__ == "__main__":
         host=db_config.get("host"), port=db_config.get("port"),
         dbname=db_config.get("name"), user=db_config.get("user"), password=db_config.get("password")
     )
+    retrieval_config = config_loader.get_retrieval_config()
+    reranker_config = config_loader.get_reranker_config()
+    scoring_config = config_loader.get_scoring_config()
 
-    runner = BenchmarkRunner(repo=repo)
+    retriever = PostgresCandidateRetriever(repo, retrieval_config)
+    reranker = Reranker(repo, reranker_config)
+    scorer = FinalScorer(
+        repo,
+        config_version=scoring_config.get("scoring_config_version", "scoring_v2_reranker"),
+        threshold_version=scoring_config.get("threshold_config_version", "threshold_v2_reranker"),
+    )
+
+    # Initialize MatchEngine with NER if enabled
+    entity_extractor = None
+    if config_loader.config.get("ner", {}).get("enabled", False):
+        try:
+            from src.models.ner_extractor import NERExtractor
+            from src.models.entity_extractor import EntityExtractor
+            ner_model = config_loader.config.get("ner", {}).get("model_name", "savasy/bert-base-turkish-ner-cased")
+            ner_extractor = NERExtractor(model_name=ner_model, device=-1)
+            entity_extractor = EntityExtractor(ner_extractor=ner_extractor)
+            logger.info("Entity extractor initialized for benchmark.")
+        except Exception as e:
+            logger.error(f"Failed to initialize NER for benchmark: {e}")
+            raise RuntimeError("NER initialization failed. Cannot proceed without real pipeline.") from e
+
+    from sentence_transformers import SentenceTransformer
+    emb_model_name = config_loader.get_embedding_config().get("model_name", "BAAI/bge-m3")
+    emb_model = SentenceTransformer(emb_model_name)
+
+    match_engine = MatchEngine(
+        config=config_loader.config,
+        retriever=retriever,
+        reranker=reranker,
+        entity_extractor=entity_extractor,
+        embedding_model=emb_model,
+    )
+
+    runner = BenchmarkRunner(repo=repo, retriever=retriever, scorer=scorer, entity_extractor=entity_extractor)
     cases = runner.load_test_cases_from_db()
 
     if not cases:
-        logger.warning("No test cases found in DB. Please seed aml_eval.test_case table first.")
-        # Create a dummy one for demonstration
-        cases = [
-            TestCase(
-                test_case_id="TC-001", eft_explanation="APPLE INC PAYMENT",
-                expected_entity="APPLE INC", expected_company_id=1, expected_variant_id=1,
-                expected_label="HIGH_ALERT"
-            )
-        ]
-        logger.info("Using a dummy test case for demonstration.")
+        logger.error("No test cases found in DB. Please seed aml_eval.test_case table first.")
+        sys.exit(1)
+
+    logger.info(f"Running benchmark on {len(cases)} test cases using real pipeline...")
+
+    # Collect explanations and row_ids for batch processing
+    explanations = [tc.eft_explanation for tc in cases]
+    row_ids = [tc.test_case_id for tc in cases]
+
+    # Run through MatchEngine (real pipeline)
+    engine_results = match_engine.process_batch(explanations, row_ids)
 
     records = []
-    # Evaluate (Mocking the pipeline for now. In a real scenario, we'd run the pipeline for each case)
-    import random
     for tc in cases:
-        # Mocking the pipeline output
-        is_match = tc.expected_label in ("HIGH_ALERT", "MEDIUM_ALERT", "MATCH")
-        score = random.uniform(0.75, 0.99) if is_match else random.uniform(0.1, 0.6)
-        label = "HIGH_ALERT" if score >= 0.70 else ("MEDIUM_ALERT" if score >= 0.62 else "NO_MATCH")
-        retrieved_ids = [tc.expected_company_id] if is_match and tc.expected_company_id else []
-        
+        start_t = time.time()
+        res = engine_results.get(tc.test_case_id, {})
+        candidates = res.get("candidates", [])
+
+        # Find retrieval rank of expected company
+        retrieved_company_ids = []
+        retrieval_rank = None
+        for rank_idx, cand in enumerate(candidates, start=1):
+            cid = cand.get("company_id") or cand.get("candidate_company_id")
+            retrieved_company_ids.append(cid)
+            if tc.expected_company_id and cid == tc.expected_company_id and retrieval_rank is None:
+                retrieval_rank = rank_idx
+
+        # Score the best candidate using FinalScorer
+        predicted_company_id = None
+        predicted_score = 0.0
+        predicted_label = "NO_MATCH"
+        reason_codes = []
+
+        if candidates:
+            best = candidates[0]
+            predicted_company_id = best.get("company_id") or best.get("candidate_company_id")
+            scores_dict = {
+                "fuzzy_score": best.get("fuzzy_score", best.get("trgm_score", 0.0)),
+                "vector_score": best.get("vector_score", 0.0),
+                "reranker_score": best.get("reranker_score", 0.0),
+                "acronym_score": best.get("acronym_score", 0.0),
+                "rule_score": best.get("rule_score", 0.0),
+                "query_token_count": len(res.get("clean_text", "").split()),
+                "exact_normalized_match": best.get("exact_normalized_match", False),
+                "exact_core_match": best.get("exact_core_match", False),
+                "legal_suffix_only_difference": best.get("legal_suffix_only_difference", False),
+                "consonant_match": best.get("consonant_match", False),
+                "_query_str": res.get("clean_text", ""),
+                "_variant_str": best.get("variant_name", ""),
+            }
+            final_score, match_reason, reason_codes = scorer.calculate_final_score(scores_dict)
+            predicted_score = final_score
+            risk_level = scorer.assign_risk_level(final_score)
+            predicted_label = scorer.assign_decision_status(risk_level)
+
+        processing_time_ms = (time.time() - start_t) * 1000
         rec = runner.evaluate_single(
             test_case=tc,
-            predicted_company_id=tc.expected_company_id if is_match else None,
-            predicted_label=label,
-            predicted_score=score,
-            retrieved_company_ids=retrieved_ids,
-            processing_time_ms=random.uniform(50, 300)
+            predicted_company_id=predicted_company_id,
+            predicted_label=predicted_label,
+            predicted_score=predicted_score,
+            retrieved_company_ids=retrieved_company_ids,
+            reason_codes=reason_codes,
+            processing_time_ms=processing_time_ms,
         )
         records.append(rec)
 
     runner.save_results_to_db(records, args.run_name)
     report = runner.compute_metrics(records)
-    
+
     os.makedirs(os.path.dirname(args.output), exist_ok=True)
     runner.save_report_json(report, args.output)
 
     # Save scores.csv for threshold validator
     if args.csv:
         os.makedirs(os.path.dirname(args.csv), exist_ok=True)
-        import csv
+        import csv as csv_mod
         with open(args.csv, "w", newline="", encoding="utf-8") as f:
-            writer = csv.writer(f)
+            writer = csv_mod.writer(f)
             writer.writerow(["score", "label"])
             for r in records:
                 label_val = 1 if r.expected_label in ("HIGH_ALERT", "MEDIUM_ALERT", "MATCH") else 0
@@ -458,3 +529,5 @@ if __name__ == "__main__":
         print(f"Accuracy (is_correct): {sum(1 for r in records if r.is_correct)/len(records):.3f}")
         print(f"F1 Score: {o.get('f1', 0):.3f}")
         print(f"Recall@1: {o.get('recall_at_1', 0):.3f}")
+        print(f"MRR: {o.get('mrr', 0):.3f}")
+

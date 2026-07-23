@@ -104,7 +104,7 @@ python scripts/load_company_data.py
 ### 5. Pipeline'ı Çalıştırma
 Bir tablodaki EFT işlemlerini toplu olarak AML motorundan geçirmek için:
 ```bash
-python src/main.py --input-table aml_source.test_eft_input
+python src/app/main.py --input-table eft_input
 ```
 
 ### 6. Analist Arayüzünü Başlatma
@@ -121,15 +121,15 @@ aml-entity-matching/
 │
 ├── sql/                        # Veritabanı tablo kurulumları ve güncellemeler (Migrations)
 ├── src/
-│   ├── config/                 # YAML konfigürasyonları (db, scoring, thresholds)
-│   ├── etl/                    # Toplu veri işleme ve akış yönetimi (Batch Processor)
-│   ├── models/                 # Model ve Veritabanı sınıfları
+│   ├── app/                    # Uygulama başlangıç noktası ve dependency container
+│   ├── config/                 # YAML ve db_tables.py konfigürasyonları
+│   ├── pipeline/               # Toplu veri işleme ve inference_service (Batch Processor)
+│   ├── models/                 # Model sarmalayıcıları (NER, Reranker, Kalibrasyon vb.)
 │   ├── repository/             # Veritabanı (PostgreSQL) CRUD işlemleri
-│   ├── reranker/               # Cross-Encoder (Reranker) entegrasyonları
 │   ├── retrieval/              # Vektör, Trigram ve Full-Text arama motorları
 │   ├── scoring/                # Skor hesaplama ve kural motorları (Ensemble)
 │   ├── ui/                     # Streamlit tabanlı Analist Arayüzü (Dashboard)
-│   └── utils/                  # NER, Metin temizleme (Text Utils) ve Logger yardımcıları
+│   └── utils/                  # Metin temizleme (Text Utils) ve Logger yardımcıları
 │
 ├── scripts/                    # Test verisi yükleme, veritabanı temizleme betikleri
 ├── tests/                      # Birim (Unit) testleri

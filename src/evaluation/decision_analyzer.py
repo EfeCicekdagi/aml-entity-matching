@@ -6,7 +6,8 @@ from collections import defaultdict
 import pandas as pd
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
-from src.utils.config_loader import ConfigLoader
+from src.config.config_loader import ConfigLoader
+from src.config.db_tables import TABLES
 from src.repository.aml_repository import AMLRepository
 from src.scoring.final_scorer import FinalScorer
 

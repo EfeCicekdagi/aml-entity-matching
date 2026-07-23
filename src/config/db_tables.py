@@ -44,4 +44,6 @@ TABLES = {
     # Evaluation
     "test_case":          "aml_eval.test_case",                 # YENİ
     "benchmark_result":   "aml_eval.benchmark_result",          # YENİ
+    "experiment_run":     "aml_experiment.experiment_run",
+    "experiment_result":  "aml_experiment.experiment_result",
 }

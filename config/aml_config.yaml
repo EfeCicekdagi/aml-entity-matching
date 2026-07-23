@@ -24,10 +24,12 @@ retrieval:
   enable_blocking_prescreen: false # Ön eleme (Trigram) filtresi KAPATILDI
   reranker_prefilter_score: 0.30
 
+# [EXPERIMENTAL] Entity Extraction
 ner:
   enabled: true
   model_name: savasy/bert-base-turkish-ner-cased
   device: auto
+  batch_size: 64
 
 entity_extraction:
   # Çok katmanlı extraction yapılandırması
@@ -35,6 +37,7 @@ entity_extraction:
   max_entity_length: 100
   use_full_text_fallback: false  # True: son çare olarak tüm metin kullanılır
 
+# [EXPERIMENTAL] Cross-Encoder Reranking
 reranker:
   enabled: true
   model_name: BAAI/bge-reranker-v2-m3
@@ -42,6 +45,12 @@ reranker:
   batch_size: 32
   use_cache: true
   device: auto
+  output_type: probability
+  apply_sigmoid: false
+
+processing:
+  scoring_workers: 4
+
 
 scoring:
   scoring_config_version: scoring_v2_reranker
@@ -51,6 +60,7 @@ scoring:
   medium_threshold: 0.62
   # LOW ve NO_MATCH artık alert tablosuna yazılmaz — sadece match_result'a
 
+# [EXPERIMENTAL] Score Calibration
 calibration:
   # Kalibrasyon modeli mevcut değilse sistem eski normalize skoru kullanır
   # (calibration_applied=False olarak işaretlenir)

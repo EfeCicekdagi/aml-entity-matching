@@ -16,8 +16,8 @@
     "recall_at_10": 0.6667,
     "recall_at_20": 0.6667,
     "recall_at_30": 0.6667,
-    "avg_score": 0.8161,
-    "avg_latency_ms": 229.07
+    "avg_score": 0.6513,
+    "avg_latency_ms": 243.34
   },
   "by_case_type": {
     "EXACT_MATCH": {
@@ -37,8 +37,8 @@
       "recall_at_10": 1.0,
       "recall_at_20": 1.0,
       "recall_at_30": 1.0,
-      "avg_score": 0.9595,
-      "avg_latency_ms": 277.23
+      "avg_score": 0.7644,
+      "avg_latency_ms": 283.34
     },
     "PARTIAL_MATCH": {
       "n": 1,
@@ -57,8 +57,8 @@
       "recall_at_10": 1.0,
       "recall_at_20": 1.0,
       "recall_at_30": 1.0,
-      "avg_score": 0.9515,
-      "avg_latency_ms": 156.89
+      "avg_score": 0.8672,
+      "avg_latency_ms": 281.41
     },
     "NO_MATCH": {
       "n": 1,
@@ -77,8 +77,8 @@
       "recall_at_10": 0.0,
       "recall_at_20": 0.0,
       "recall_at_30": 0.0,
-      "avg_score": 0.5372,
-      "avg_latency_ms": 253.09
+      "avg_score": 0.3223,
+      "avg_latency_ms": 165.25
     }
   },
   "by_difficulty_level": {
@@ -99,8 +99,8 @@
       "recall_at_10": 0.5,
       "recall_at_20": 0.5,
       "recall_at_30": 0.5,
-      "avg_score": 0.7483,
-      "avg_latency_ms": 265.16
+      "avg_score": 0.5434,
+      "avg_latency_ms": 224.3
     },
     "MEDIUM": {
       "n": 1,
@@ -119,8 +119,8 @@
       "recall_at_10": 1.0,
       "recall_at_20": 1.0,
       "recall_at_30": 1.0,
-      "avg_score": 0.9515,
-      "avg_latency_ms": 156.89
+      "avg_score": 0.8672,
+      "avg_latency_ms": 281.41
     }
   },
   "by_language": {
@@ -141,8 +141,8 @@
       "recall_at_10": 0.6667,
       "recall_at_20": 0.6667,
       "recall_at_30": 0.6667,
-      "avg_score": 0.8161,
-      "avg_latency_ms": 229.07
+      "avg_score": 0.6513,
+      "avg_latency_ms": 243.34
     }
   }
 }
