@@ -5,7 +5,7 @@ import os
 import argparse
 
 # Add src to python path for easier imports if running from root
-sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
 from src.app.container import ApplicationContainer
 from src.pipeline.batch_processor import BatchProcessor

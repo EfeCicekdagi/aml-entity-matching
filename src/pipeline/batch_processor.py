@@ -122,7 +122,7 @@ class BatchProcessor:
                     metrics["input_count"]     += len(chunk)
 
                     raw_explanations = chunk["explanation"].tolist()
-                    row_ids = chunk["row_id"].astype(str).tolist()
+                    row_ids = chunk.get("row_id", chunk["eft_id"]).astype(str).tolist()
                     eft_ids = chunk["eft_id"].tolist()
 
                     chunk_start = time.time()

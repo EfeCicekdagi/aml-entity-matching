@@ -118,4 +118,4 @@ def setup_secure_logging(logger_name: str = None) -> None:
         if isinstance(f, SecureLogFilter):
             return
     target_logger.addFilter(SecureLogFilter())
-    logger.debug(f"SecureLogFilter added to logger: {logger_name or 'root'}")
+    target_logger.debug(f"SecureLogFilter added to logger: {logger_name or 'root'}")

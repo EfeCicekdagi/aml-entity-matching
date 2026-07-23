@@ -13,7 +13,7 @@ from src.config.config_loader import ConfigLoader
 from src.repository.aml_repository import AMLRepository
 from src.utils.text_utils import normalize_text, get_normalized_core_name, is_consonant_match
 from src.config.db_tables import TABLES
-from src.pipeline.batch_processor import _acronym_score, _rule_score, _exact_name_score
+from src.scoring.score_features import _acronym_score, _rule_score, _exact_name_score
 
 # ── Sayfa ayarlari ───────────────────────────────────────────────────────────
 st.set_page_config(
