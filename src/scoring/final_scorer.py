@@ -307,7 +307,7 @@ class FinalScorer:
                 final_score = max(final_score, score_floor)
                 match_reason = "EXACT_COMPACT_MATCH"
                 reason_codes.append(ReasonCode.EXACT_COMPACT_MATCH)
-                logger.info(f"Exact compact match triggered for '{compact_cand}'. Score overridden to {final_score}")
+                logger.debug(f"Exact compact match triggered for '{compact_cand}'. Score overridden to {final_score}")
             else:
                 logger.debug(f"Exact compact match ignored for '{compact_cand}' due to min_length ({len(compact_cand)} < {min_length})")
 
