@@ -172,7 +172,12 @@ class AMLInferenceService:
                 current_ex_method = "FALLBACK_MATCHED_VARIANT"
                 current_ex_status = "FALLBACK"
             
-            scores_dict = build_score_features(clean_text, cand, current_ex_entity)
+            scores_dict = build_score_features(
+                clean_text, 
+                cand, 
+                current_ex_entity, 
+                raw_explanation=norm_exp
+            )
             
             final_score, match_reason, reason_codes = self.scorer.calculate_final_score(
                 scores_dict, alias_confidence=cand.get("alias_confidence", 1.0)
@@ -236,6 +241,10 @@ class AMLInferenceService:
                 "matched_variant_name": cand.get("variant_name"),
                 "variant_type": cand.get("variant_type"),
                 "watchlist_company_name": cand.get("company_name"),
+                "exact_compact_match": scores_dict.get("exact_compact_match", False),
+                "compact_explanation": scores_dict.get("compact_explanation"),
+                "compact_matched_variant": scores_dict.get("compact_matched_variant"),
+                "rule_score": scores_dict.get("rule_score", 0.0),
             }
             result["match_results"].append(match_record)
             

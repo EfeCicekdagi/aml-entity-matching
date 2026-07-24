@@ -296,6 +296,21 @@ class FinalScorer:
                     f"score capped at {final_score:.3f}"
                 )
 
+        # ── Exact compact match override ────────────────────────────────────────
+        if scores.get("exact_compact_match"):
+            compact_cand = scores.get("compact_matched_variant", "")
+            # TODO: ConfigLoader kullanılarak dinamik yapılabilir, şu an default değerleri kullanıyoruz
+            min_length = 10
+            score_floor = 0.98
+            
+            if len(compact_cand) >= min_length:
+                final_score = max(final_score, score_floor)
+                match_reason = "EXACT_COMPACT_MATCH"
+                reason_codes.append(ReasonCode.EXACT_COMPACT_MATCH)
+                logger.info(f"Exact compact match triggered for '{compact_cand}'. Score overridden to {final_score}")
+            else:
+                logger.debug(f"Exact compact match ignored for '{compact_cand}' due to min_length ({len(compact_cand)} < {min_length})")
+
         if not reason_codes:
             reason_codes.append(ReasonCode.LOW_CONFIDENCE)
 

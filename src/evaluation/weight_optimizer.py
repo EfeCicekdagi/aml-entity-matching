@@ -1,7 +1,6 @@
 import sys
 import os
 import pandas as pd
-import itertools
 import json
 from datetime import datetime
 import logging
@@ -54,6 +53,10 @@ class WeightOptimizer:
         if os.path.exists(cache_file):
             with open(cache_file, "r") as f:
                 cached = json.load(f)
+            if isinstance(cached, list):
+                logger.warning(f"Old cache format detected in {cache_file}. Using as-is without metadata validation.")
+                return cached
+
             # Validate metadata — reject stale cache
             cached_meta = cached.get("__metadata__", {})
             mismatches = {k: (cached_meta.get(k), current_meta[k])
@@ -212,7 +215,7 @@ class WeightOptimizer:
         
         # Create experiment run
         run_name = f"Weight-Opt-{datetime.now().strftime('%Y%m%d%H%M%S')}"
-        cur.execute("INSERT INTO {TABLES['experiment_run']} (run_name, description) VALUES (%s, %s) RETURNING experiment_id",
+        cur.execute(f"INSERT INTO {TABLES['experiment_run']} (run_name, description) VALUES (%s, %s) RETURNING experiment_id",
                     (run_name, "Grid Search for weights"))
         experiment_id = cur.fetchone()[0]
         

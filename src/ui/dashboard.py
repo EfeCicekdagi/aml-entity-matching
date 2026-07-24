@@ -8,7 +8,6 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-import plotly.graph_objects as go
 from src.config.config_loader import ConfigLoader
 from src.repository.aml_repository import AMLRepository
 from src.utils.text_utils import normalize_text, get_normalized_core_name, is_consonant_match
@@ -126,7 +125,7 @@ with st.sidebar:
     st.title("🚨 AML Dashboard")
     st.divider()
     
-    page = st.radio("Menü", ["🏠 Ana Sayfa", "📈 Run Detayları", "🧪 Benchmark"])
+    page = st.radio("Menü", ["🏠 Ana Sayfa", "📈 Run Detayları", "📊 Model Optimizasyon"])
     st.divider()
 
     runs_df = load_runs()
@@ -232,14 +231,23 @@ if page == "🏠 Ana Sayfa":
                         query_is_contained = (norm_exp in norm_cand and bool(norm_exp))
                         cand_is_contained = (norm_cand in norm_exp and bool(norm_cand))
 
+                        from src.utils.text_utils import compact_normalize
+                        compact_explanation = compact_normalize(user_input)
+                        compact_matched_variant = compact_normalize(cand["variant_name"])
+                        exact_compact_match = bool(compact_matched_variant and compact_matched_variant in compact_explanation)
+
+                        base_rule_score = max(
+                                _rule_score(norm_exp, cand["variant_name"]),
+                                _exact_name_score(norm_exp, cand["variant_name"])
+                            )
+                        if exact_compact_match:
+                            base_rule_score = 1.0
+
                         scores_dict = {
                             "fuzzy_score":    fuzzy_score,
                             "vector_score":   vector_score,
                             "acronym_score":  _acronym_score(norm_exp, cand["variant_name"]),
-                            "rule_score":     max(
-                                _rule_score(norm_exp, cand["variant_name"]),
-                                _exact_name_score(norm_exp, cand["variant_name"])
-                            ),
+                            "rule_score":     base_rule_score,
                             "reranker_score": cand.get("reranker_score", 0.0),
                             "query_token_count": query_token_count,
                             "exact_normalized_match": exact_normalized_match,
@@ -247,7 +255,10 @@ if page == "🏠 Ana Sayfa":
                             "legal_suffix_only_difference": legal_suffix_only_difference,
                             "query_is_contained_in_candidate": query_is_contained,
                             "candidate_is_contained_in_query": cand_is_contained,
-                            "consonant_match": is_consonant_match(core_query, core_cand)
+                            "consonant_match": is_consonant_match(core_query, core_cand),
+                            "exact_compact_match": exact_compact_match,
+                            "compact_explanation": compact_explanation,
+                            "compact_matched_variant": compact_matched_variant,
                         }
                         
                         if entity:
@@ -277,10 +288,12 @@ if page == "🏠 Ana Sayfa":
                             "Sebep": match_reason,
                             "Gerekçeler": ", ".join(reason_codes),
                             "Final Skor": final_score,
-                            "Reranker Skor": scores_dict["reranker_score"]
-,
+                            "Reranker Skor": scores_dict["reranker_score"],
                             "Vektör Skor": scores_dict["vector_score"],
-                            "Fuzzy Skor": scores_dict["fuzzy_score"]
+                            "Fuzzy Skor": scores_dict["fuzzy_score"],
+                            "Rule Skor": scores_dict["rule_score"],
+                            "Exact Compact Match": "Evet" if scores_dict["exact_compact_match"] else "Hayır",
+                            "Compact Variant": scores_dict["compact_matched_variant"]
                         })
                     
                     if not results:
@@ -628,3 +641,88 @@ elif page == "🧪 Benchmark":
                     f"MEDIUM={best_f1.get('medium_threshold')} → F1={best_f1.get('f1', 0):.3f}"
                 )
             st.warning(report.get('note', ''))
+
+elif page == "📊 Model Optimizasyon":
+    st.title("📊 Model Optimizasyon Raporu")
+    st.markdown("Bu sayfada son yapılan ağırlık (weight) ve eşik (threshold) optimizasyonu testlerinin sonuçlarını ve seçilen konfigürasyonların matematiksel gerekçelerini (kanıtlarını) inceleyebilirsiniz.")
+    
+    st.divider()
+    
+    repo = get_repo()
+    conn = repo.get_connection()
+    if not conn:
+        st.error("Veritabanına bağlanılamadı.")
+    else:
+        try:
+            # 1. Weight Optimizasyonu Sonuçları
+            st.markdown("### 1. Ağırlık (Weight) Optimizasyonu Sonuçları")
+            st.markdown("Farklı (Fuzzy, Vector, Reranker) ağırlık kombinasyonlarının **F1 Skoru** üzerindeki etkileri:")
+            
+            weight_df = pd.read_sql("""
+                SELECT fuzzy_weight, vector_weight, reranker_weight, f1_score, precision_score, recall_score
+                FROM aml_experiment.weight_analysis
+                WHERE experiment_id = (SELECT MAX(experiment_id) FROM aml_experiment.weight_analysis)
+                ORDER BY f1_score DESC
+            """, conn)
+            
+            if not weight_df.empty:
+                weight_df["Model Konfigürasyonu (F/V/R)"] = weight_df.apply(
+                    lambda row: f"F:{row['fuzzy_weight']:.1f} V:{row['vector_weight']:.1f} R:{row['reranker_weight']:.1f}", axis=1)
+                
+                # En iyi 10 sonucu bar chart ile göster
+                top_weights = weight_df.head(10).sort_values("f1_score", ascending=True)
+                fig1 = px.bar(top_weights, x="f1_score", y="Model Konfigürasyonu (F/V/R)", orientation='h',
+                              title="En İyi 10 Ağırlık Konfigürasyonu (F1 Skoru)",
+                              color="f1_score", color_continuous_scale="Viridis",
+                              labels={'f1_score': 'F1 Skoru'})
+                st.plotly_chart(fig1, use_container_width=True)
+                
+                with st.expander("Tabloyu Görüntüle"):
+                    st.dataframe(weight_df.style.highlight_max(subset=['f1_score', 'precision_score'], color='lightgreen'))
+                    
+                best_w = weight_df.iloc[0]
+                st.success(f"**Sonuç:** En iyi performansı (F1: {best_w['f1_score']:.4f}) gösteren konfigürasyon F={best_w['fuzzy_weight']:.2f}, V={best_w['vector_weight']:.2f}, R={best_w['reranker_weight']:.2f} olarak tespit edilip sisteme tanımlanmıştır.")
+            else:
+                st.info("Ağırlık optimizasyonu verisi bulunamadı.")
+                
+            st.divider()
+            
+            # 2. Threshold Optimizasyonu Sonuçları
+            st.markdown("### 2. Eşik (Threshold) Optimizasyonu Sonuçları")
+            st.markdown("Reranker ağırlığı sabitlendiğinde (en iyi konfigürasyonda), farklı risk eşiklerinin yakalama oranları (Recall) ve kesinlik (Precision) metrikleri:")
+            
+            thresh_df = pd.read_sql("""
+                SELECT medium_threshold, high_threshold, f1_score, precision_score, recall_score
+                FROM aml_experiment.threshold_analysis
+                WHERE experiment_id = (SELECT MAX(experiment_id) FROM aml_experiment.threshold_analysis)
+                ORDER BY f1_score DESC
+            """, conn)
+            
+            if not thresh_df.empty:
+                thresh_df["Eşik Seçimi (High/Medium)"] = thresh_df.apply(
+                    lambda row: f"H:{row['high_threshold']:.2f} / M:{row['medium_threshold']:.2f}", axis=1)
+                
+                top_thresh = thresh_df.head(10).sort_values("f1_score", ascending=True)
+                fig2 = px.scatter(thresh_df, x="recall_score", y="precision_score", 
+                                  color="f1_score", hover_name="Eşik Seçimi (High/Medium)",
+                                  title="Precision vs Recall - Eşik Analizi",
+                                  labels={'recall_score': 'Duyarlılık (Recall)', 'precision_score': 'Kesinlik (Precision)'})
+                st.plotly_chart(fig2, use_container_width=True)
+                
+                fig3 = px.bar(top_thresh, x="f1_score", y="Eşik Seçimi (High/Medium)", orientation='h',
+                              title="En İyi 10 Eşik Konfigürasyonu (F1 Skoru)",
+                              color="f1_score", color_continuous_scale="Blues")
+                st.plotly_chart(fig3, use_container_width=True)
+                
+                with st.expander("Tüm Eşik Testlerini Görüntüle"):
+                    st.dataframe(thresh_df.style.highlight_max(subset=['f1_score'], color='lightblue'))
+                    
+                best_t = thresh_df.iloc[0]
+                st.success(f"**Sonuç:** F1 skorunu ({best_t['f1_score']:.4f}) maksimize eden en optimal karar sınırları **Yüksek Risk (High): {best_t['high_threshold']:.2f}** ve **Orta Risk (Medium): {best_t['medium_threshold']:.2f}** olarak seçilmiştir.")
+            else:
+                st.info("Threshold optimizasyonu verisi bulunamadı.")
+                
+        except Exception as e:
+            st.error(f"Veri çekilirken hata oluştu: {e}")
+        finally:
+            repo.release_connection(conn)

@@ -3,7 +3,8 @@ from src.utils.text_utils import (
     normalize_text,
     remove_company_suffixes,
     get_normalized_core_name,
-    is_consonant_match
+    is_consonant_match,
+    compact_normalize
 )
 from src.utils.alias_utils import generate_acronym
 
@@ -54,7 +55,8 @@ def _exact_name_score(explanation: str, variant_name: str) -> float:
 def build_score_features(
     norm_exp: str,
     cand: dict,
-    extracted_entity: str = None
+    extracted_entity: str = None,
+    raw_explanation: str = None
 ) -> dict:
     """
     Candidate için kural tabanlı, fuzzy ve overlap özelliklerini hesaplar.
@@ -68,6 +70,15 @@ def build_score_features(
     norm_cand    = normalize_text(variant_name)
     core_query   = get_normalized_core_name(norm_exp)
     core_cand    = get_normalized_core_name(variant_name)
+    
+    compact_explanation = compact_normalize(raw_explanation) if raw_explanation else compact_normalize(norm_exp)
+    compact_matched_variant = compact_normalize(variant_name)
+    exact_compact_match = bool(compact_matched_variant and compact_matched_variant in compact_explanation)
+    
+    # Kural skoru eğer exact compact match ise 1.0 olmalı (fallback kural)
+    base_rule_score = max(_rule_score(norm_exp, variant_name), _exact_name_score(norm_exp, variant_name))
+    if exact_compact_match:
+        base_rule_score = 1.0
 
     exact_normalized_match = bool(norm_exp == norm_cand and norm_exp)
     exact_core_match       = bool(core_query == core_cand and core_query)
@@ -80,10 +91,7 @@ def build_score_features(
         "fuzzy_score":    fuzzy_score,
         "vector_score":   vector_score,
         "acronym_score":  _acronym_score(norm_exp, variant_name),
-        "rule_score":     max(
-            _rule_score(norm_exp, variant_name),
-            _exact_name_score(norm_exp, variant_name)
-        ),
+        "rule_score":     base_rule_score,
         "reranker_score": norm_reranker,
         "query_token_count": query_token_count,
         "exact_normalized_match": exact_normalized_match,
@@ -92,6 +100,9 @@ def build_score_features(
         "query_is_contained_in_candidate": query_is_contained,
         "candidate_is_contained_in_query": cand_is_contained,
         "consonant_match": is_consonant_match(core_query, core_cand),
+        "exact_compact_match": exact_compact_match,
+        "compact_explanation": compact_explanation,
+        "compact_matched_variant": compact_matched_variant,
         "_query_str":   norm_exp,
         "_variant_str": norm_cand,
     }

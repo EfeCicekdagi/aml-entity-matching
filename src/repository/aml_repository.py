@@ -8,7 +8,6 @@ Değişiklikler (v3):
   - populate_alert_export context manager kullanıyor.
 """
 
-import psycopg2
 import json
 import logging
 from contextlib import contextmanager
@@ -291,7 +290,8 @@ class AMLRepository:
                         retrieval_sources, candidate_rank,
                         matched_variant_name, variant_type, watchlist_company_name,
                         name_score, country_score, identifier_score, address_score,
-                        date_of_birth_score, entity_type_score, auxiliary_field_reason_codes
+                        date_of_birth_score, entity_type_score, auxiliary_field_reason_codes,
+                        exact_compact_match, compact_explanation, compact_matched_variant, rule_score
                     )
                     VALUES %s
                     ON CONFLICT DO NOTHING
@@ -335,6 +335,10 @@ class AMLRepository:
                         r.get("date_of_birth_score"),
                         r.get("entity_type_score"),
                         json.dumps(r.get("auxiliary_field_reason_codes", {})) if r.get("auxiliary_field_reason_codes") else None,
+                        r.get("exact_compact_match", False),
+                        r.get("compact_explanation"),
+                        r.get("compact_matched_variant"),
+                        r.get("rule_score"),
                     )
                     for r in results
                 ])
@@ -389,7 +393,8 @@ class AMLRepository:
                         calibrated_probability, calibration_applied,
                         calibration_method, calibration_version,
                         entity_type, extraction_method, extraction_confidence,
-                        retrieval_sources, candidate_rank, candidate_count
+                        retrieval_sources, candidate_rank, candidate_count,
+                        exact_compact_match, compact_explanation, compact_matched_variant, rule_score
                     )
                     VALUES %s
                     ON CONFLICT DO NOTHING
@@ -419,6 +424,10 @@ class AMLRepository:
                         json.dumps(a.get("retrieval_sources", {})) if a.get("retrieval_sources") else None,
                         a.get("candidate_rank"),
                         a.get("candidate_count", 0),
+                        a.get("exact_compact_match", False),
+                        a.get("compact_explanation"),
+                        a.get("compact_matched_variant"),
+                        a.get("rule_score"),
                     )
                     for a in alerts
                 ])

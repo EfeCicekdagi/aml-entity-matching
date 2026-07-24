@@ -35,12 +35,12 @@ class ReasonCode(str, Enum):
       - NO_*: Aday yok durumu
     """
 
-    # ── Tam eşleşme türleri ───────────────────────────────────────────────────
     EXACT_OFFICIAL_NAME        = "EXACT_OFFICIAL_NAME"
     EXACT_OFFICIAL_ALIAS       = "EXACT_OFFICIAL_ALIAS"
     EXACT_CORE_MATCH           = "EXACT_CORE_MATCH"
     LEGAL_SUFFIX_ONLY_DIFFERENCE = "LEGAL_SUFFIX_ONLY_DIFFERENCE"
     EXACT_MATCH_REQUIRES_REVIEW  = "EXACT_MATCH_REQUIRES_REVIEW"
+    EXACT_COMPACT_MATCH        = "EXACT_COMPACT_MATCH"
 
     # ── Tam eşleşme uyarıları ─────────────────────────────────────────────────
     SHORT_AMBIGUOUS_EXACT_MATCH = "SHORT_AMBIGUOUS_EXACT_MATCH"
@@ -88,6 +88,8 @@ class ReasonCode(str, Enum):
 
 # ── İnsan tarafından okunabilir açıklama şablonları ──────────────────────────
 _REASON_DESCRIPTIONS: dict[ReasonCode, str] = {
+    ReasonCode.EXACT_COMPACT_MATCH:
+        "EFT açıklamasında şirket adı boşluk ve noktalama işaretlerinden bağımsız normalizasyon sonrasında tam olarak tespit edildi.",
     ReasonCode.EXACT_OFFICIAL_NAME:
         "Resmi şirket adı tam olarak eşleşti.",
     ReasonCode.EXACT_OFFICIAL_ALIAS:

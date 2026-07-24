@@ -51,6 +51,35 @@ LEGAL_SUFFIXES: set[str] = {
     "anonim", "sirketi", "limited",
 }
 
+# ── Compact match haritası ────────────────────────────────────────────────
+COMPACT_SUFFIX_MAP: dict[str, str] = {
+    "limited": "ltd",
+    "private": "pvt",
+    "incorporated": "inc",
+    "corporation": "corp",
+    "company": "co",
+}
+
+
+def compact_normalize(text: Optional[str]) -> str:
+    """
+    Compact exact match için metni standardize eder.
+    1. NFKC + casefold
+    2. Suffix'leri kısalt (limited -> ltd vb.)
+    3. Harf ve rakam dışındaki her şeyi (boşluk, noktalama) kaldırır.
+    """
+    if not text:
+        return ""
+    
+    text = unicode_normalize(str(text)).casefold()
+    text = text.translate(str.maketrans(string.punctuation, " " * len(string.punctuation)))
+    
+    tokens = text.split()
+    compacted_tokens = [COMPACT_SUFFIX_MAP.get(t, t) for t in tokens]
+    
+    compact_text = "".join(compacted_tokens)
+    return re.sub(r'[\W_]', '', compact_text)
+
 
 def unicode_normalize(text: str) -> str:
     """

@@ -29,7 +29,10 @@ class ThresholdOptimizer:
             logger.error(f"Cache file {cache_file} not found. Run WeightOptimizer first.")
             sys.exit(1)
         with open(cache_file, "r") as f:
-            return json.load(f)
+            data = json.load(f)
+            if isinstance(data, dict) and "records" in data:
+                return data["records"]
+            return data
 
     def get_best_weights(self):
         logger.info("Fetching best weight configuration based on F1 Score...")
@@ -173,7 +176,7 @@ if __name__ == "__main__":
     print("[B] HIGH/MEDIUM Ayrımı:")
     print("    Ground truth'ta HIGH ve MEDIUM etiketleri ayrı tanımlı değil.")
     print("    Bu nedenle HIGH/MEDIUM ayrım eşiği yalnızca Alert olan kayıtlar üzerinde")
-    print("    iş kuralına göre belirlenebilir (örn. risk skoru >= 0.85 → HIGH).")
+    print("    iş kuralına göre belirlenebilir (örn. risk skoru >= 0.85 -> HIGH).")
     print("    Şu an için HIGH/MEDIUM ayrımı optimize edilememektedir.")
     print("    Bu analiz P1 aşamasına bırakılmıştır.")
     print("="*60)
