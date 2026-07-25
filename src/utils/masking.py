@@ -55,23 +55,13 @@ def mask_pii(text: str, replacement: str = "****") -> str:
     # IP adresleri
     text = _IP_PATTERN.sub(lambda m: f"{m.group(1)}.{replacement}", text)
 
+    # Türkiye TC Kimlik No: İlk 3 ve son 2 rakam görünür, ortası maskeli
+    text = _TC_ID_PATTERN.sub(lambda m: f"{m.group(1)}{replacement}{m.group(2)}", text)
+
+    # Pasaport numarası: Harf kısmı görünür, rakam kısmı maskeli
+    text = _PASSPORT_PATTERN.sub(lambda m: f"{m.group(1)}{replacement}", text)
+
     return text
-
-
-def mask_entity(entity: str) -> str:
-    """
-    Entity string'ini kısmen maskeler (log için).
-    İlk 3 karakter görünür, geri kalanı maskeli.
-
-    Args:
-        entity: Ham entity string
-
-    Returns:
-        Kısmen maskelenmiş string
-    """
-    if not entity or len(entity) <= 3:
-        return "***"
-    return entity[:3] + "***"
 
 
 class SecureLogFilter(logging.Filter):

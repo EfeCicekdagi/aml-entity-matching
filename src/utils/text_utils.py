@@ -61,18 +61,31 @@ COMPACT_SUFFIX_MAP: dict[str, str] = {
 }
 
 
+def clean_spaced_characters(text: str) -> str:
+    """
+    Harfleri arasına boşluk veya noktalama konularak gizlenmeye çalışılmış (evasion/obfuscation)
+    metinleri birleştirir. Ör: 'M i c r o s o f t', 'M.i.c.r.o.s.o.f.t', 'M-I-C-R-O-S-O-F-T', '(M)(i)(c)' -> 'Microsoft', 'MICROSOFT', 'Mic'.
+    En az 2 tekli karakterin yanyana gelmesi durumunda çalışır.
+    """
+    if not text:
+        return ""
+    return re.sub(r'\b(?:[^\W_](?:[\.,\-/\(\)\|\*\:]+|[ \t])){1,}[^\W_]\b', lambda m: re.sub(r'[\s\.,\-/\(\)\|\*\:]+', '', m.group(0)), str(text))
+
+
 def compact_normalize(text: Optional[str]) -> str:
     """
     Compact exact match için metni standardize eder.
-    1. NFKC + casefold
+    1. NFKC + casefold + spaced evasion temizliği
     2. Suffix'leri kısalt (limited -> ltd vb.)
     3. Harf ve rakam dışındaki her şeyi (boşluk, noktalama) kaldırır.
     """
     if not text:
         return ""
     
-    text = unicode_normalize(str(text)).casefold()
+    text = unicode_normalize(str(text))
+    text = clean_spaced_characters(text).casefold()
     text = text.translate(str.maketrans(string.punctuation, " " * len(string.punctuation)))
+    text = clean_spaced_characters(text)
     
     tokens = text.split()
     compacted_tokens = [COMPACT_SUFFIX_MAP.get(t, t) for t in tokens]
@@ -98,10 +111,11 @@ def normalize_text(text: Optional[str]) -> str:
 
     Adımlar:
       1. Unicode NFKC normalizasyonu
-      2. casefold (Türkçe I/İ için locale-agnostic)
-      3. Noktalama işaretlerini boşluğa çevir
-      4. Çoklu boşlukları temizle
-      5. Legal suffix normalizasyonu
+      2. Harf arasına boşluk konularak gizleme (obfuscation/evasion) temizliği
+      3. casefold (Türkçe I/İ için locale-agnostic)
+      4. Noktalama işaretlerini boşluğa çevir
+      5. Çoklu boşlukları ve tekrar eden boşluklu harfleri temizle
+      6. Legal suffix normalizasyonu
 
     Args:
         text: Normalize edilecek metin
@@ -115,11 +129,17 @@ def normalize_text(text: Optional[str]) -> str:
     # 1. Unicode NFKC
     text = unicode_normalize(str(text))
 
+    # 1.5 Harf arasına boşluk konularak gizleme (obfuscation) temizliği
+    text = clean_spaced_characters(text)
+
     # 2. casefold (Türkçe "İ" → "i" için str.lower() yerine casefold)
     text = text.casefold()
 
     # 3. Noktalama işaretlerini boşluğa çevir
     text = text.translate(str.maketrans(string.punctuation, " " * len(string.punctuation)))
+
+    # 3.5 Noktalama sonrasında oluşabilecek boşluklu harf öbeklerini tekrar birleştir
+    text = clean_spaced_characters(text)
 
     # 4. Fazla boşlukları temizle
     tokens = text.split()

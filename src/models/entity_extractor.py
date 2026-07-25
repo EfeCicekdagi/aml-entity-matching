@@ -271,6 +271,9 @@ class EntityExtractor:
                 entity_extraction_status="NOT_FOUND"
             )
 
+        from src.utils.text_utils import clean_spaced_characters
+        text = clean_spaced_characters(text)
+
         # Katman 1: NER
         result = self._extract_via_ner(text)
         if result:
@@ -326,6 +329,9 @@ class EntityExtractor:
         """
         if not texts:
             return []
+
+        from src.utils.text_utils import clean_spaced_characters
+        texts = [clean_spaced_characters(t) if t else "" for t in texts]
 
         results = [None] * len(texts)
 

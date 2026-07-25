@@ -45,3 +45,19 @@ def test_negative_exact_compact_match():
     cand = {"variant_name": "Indiaforensic Services Pvt Ltd"}
     scores = build_score_features(norm_exp, cand, raw_explanation=norm_exp)
     assert scores["exact_compact_match"] is False
+
+def test_spaced_characters_evasion():
+    from src.utils.text_utils import clean_spaced_characters, normalize_text
+    assert clean_spaced_characters("M i c r o s o f t") == "Microsoft"
+    assert clean_spaced_characters("TRANSFER TO M i c r o s o f t CORP") == "TRANSFER TO Microsoft CORP"
+    assert normalize_text("M i c r o s o f t   C o r p .") == "microsoft corporation"
+    assert compact_normalize("M i c r o s o f t   C o r p .") == "microsoftcorp"
+    
+    # Nokta, virgül, tire, slash ve parantez gibi karakterlerle gizleme (evasion) testleri
+    assert clean_spaced_characters("M.i.c.r.o.s.o.f.t") == "Microsoft"
+    assert clean_spaced_characters("M/i/c/r/o/s/o/f/t") == "Microsoft"
+    assert clean_spaced_characters("M-i-c-r-o-s-o-f-t") == "Microsoft"
+    assert clean_spaced_characters("M,i,c,r,o,s,o,f,t") == "Microsoft"
+    assert clean_spaced_characters("(M)(i)(c)(r)(o)(s)(o)(f)(t)") == "(Microsoft)"
+    assert normalize_text("(M)(i)(c)(r)(o)(s)(o)(f)(t)") == "microsoft"
+    assert normalize_text("TRANSFER TO (M)(i)(c)(r)(o)(s)(o)(f)(t) CORP.") == "transfer to microsoft corporation"

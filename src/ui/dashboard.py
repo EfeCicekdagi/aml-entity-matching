@@ -291,7 +291,6 @@ if page == "🏠 Ana Sayfa":
                             "Reranker Skor": scores_dict["reranker_score"],
                             "Vektör Skor": scores_dict["vector_score"],
                             "Fuzzy Skor": scores_dict["fuzzy_score"],
-                            "Rule Skor": scores_dict["rule_score"],
                             "Exact Compact Match": "Evet" if scores_dict["exact_compact_match"] else "Hayır",
                             "Compact Variant": scores_dict["compact_matched_variant"]
                         })

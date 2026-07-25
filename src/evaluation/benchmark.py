@@ -380,6 +380,11 @@ if __name__ == "__main__":
     import sys
     sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
     from src.config.config_loader import ConfigLoader
+    from src.repository.aml_repository import AMLRepository
+    from src.retrieval.postgres_candidate_retriever import PostgresCandidateRetriever
+    from src.models.reranker import Reranker
+    from src.scoring.final_scorer import FinalScorer
+    from src.pipeline.match_engine import MatchEngine
     parser = argparse.ArgumentParser(description="Run AML Benchmark")
     parser.add_argument("--run-name", default="benchmark_v1", help="Name of the benchmark run")
     parser.add_argument("--output", default="outputs/benchmark_report.json")

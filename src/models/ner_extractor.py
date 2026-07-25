@@ -35,6 +35,9 @@ class NERExtractor:
         # The pipeline returns a list of dicts:
         # [{'entity_group': 'ORG', 'score': 0.99, 'word': 'XYZ Sirketi', 'start': 10, 'end': 21}]
         try:
+            from src.utils.text_utils import clean_spaced_characters
+            text = clean_spaced_characters(text)
+            
             # Title case the text to help the cased NER model if it's all lowercase
             if text.islower():
                 text_to_process = text.title()
@@ -74,8 +77,10 @@ class NERExtractor:
             
         logger.debug(f"Running batched NER extraction for {len(texts)} texts...")
         
-        # Preprocess text (title case if lower)
-        processed_texts = [text.title() if text and text.islower() else (text or "") for text in texts]
+        # Preprocess text (clean spaced characters and title case if lower)
+        from src.utils.text_utils import clean_spaced_characters
+        processed_texts = [clean_spaced_characters(text) if text else "" for text in texts]
+        processed_texts = [t.title() if t.islower() else t for t in processed_texts]
         
         try:
             # Batch size 64 for good GPU utilization on 3060

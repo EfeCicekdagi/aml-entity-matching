@@ -23,7 +23,7 @@ def main():
 
     conn.commit()
     cur.close()
-    conn.close()
+    repo.release_connection(conn)
     print("Database updated.")
 
 if __name__ == "__main__":
