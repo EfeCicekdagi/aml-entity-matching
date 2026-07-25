@@ -305,3 +305,48 @@ class WatchlistManager:
             return {}
         finally:
             self.repo.release_connection(conn)
+
+    def generate_and_add_aliases(
+        self,
+        company_id: int,
+        company_name: str,
+        source_name: str = None,
+        alias_confidence: float = 0.8
+    ) -> dict:
+        """
+        Şirket için sistem tarafından (alias_utils yardımıyla) üretilen kısaltmaları (acronym)
+        ve kısaltmalı varyasyonları (abbreviated aliases) veritabanına ekler.
+        """
+        from src.utils.alias_utils import generate_acronym, generate_abbreviated_aliases
+        stats = {"acronyms_added": 0, "abbreviations_added": 0}
+
+        # 1. Baş harf kısaltması (acronym) ekle
+        acronym = generate_acronym(company_name)
+        if acronym and len(acronym) >= 2:
+            res = self.add_alias(
+                company_id=company_id,
+                company_name=company_name,
+                variant_name=acronym,
+                variant_type="ACRONYM",
+                alias_confidence=alias_confidence,
+                source_name=source_name
+            )
+            if res:
+                stats["acronyms_added"] += 1
+
+        # 2. Kısaltmalı varyasyonlar (abbreviated aliases) ekle
+        for abbr in generate_abbreviated_aliases(company_name, max_alias_count=20):
+            if abbr and abbr.strip() and len(abbr.strip()) >= 2 and abbr.strip().casefold() != company_name.casefold():
+                res = self.add_alias(
+                    company_id=company_id,
+                    company_name=company_name,
+                    variant_name=abbr.strip(),
+                    variant_type="ABBREVIATION",
+                    alias_confidence=alias_confidence,
+                    source_name=source_name
+                )
+                if res:
+                    stats["abbreviations_added"] += 1
+
+        return stats
+

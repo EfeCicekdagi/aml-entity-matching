@@ -45,6 +45,7 @@ class ReasonCode(str, Enum):
     # ── Tam eşleşme uyarıları ─────────────────────────────────────────────────
     SHORT_AMBIGUOUS_EXACT_MATCH = "SHORT_AMBIGUOUS_EXACT_MATCH"
     DUPLICATE_ALIAS_MATCH       = "DUPLICATE_ALIAS_MATCH"
+    PARTIAL_MATCH_REQUIRES_REVIEW = "PARTIAL_MATCH_REQUIRES_REVIEW"
 
     # ── Yüksek skor sinyalleri ────────────────────────────────────────────────
     HIGH_TRIGRAM_SIMILARITY    = "HIGH_TRIGRAM_SIMILARITY"
@@ -61,6 +62,7 @@ class ReasonCode(str, Enum):
     FORMER_NAME_MATCH          = "FORMER_NAME_MATCH"
     ABBREVIATION_MATCH         = "ABBREVIATION_MATCH"
     ACRONYM_MATCH              = "ACRONYM_MATCH"
+    LEETSPEAK_EVASION          = "LEETSPEAK_EVASION"
 
     # ── NER ve entity extraction ──────────────────────────────────────────────
     NER_FALLBACK_USED          = "NER_FALLBACK_USED"
@@ -104,6 +106,8 @@ _REASON_DESCRIPTIONS: dict[ReasonCode, str] = {
         "Eşleşen isim çok kısa veya genel bir ifade (örn. ABC, GLOBAL, STAR). Tam eşleşme olsa da skor güvenilir değil.",
     ReasonCode.DUPLICATE_ALIAS_MATCH:
         "Bu alias birden fazla farklı şirkette kullanılmaktadır. Eşleşme belirsiz olabilir.",
+    ReasonCode.PARTIAL_MATCH_REQUIRES_REVIEW:
+        "Aday üretimi için kısmi bilgi yeterli görülmüştür ancak eksik bilgi fazla olduğu için doğrudan yüksek risk yerine analist incelemesi önerilir.",
     ReasonCode.HIGH_TRIGRAM_SIMILARITY:
         "Trigram karakter benzerliği yüksek.",
     ReasonCode.HIGH_VECTOR_SIMILARITY:
@@ -128,6 +132,8 @@ _REASON_DESCRIPTIONS: dict[ReasonCode, str] = {
         "Kısaltma eşleşmesi bulundu.",
     ReasonCode.ACRONYM_MATCH:
         "Baş harf kısaltması (acronym) eşleşmesi bulundu.",
+    ReasonCode.LEETSPEAK_EVASION:
+        "Harflerin rakam veya sembollerle değiştirilerek gizlenmeye çalışıldığı (Leetspeak normalizasyonu) tespit edildi.",
     ReasonCode.NER_FALLBACK_USED:
         "NER modeli entity çıkaramadı; aday varyantı fallback olarak kullanıldı.",
     ReasonCode.NO_ENTITY_EXTRACTED:

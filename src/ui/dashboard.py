@@ -215,69 +215,13 @@ if page == "🏠 Ana Sayfa":
                     
                     # 5. Scoring
                     results = []
-                    for cand in strong:
-                        fuzzy_score  = cand["candidate_score"] if "pg_trgm" in cand.get("sources", []) else 0.0
-                        vector_score = cand["candidate_score"] if "pgvector" in cand.get("sources", []) else 0.0
-                        norm_cand = normalize_text(cand["variant_name"])
-                        core_query = get_normalized_core_name(norm_exp)
-                        core_cand = get_normalized_core_name(cand["variant_name"])
-                        
-                        query_token_count = len(norm_exp.split())
-                        
-                        exact_normalized_match = (norm_exp == norm_cand and bool(norm_exp))
-                        exact_core_match = (core_query == core_cand and bool(core_query))
-                        legal_suffix_only_difference = exact_core_match and not exact_normalized_match
-                        
-                        query_is_contained = (norm_exp in norm_cand and bool(norm_exp))
-                        cand_is_contained = (norm_cand in norm_exp and bool(norm_cand))
-
-                        from src.utils.text_utils import compact_normalize
-                        compact_explanation = compact_normalize(user_input)
-                        compact_matched_variant = compact_normalize(cand["variant_name"])
-                        exact_compact_match = bool(compact_matched_variant and compact_matched_variant in compact_explanation)
-
-                        base_rule_score = max(
-                                _rule_score(norm_exp, cand["variant_name"]),
-                                _exact_name_score(norm_exp, cand["variant_name"])
-                            )
-                        if exact_compact_match:
-                            base_rule_score = 1.0
-
-                        scores_dict = {
-                            "fuzzy_score":    fuzzy_score,
-                            "vector_score":   vector_score,
-                            "acronym_score":  _acronym_score(norm_exp, cand["variant_name"]),
-                            "rule_score":     base_rule_score,
-                            "reranker_score": cand.get("reranker_score", 0.0),
-                            "query_token_count": query_token_count,
-                            "exact_normalized_match": exact_normalized_match,
-                            "exact_core_match": exact_core_match,
-                            "legal_suffix_only_difference": legal_suffix_only_difference,
-                            "query_is_contained_in_candidate": query_is_contained,
-                            "candidate_is_contained_in_query": cand_is_contained,
-                            "consonant_match": is_consonant_match(core_query, core_cand),
-                            "exact_compact_match": exact_compact_match,
-                            "compact_explanation": compact_explanation,
-                            "compact_matched_variant": compact_matched_variant,
-                        }
-                        
-                        if entity:
-                            import difflib
-                            fuzzy_ext = difflib.SequenceMatcher(None, entity.lower(), cand["variant_name"].lower()).ratio()
-                            if core_cand:
-                                fuzzy_ext_core = difflib.SequenceMatcher(None, entity.lower(), core_cand.lower()).ratio()
-                                fuzzy_ext = max(fuzzy_ext, fuzzy_ext_core)
-                            scores_dict["fuzzy_score"] = max(scores_dict["fuzzy_score"], fuzzy_ext)
-                            
-                            if is_consonant_match(entity, core_cand):
-                                scores_dict["consonant_match"] = True
-                            
-                            acronym_ext = _acronym_score(entity, cand["variant_name"])
-                            scores_dict["acronym_score"] = max(scores_dict["acronym_score"], acronym_ext)
-                            
-                            rule_ext = max(_rule_score(entity, cand["variant_name"]), _exact_name_score(entity, cand["variant_name"]))
-                            scores_dict["rule_score"] = max(scores_dict["rule_score"], rule_ext)
-                            
+                        from src.scoring.score_features import build_score_features
+                        cand_copy = dict(cand)
+                        if "pg_trgm" in cand.get("sources", []):
+                            cand_copy["trgm_score"] = cand.get("candidate_score", 0.0)
+                        if "pgvector" in cand.get("sources", []):
+                            cand_copy["vector_score"] = cand.get("candidate_score", 0.0)
+                        scores_dict = build_score_features(norm_exp, cand_copy, extracted_entity=entity, raw_explanation=user_input)
                         final_score, match_reason, reason_codes = scorer.calculate_final_score(scores_dict)
                         risk_level  = scorer.assign_risk_level(final_score)
                         

@@ -18,16 +18,23 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 class WeightOptimizer:
-    def __init__(self):
+    def __init__(self, repo=None):
         self.config_loader = ConfigLoader()
-        db_cfg = self.config_loader.get_db_config()
-        self.repo = AMLRepository(
-            host=db_cfg.get("host"), port=db_cfg.get("port"),
-            dbname=db_cfg.get("name"), user=db_cfg.get("user"), password=db_cfg.get("password")
-        )
+        if repo is not None:
+            self.repo = repo
+        else:
+            db_cfg = self.config_loader.get_db_config()
+            try:
+                self.repo = AMLRepository(
+                    host=db_cfg.get("host"), port=db_cfg.get("port"),
+                    dbname=db_cfg.get("name"), user=db_cfg.get("user"), password=db_cfg.get("password")
+                )
+            except Exception as e:
+                logger.warning(f"AMLRepository init failed: {e}. Running offline mode.")
+                self.repo = None
         
-        self.retriever = PostgresCandidateRetriever(self.repo, self.config_loader.get_retrieval_config())
-        self.reranker = Reranker(self.repo, self.config_loader.get_reranker_config())
+        self.retriever = PostgresCandidateRetriever(self.repo, self.config_loader.get_retrieval_config()) if self.repo else None
+        self.reranker = Reranker(self.repo, self.config_loader.get_reranker_config()) if self.repo else None
         self.scorer = FinalScorer(self.repo)
         
     def load_ground_truth(self, csv_path):
@@ -141,7 +148,8 @@ class WeightOptimizer:
                 exact_normalized_match = (norm_query == norm_cand and bool(norm_query))
                 exact_core_match = (core_query == core_cand and bool(core_query))
 
-                raw_scores = {
+                raw_scores = dict(best_cand)
+                raw_scores.update({
                     "fuzzy_score": best_cand.get("fuzzy_score", best_cand.get("trgm_score", 0.0)),
                     "vector_score": best_cand.get("vector_score", 0.0),
                     "reranker_score": best_cand.get("reranker_score", 0.0),
@@ -156,7 +164,7 @@ class WeightOptimizer:
                     "alias_confidence": best_cand.get("alias_confidence", 1.0),
                     "_query_str": norm_query,
                     "_variant_str": norm_cand,
-                }
+                })
                 raw_scores_list.append({
                     "eft_id": eft_id,
                     "should_match": should_match,
@@ -210,14 +218,21 @@ class WeightOptimizer:
         
         logger.info(f"Generated {len(combinations)} valid weight combinations.")
         
-        conn = self.repo.get_connection()
-        cur = conn.cursor()
-        
-        # Create experiment run
-        run_name = f"Weight-Opt-{datetime.now().strftime('%Y%m%d%H%M%S')}"
-        cur.execute(f"INSERT INTO {TABLES['experiment_run']} (run_name, description) VALUES (%s, %s) RETURNING experiment_id",
-                    (run_name, "Grid Search for weights"))
-        experiment_id = cur.fetchone()[0]
+        conn = None
+        cur = None
+        experiment_id = None
+        if self.repo is not None:
+            try:
+                conn = self.repo.get_connection()
+                cur = conn.cursor()
+                run_name = f"Weight-Opt-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+                cur.execute(f"INSERT INTO {TABLES['experiment_run']} (run_name, description) VALUES (%s, %s) RETURNING experiment_id",
+                            (run_name, "Grid Search for weights"))
+                experiment_id = cur.fetchone()[0]
+            except Exception as e:
+                logger.warning(f"DB connection failed in grid_search: {e}. Running offline in memory.")
+                conn = None
+                cur = None
         
         results = []
         for combo in combinations:
@@ -254,19 +269,47 @@ class WeightOptimizer:
             f1 = f1_score(y_true, y_pred, zero_division=0)
             acc = accuracy_score(y_true, y_pred)
             
-            # Save to db
-            cur.execute("""
-                INSERT INTO aml_experiment.weight_analysis 
-                (experiment_id, fuzzy_weight, vector_weight, reranker_weight, high_threshold, medium_threshold, precision_score, recall_score, f1_score, accuracy, tp, fp, tn, fn)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            """, (experiment_id, combo["fuzzy_weight"], combo["vector_weight"], combo["reranker_weight"], 0.70, 0.60, precision, recall, f1, acc, tp, fp, tn, fn))
+            res_dict = {
+                "fuzzy_weight": combo["fuzzy_weight"],
+                "vector_weight": combo["vector_weight"],
+                "reranker_weight": combo["reranker_weight"],
+                "precision": precision,
+                "recall": recall,
+                "f1": f1,
+                "accuracy": acc,
+                "tp": tp, "fp": fp, "tn": tn, "fn": fn
+            }
+            results.append(res_dict)
+            
+            if cur and experiment_id:
+                try:
+                    cur.execute("""
+                        INSERT INTO aml_experiment.weight_analysis 
+                        (experiment_id, fuzzy_weight, vector_weight, reranker_weight, high_threshold, medium_threshold, precision_score, recall_score, f1_score, accuracy, tp, fp, tn, fn)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    """, (experiment_id, combo["fuzzy_weight"], combo["vector_weight"], combo["reranker_weight"], 0.70, 0.60, precision, recall, f1, acc, tp, fp, tn, fn))
+                except Exception as e:
+                    logger.warning(f"DB insert failed in grid_search: {e}")
             
             logger.info(f"Combo F={combo['fuzzy_weight']:.2f}, V={combo['vector_weight']:.2f}, R={combo['reranker_weight']:.2f} | F1={f1:.4f}")
             
-        conn.commit()
-        cur.close()
-        self.repo.release_connection(conn)
-        logger.info(f"Grid search completed. Experiment ID: {experiment_id}")
+        if conn and cur:
+            try:
+                conn.commit()
+                cur.close()
+                self.repo.release_connection(conn)
+                logger.info(f"Grid search completed. Experiment ID: {experiment_id}")
+            except Exception as e:
+                logger.warning(f"DB commit/close failed: {e}")
+        else:
+            logger.info("Grid search completed in memory (offline).")
+            
+        results.sort(key=lambda x: (x["f1"], x["accuracy"]), reverse=True)
+        best_combo = results[0] if results else None
+        return {
+            "best_combination": best_combo,
+            "all_results": results
+        }
 
         # ── SHORT_QUERY_PROFILE uyarısı ──────────────────────────────────────
         # FinalScorer, query_token_count <= 2 olan sorgular için farklı ağırlıklar kullanır:

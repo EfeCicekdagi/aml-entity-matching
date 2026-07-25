@@ -65,6 +65,24 @@ class TestExactMatchGuard(unittest.TestCase):
         is_safe, code = self.scorer._is_safe_exact_override("star", "Star")
         self.assertFalse(is_safe)
 
+    def test_generic_names_apple_oracle_blocked_from_override(self):
+        """'Apple', 'Oracle', 'Amazon' gibi genel/tek kelimelik şirketler doğrudan override engellenir, bağlam değerlendirilir."""
+        for name in ["Apple", "Oracle", "Amazon", "Target", "Shell", "Apple Inc.", "Oracle Corp."]:
+            is_safe, code = self.scorer._is_safe_exact_override(name, name)
+            self.assertFalse(is_safe, f"'{name}' doğrudan override almamalı, bağlamı değerlendirmeli!")
+
+    def test_international_and_turkish_legal_suffixes(self):
+        """Corporation, Corp, Inc, Ltd, LLC, Private Limited, Pvt Ltd, GmbH, SA, AG, San, Tic, Şti ekleri uyumlu çalışmalı."""
+        is_safe, _ = self.scorer._is_safe_exact_override(
+            "North Star Trading Private Limited", "North Star Trading Pvt Ltd"
+        )
+        self.assertTrue(is_safe)
+        
+        is_safe_tr, _ = self.scorer._is_safe_exact_override(
+            "Anadolu Lojistik Sanayi ve Ticaret Limited Şirketi", "Anadolu Lojistik San. Tic. Ltd. Şti."
+        )
+        self.assertTrue(is_safe_tr)
+
     def test_low_alias_confidence_blocks_override(self):
         """Düşük alias confidence → override engellenir."""
         is_safe, code = self.scorer._is_safe_exact_override(

@@ -168,19 +168,48 @@ class EntityExtractor:
             return None
 
         text_lower = text.lower()
+        text_tokens = set(text_lower.split())
         best_match: Optional[tuple[str, int]] = None  # (variant_name, length)
+        best_acronym_match: Optional[tuple[str, int]] = None  # (variant_name, length)
+
+        from src.utils.alias_utils import generate_acronym, generate_abbreviated_aliases
+        from src.utils.text_utils import normalize_leetspeak
+
+        leet_text_lower = normalize_leetspeak(text_lower)
+        leet_text_tokens = set(leet_text_lower.split())
 
         for cand in candidates:
             vname = cand.get("variant_name", "")
-            if not vname:
+            if not vname or len(vname.strip()) < 2:
                 continue
             vname_lower = vname.lower()
-            if len(vname_lower) < self.min_entity_length:
-                continue
 
-            if vname_lower in text_lower:
-                if best_match is None or len(vname) > best_match[1]:
-                    best_match = (vname, len(vname))
+            # 1. Doğrudan variant adının veya leetspeak çevirisinin eşleşmesi
+            in_text = vname_lower in text_lower
+            in_leet = vname_lower in leet_text_lower and leet_text_lower != text_lower
+            if in_text or in_leet:
+                if len(vname_lower.split()) == 1 and len(vname_lower) <= 3 and vname_lower not in text_tokens and vname_lower not in leet_text_tokens:
+                    pass  # 2-3 harflik kısa kelimelerde kelime sınırı (word boundary) kontrolü
+                else:
+                    if best_match is None or len(vname) > best_match[1]:
+                        best_match = (vname, len(vname))
+
+            # 2. Sistem tarafından üretilen baş harf kısaltması (acronym) veya kısaltmalı alias eşleşmesi
+            if best_match is None:
+                orig_name = cand.get("original_company_name", vname)
+                for name_to_check in [vname, orig_name]:
+                    if not name_to_check:
+                        continue
+                    acr = generate_acronym(name_to_check)
+                    if acr and len(acr) >= 2 and (acr in text_tokens or acr in leet_text_tokens):
+                        if best_acronym_match is None or len(name_to_check) > best_acronym_match[1]:
+                            best_acronym_match = (name_to_check, len(name_to_check))
+                    for abbr in generate_abbreviated_aliases(name_to_check, max_alias_count=10):
+                        if abbr and len(abbr) >= 2 and (abbr in text_lower or abbr in leet_text_lower):
+                            if len(abbr.split()) == 1 and abbr not in text_tokens and abbr not in leet_text_tokens:
+                                continue
+                            if best_acronym_match is None or len(name_to_check) > best_acronym_match[1]:
+                                best_acronym_match = (name_to_check, len(name_to_check))
 
         if best_match:
             return ExtractionResult(
@@ -188,6 +217,62 @@ class EntityExtractor:
                 entity_type="ORGANIZATION",
                 extraction_method="CANDIDATE_SUPPORTED",
                 extraction_confidence=0.75,
+                entity_extraction_status="EXTRACTED"
+            )
+
+        if best_acronym_match:
+            return ExtractionResult(
+                extracted_entity=best_acronym_match[0],
+                entity_type="ORGANIZATION",
+                extraction_method="ACRONYM_SUPPORTED",
+                extraction_confidence=0.75,
+                entity_extraction_status="EXTRACTED"
+            )
+
+        # Exact substring eşleşmediyse, adayın kendisiyle (veya öz adıyla) fuzzy ve compact benzerlik kontrolü yap (yazım hatası / typo / bitişik-ayrı yazım desteği)
+        import difflib
+        from src.utils.text_utils import get_normalized_core_name, get_compact_core_name
+        text_core = get_normalized_core_name(text_lower)
+        text_compact = get_compact_core_name(text_lower)
+        best_fuzzy_cand: Optional[tuple[str, float]] = None
+
+        for cand in candidates:
+            vname = cand.get("variant_name", "")
+            if not vname or len(vname) < self.min_entity_length:
+                continue
+            vname_core = get_normalized_core_name(vname.lower())
+            vname_compact = get_compact_core_name(vname.lower())
+            if not vname_core and not vname_compact:
+                continue
+            
+            trgm = cand.get("trgm_score", 0.0)
+            ratio = difflib.SequenceMatcher(None, text_core, vname_core).ratio() if vname_core else 0.0
+            
+            # Compact core benzerliği (bitişik veya ayrı yazılan kelimeler için)
+            compact_sim = 0.0
+            if vname_compact and len(vname_compact) >= 4:
+                if vname_compact in text_compact:
+                    compact_sim = 1.0
+                elif text_compact:
+                    compact_sim = difflib.SequenceMatcher(None, text_compact, vname_compact).ratio()
+
+            # Token bazlı benzerlik (kelimeler arası en yüksek eşleşme)
+            t_sim = 0.0
+            c_words = [w for w in vname_core.split() if len(w) > 2]
+            q_words = [w for w in text_core.split() if len(w) > 2]
+            if c_words and q_words:
+                t_sim = sum(max(difflib.SequenceMatcher(None, qw, cw).ratio() for qw in q_words) for cw in c_words) / len(c_words)
+                
+            sim = max(trgm, ratio, t_sim, compact_sim)
+            if sim >= 0.80 and (best_fuzzy_cand is None or sim > best_fuzzy_cand[1]):
+                best_fuzzy_cand = (vname, sim)
+
+        if best_fuzzy_cand:
+            return ExtractionResult(
+                extracted_entity=best_fuzzy_cand[0],
+                entity_type="ORGANIZATION",
+                extraction_method="FUZZY_CANDIDATE_MATCH",
+                extraction_confidence=0.70,
                 entity_extraction_status="EXTRACTED"
             )
 
@@ -280,18 +365,18 @@ class EntityExtractor:
             logger.debug(f"Entity extracted via NER: {result.extracted_entity}")
             return result
 
-        # Katman 2: Rule-based
-        result = self._extract_via_rules(text)
-        if result:
-            logger.debug(f"Entity extracted via rules: {result.extracted_entity}")
-            return result
-
-        # Katman 3: Candidate-supported
+        # Katman 2: Candidate-supported (öncelikli)
         if candidates:
             result = self._extract_via_candidates(text, candidates)
             if result:
                 logger.debug(f"Entity extracted via candidates: {result.extracted_entity}")
                 return result
+
+        # Katman 3: Rule-based heuristic fallback
+        result = self._extract_via_rules(text)
+        if result:
+            logger.debug(f"Entity extracted via rules: {result.extracted_entity}")
+            return result
 
         # Katman 4: Variant fallback
         if candidates:
@@ -366,10 +451,12 @@ class EntityExtractor:
                 )
                 continue
 
-            # Fallbacks: Rule-based, Candidates, Variant fallback, Full text
-            result = self._extract_via_rules(text)
-            if not result and candidates:
+            # Fallbacks: Candidates, Rule-based, Variant fallback, Full text
+            result = None
+            if candidates:
                 result = self._extract_via_candidates(text, candidates)
+            if not result:
+                result = self._extract_via_rules(text)
             if not result and candidates:
                 result = self._extract_via_variant_fallback(text, candidates)
             if not result and use_full_text_fallback:

@@ -18,7 +18,7 @@ from typing import Optional
 
 # ── Legal suffix haritası (normalize → standart form) ──────────────────────
 COMPANY_SUFFIX_MAP: dict[str, str] = {
-    # İngilizce
+    # İngilizce / Uluslararası
     "ltd": "limited",
     "ltd.": "limited",
     "llc": "llc",
@@ -32,23 +32,56 @@ COMPANY_SUFFIX_MAP: dict[str, str] = {
     "llp": "llp",
     "pvt": "private",
     "pvt.": "private",
+    "pte": "private",
+    "pte.": "private",
+    "pty": "private",
+    "pty.": "private",
+    "gmbh": "gmbh",
+    "sa": "sa",
+    "s.a.": "sa",
+    "ag": "ag",
+    "bv": "bv",
+    "b.v.": "bv",
+    "nv": "nv",
+    "n.v.": "nv",
+    "srl": "srl",
+    "s.r.l.": "srl",
+    "spa": "spa",
+    "s.p.a.": "spa",
+    "oy": "oy",
+    "ab": "ab",
+    "sdn": "sendirian",
+    "bhd": "berhad",
+    "bhd.": "berhad",
+    "tbk": "tbk",
     "intl": "international",
+    "ent": "enterprises",
+    "sol": "solutions",
+    "ind": "industries",
+    "svc": "services",
     # Türkçe
     "a.s.": "anonim sirketi",
     "as": "anonim sirketi",
     "sti": "sirketi",
     "ltd sti": "limited sirketi",
+    "ltd. sti.": "limited sirketi",
+    "san": "sanayi",
+    "san.": "sanayi",
+    "tic": "ticaret",
+    "tic.": "ticaret",
 }
 
 # ── Legal suffix kümesi (core name hesabı için kaldırılacaklar) ─────────────
 LEGAL_SUFFIXES: set[str] = {
-    # İngilizce
+    # İngilizce / Uluslararası
     "inc", "incorporated", "corp", "corporation", "co", "company",
-    "ltd", "limited", "llc", "llp", "plc", "pvt", "private",
+    "ltd", "limited", "llc", "llp", "plc", "pvt", "private", "pte", "pty",
+    "gmbh", "sa", "ag", "bv", "nv", "srl", "spa", "oy", "ab", "sendirian", "berhad", "tbk",
     "technologies", "technology", "intl", "international",
-    "group", "holdings", "holding",
+    "group", "holdings", "holding", "enterprises", "enterprise", "solutions", "solution",
+    "industries", "industry", "services", "service", "partners", "partner", "associates", "associate",
     # Türkçe
-    "anonim", "sirketi", "limited",
+    "anonim", "sirketi", "limited", "sanayi", "ticaret", "ve",
 }
 
 # ── Compact match haritası ────────────────────────────────────────────────
@@ -59,6 +92,105 @@ COMPACT_SUFFIX_MAP: dict[str, str] = {
     "corporation": "corp",
     "company": "co",
 }
+
+_ALL_SUFFIX_WORDS = sorted(list(LEGAL_SUFFIXES | {
+    "entertainment", "enterprises", "technologies", "technology", "solutions",
+    "services", "service", "international", "holding", "holdings", "investments",
+    "investment", "industries", "industry", "trading", "trade", "group", "limited",
+    "private", "pvt", "ltd", "inc", "corp", "corporation", "company", "llc",
+    "anonim", "sirketi", "sanayi", "ticaret", "berhad", "sendirian", "pvtltd",
+    "limitedsirketi", "anonimsirketi"
+}), key=len, reverse=True)
+
+_COMPACT_SUFFIX_STRINGS = sorted(list({
+    re.sub(r'[\W_]', '', s.casefold()) for s in _ALL_SUFFIX_WORDS if len(s) > 2
+}), key=len, reverse=True)
+
+# ── Leetspeak haritası ───────────────────────────────────────────────────
+LEETSPEAK_MAP: dict[str, str] = {
+    '0': 'o',
+    '1': 'i',
+    '3': 'e',
+    '4': 'a',
+    '5': 's',
+    '7': 't',
+    '8': 'b',
+    '@': 'a',
+    '$': 's',
+    '!': 'i',
+    '|': 'l',
+}
+
+
+def normalize_leetspeak(text: Optional[str]) -> str:
+    """
+    Harflerin rakamlar veya sembollerle değiştirilerek (Leetspeak: 0->o, 1->i, 3->e, 4->a, 5->s, 7->t, 8->b vb.)
+    yapılan gizleme (evasion/obfuscation) girişimlerini normalize eder.
+    Ör: 'M!cr0s0ft C0rp0r4t!0n' -> 'microsoft corporation'
+        '4ppl3 Inc' -> 'apple inc'
+        '0r4cl3' -> 'oracle'
+        'F!nsp!r3' -> 'finspire'
+    """
+    if not text:
+        return ""
+    text_str = str(text).casefold()
+    trans_table = str.maketrans(LEETSPEAK_MAP)
+    return text_str.translate(trans_table)
+
+
+def check_leetspeak_evasion(query: Optional[str], candidate: Optional[str]) -> tuple[bool, float, str]:
+    """
+    Sorgu ile aday arasında Leetspeak (harf yerine rakam/sembol kullanımı) ile gizleme (evasion)
+    yapılıp yapılmadığını kontrol eder.
+
+    Returns:
+        (evasion_detected: bool, improved_score: float, leet_normalized_query: str)
+    """
+    if not query or not candidate:
+        return False, 0.0, ""
+
+    norm_q = normalize_text(str(query))
+    norm_c = normalize_text(str(candidate))
+
+    if not norm_q or not norm_c:
+        return False, 0.0, ""
+
+    has_leet_chars = any(c in LEETSPEAK_MAP for c in norm_q)
+    if not has_leet_chars:
+        return False, 0.0, norm_q
+
+    leet_q = normalize_text(normalize_leetspeak(query))
+    leet_c = normalize_text(normalize_leetspeak(candidate))
+
+    if leet_q == norm_q:
+        return False, 0.0, leet_q
+
+    import difflib
+    def _tok_sim(q_str: str, c_str: str) -> float:
+        c_toks = [w for w in c_str.split() if len(w) > 2 and w not in LEGAL_SUFFIXES]
+        q_toks = [w for w in q_str.split() if len(w) > 2 and w not in LEGAL_SUFFIXES]
+        if not c_toks or not q_toks:
+            return 0.0
+        return sum(max(difflib.SequenceMatcher(None, qt, ct).ratio() for qt in q_toks) for ct in c_toks) / len(c_toks)
+
+    orig_sim = max(difflib.SequenceMatcher(None, norm_q, norm_c).ratio(), _tok_sim(norm_q, norm_c))
+    leet_sim = max(difflib.SequenceMatcher(None, leet_q, leet_c).ratio(), _tok_sim(leet_q, leet_c))
+
+    q_tokens = leet_q.split()
+    c_tokens = set(leet_c.split()) if leet_c else set(norm_c.split())
+
+    token_match = any(
+        qt in c_tokens and len(qt) >= 3 and qt not in LEGAL_SUFFIXES
+        for qt in q_tokens
+    )
+
+    evasion_detected = bool(
+        (leet_sim > 0.80 and leet_sim > orig_sim + 0.05) or
+        (token_match and orig_sim < 0.95 and leet_q != norm_q)
+    )
+
+    return evasion_detected, leet_sim, leet_q
+
 
 
 def clean_spaced_characters(text: str) -> str:
@@ -91,7 +223,10 @@ def compact_normalize(text: Optional[str]) -> str:
     compacted_tokens = [COMPACT_SUFFIX_MAP.get(t, t) for t in tokens]
     
     compact_text = "".join(compacted_tokens)
-    return re.sub(r'[\W_]', '', compact_text)
+    compact_text = re.sub(r'[\W_]', '', compact_text)
+    for k, v in COMPACT_SUFFIX_MAP.items():
+        compact_text = compact_text.replace(k, v)
+    return compact_text
 
 
 def unicode_normalize(text: str) -> str:
@@ -194,6 +329,41 @@ def get_normalized_core_name(text: str) -> str:
         Sadece öz isim tokenleri içeren string
     """
     return remove_company_suffixes(text)
+
+
+def get_compact_core_name(text: Optional[str]) -> str:
+    """
+    Kelimelerin bitişik veya ayrı yazılması (concatenated/split) durumlarında dahi
+    şirket öz ismini saf alfanümerik compact formda döndürür.
+
+    Ör: 'microsoftcorporation'     → 'microsoft'
+        'micro soft corporation'   → 'microsoft'
+        'indiaforensicservices'    → 'indiaforensic'
+        'india forensic services'  → 'indiaforensic'
+        'finspiresolutions'        → 'finspire'
+        'fin spire solutions'      → 'finspire'
+    """
+    if not text:
+        return ""
+    c = compact_normalize(text)
+    changed = True
+    while changed and len(c) > 3:
+        changed = False
+        for s in _COMPACT_SUFFIX_STRINGS:
+            if c.endswith(s) and len(c) - len(s) >= 3:
+                c = c[:-len(s)]
+                changed = True
+    return c
+
+
+def get_leetspeak_compact_core_name(text: Optional[str]) -> str:
+    """
+    Leetspeak karakterleri normalize edildikten sonra compact core name hesaplar.
+    Ör: 'm1cr0s0ftc0rp0r4t10n' -> 'microsoft'
+    """
+    if not text:
+        return ""
+    return get_compact_core_name(normalize_leetspeak(text))
 
 
 def is_consonant_match(text1: str, text2: str) -> bool:

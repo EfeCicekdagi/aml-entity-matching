@@ -216,9 +216,15 @@ class PostgresCandidateRetriever:
         Returns:
             Birleştirilmiş, puanlanmış aday listesi
         """
+        from src.utils.text_utils import normalize_leetspeak
         trgm_cands = self.retrieve_trgm_candidates(normalized_explanation)
         fts_cands  = self.retrieve_full_text_candidates(normalized_explanation)
         vec_cands  = self.retrieve_vector_candidates(query_embedding) if query_embedding else []
+
+        leet_exp = normalize_leetspeak(normalized_explanation)
+        if leet_exp != normalized_explanation:
+            trgm_cands += self.retrieve_trgm_candidates(leet_exp)
+            fts_cands  += self.retrieve_full_text_candidates(leet_exp)
 
         return self._merge_candidates(trgm_cands + fts_cands + vec_cands)
 
@@ -328,9 +334,18 @@ class PostgresCandidateRetriever:
 
         try:
             with conn.cursor() as cur:
-                # ── QUERY 1: Batch Trigram ─────────────────────────────────
-                row_ids   = [str(r["row_id"]) for r in rows]
-                norm_exps = [r["normalized_explanation"] for r in rows]
+                from src.utils.text_utils import normalize_leetspeak
+                row_ids = []
+                norm_exps = []
+                for r in rows:
+                    rid = str(r["row_id"])
+                    n_exp = r["normalized_explanation"]
+                    row_ids.append(rid)
+                    norm_exps.append(n_exp)
+                    l_exp = normalize_leetspeak(n_exp)
+                    if l_exp != n_exp:
+                        row_ids.append(rid)
+                        norm_exps.append(l_exp)
 
                 trgm_query = f"""
                     WITH input AS (
@@ -404,9 +419,9 @@ class PostgresCandidateRetriever:
                         SELECT
                             v.company_id,
                             v.variant_id,
-                            ts_rank(
-                                to_tsvector('simple', v.normalized_variant_name),
-                                plainto_tsquery('simple', input.norm_exp)
+                            GREATEST(
+                                ts_rank(to_tsvector('simple', v.normalized_variant_name), plainto_tsquery('simple', input.norm_exp)),
+                                ts_rank(to_tsvector('simple', input.norm_exp), plainto_tsquery('simple', v.normalized_variant_name))
                             ) AS candidate_score,
                             v.original_company_name,
                             v.normalized_variant_name,
@@ -414,8 +429,12 @@ class PostgresCandidateRetriever:
                             COALESCE(v.alias_confidence, 1.0) AS alias_confidence
                         FROM {TABLES['company_variant']} v
                         WHERE v.is_active = true
-                          AND to_tsvector('simple', v.normalized_variant_name) @@ plainto_tsquery('simple', input.norm_exp)
-                        ORDER BY ts_rank(to_tsvector('simple', v.normalized_variant_name), plainto_tsquery('simple', input.norm_exp)) DESC
+                          AND (to_tsvector('simple', v.normalized_variant_name) @@ plainto_tsquery('simple', input.norm_exp)
+                               OR to_tsvector('simple', input.norm_exp) @@ plainto_tsquery('simple', v.normalized_variant_name))
+                        ORDER BY GREATEST(
+                            ts_rank(to_tsvector('simple', v.normalized_variant_name), plainto_tsquery('simple', input.norm_exp)),
+                            ts_rank(to_tsvector('simple', input.norm_exp), plainto_tsquery('simple', v.normalized_variant_name))
+                        ) DESC
                         LIMIT %s
                     ) nearest
                 """
