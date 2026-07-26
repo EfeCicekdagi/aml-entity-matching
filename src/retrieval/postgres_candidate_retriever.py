@@ -1,13 +1,10 @@
 """
-postgres_candidate_retriever.py — PostgreSQL tabanlı çok kanallı aday getirici.
+postgres_candidate_retriever.py — PostgreSQL tabanlı çok kanallı aday getirici (Trigram, FTS, Vektör).
 
-Değişiklikler (v2):
-  - batch_get_candidates artık her kanal için aday sayısı ve
-    pipeline_status bilgisi döndürüyor.
-  - pipeline_status: TRIGRAM_NO_RESULT, FTS_NO_RESULT, VECTOR_NO_RESULT,
-    ALL_RETRIEVAL_CHANNELS_EMPTY, CANDIDATES_FOUND
-  - Pre-screening artık CLEAN kararı vermiyor — sadece hangi kanalların
-    çalışacağını belirliyor. Trigram eşik altında olsa bile FTS + vector çalışıyor.
+Özellikler:
+  - Toplu (batch) arama yapısı ile veritabanı sorgularını optimize eder.
+  - Her işlem ve kanal için detaylı pipeline_status (TRIGRAM_NO_RESULT, FTS_NO_RESULT, VECTOR_NO_RESULT, ALL_RETRIEVAL_CHANNELS_EMPTY, CANDIDATES_FOUND) döndürür.
+  - Trigram ön eleme eşiğinin altında kalan işlemler için FTS ve Vektör kanallarını çalıştırarak kapsama alanını maksimize eder.
 """
 
 import logging
@@ -306,11 +303,9 @@ class PostgresCandidateRetriever:
 
     def batch_get_candidates(self, rows: list) -> dict:
         """
-        Tüm chunk'ı 2 SQL sorgusu ile işler (batch verimli).
-
-        ÖNEMLI DEĞİŞİKLİK: Trigram eşik altında kalan satırlar artık
-        tamamen atlanmıyor — FTS ve vector kanalları çalışıyor.
-        Hiçbir kanaldan aday bulunmazsa pipeline_status = ALL_RETRIEVAL_CHANNELS_EMPTY.
+        Tüm chunk'ı 2 optimize SQL sorgusu ile işler (batch verimli).
+        Trigram eşik altında kalan satırlar için FTS ve vector kanalları devreye girerek aday aramaya devam eder.
+        Hiçbir kanaldan aday bulunmazsa pipeline_status = ALL_RETRIEVAL_CHANNELS_EMPTY olarak işaretlenir.
 
         Args:
             rows: [{"row_id", "normalized_explanation", "embedding"}] listesi

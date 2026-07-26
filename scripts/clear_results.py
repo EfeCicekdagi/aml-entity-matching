@@ -11,7 +11,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 def clear_results():
-    logger.info("Eski sonuçlar ve önbellek (cache) temizleniyor...")
+    logger.info("Önceki çalışmalara ait işlem sonuçları ve önbellek (cache) temizleniyor...")
     config_loader = ConfigLoader()
     db_config = config_loader.get_db_config()
 
@@ -40,7 +40,7 @@ def clear_results():
                 logger.info(f"{table} tablosu temizleniyor...")
                 cur.execute(f"TRUNCATE TABLE {table} RESTART IDENTITY CASCADE;")
         conn.commit()
-        logger.info("✅ Tüm eski sonuçlar ve cache başarıyla temizlendi! Artık temiz bir şekilde çalıştırabilirsiniz.")
+        logger.info("✅ Önceki işlem kayıtları ve önbellek başarıyla temizlendi. Sistem yeni analizler için hazır.")
     except Exception as e:
         logger.error(f"Tablolar temizlenirken hata oluştu: {e}")
         conn.rollback()

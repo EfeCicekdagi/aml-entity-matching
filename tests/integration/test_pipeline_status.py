@@ -34,18 +34,18 @@ class TestPipelineStatus(unittest.TestCase):
     def test_high_score_gives_high_risk(self):
         self.assertEqual(self.scorer.assign_risk_level(0.85), "HIGH")
 
-    def test_exactly_0_70_gives_high_risk(self):
-        self.assertEqual(self.scorer.assign_risk_level(0.70), "HIGH")
+    def test_exactly_0_65_gives_high_risk(self):
+        self.assertEqual(self.scorer.assign_risk_level(0.65), "HIGH")
 
     def test_medium_score_gives_medium_risk(self):
-        self.assertEqual(self.scorer.assign_risk_level(0.65), "MEDIUM")
+        self.assertEqual(self.scorer.assign_risk_level(0.55), "MEDIUM")
 
-    def test_exactly_0_60_gives_medium_risk(self):
-        self.assertEqual(self.scorer.assign_risk_level(0.60), "MEDIUM")
+    def test_exactly_0_45_gives_medium_risk(self):
+        self.assertEqual(self.scorer.assign_risk_level(0.45), "MEDIUM")
 
-    def test_below_0_60_gives_no_match(self):
-        self.assertEqual(self.scorer.assign_risk_level(0.59), "NO_MATCH")
-        self.assertEqual(self.scorer.assign_risk_level(0.50), "NO_MATCH")
+    def test_below_0_45_gives_no_match(self):
+        self.assertEqual(self.scorer.assign_risk_level(0.44), "NO_MATCH")
+        self.assertEqual(self.scorer.assign_risk_level(0.30), "NO_MATCH")
         self.assertEqual(self.scorer.assign_risk_level(0.00), "NO_MATCH")
 
     # ── assign_decision_status testleri ─────────────────────────────────────

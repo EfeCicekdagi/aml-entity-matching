@@ -37,7 +37,7 @@ class TestPartialMatchReview:
         final_score, match_reason, reason_codes = scorer.calculate_final_score(scores, alias_confidence=1.0)
         risk_level = scorer.assign_risk_level(final_score)
 
-        assert 0.60 <= final_score <= 0.68, f"Beklenen orta risk bandı skoru, alınan: {final_score}"
+        assert 0.45 <= final_score <= 0.64, f"Beklenen orta risk bandı skoru, alınan: {final_score}"
         assert risk_level == "MEDIUM", f"Beklenen risk seviyesi MEDIUM (analist incelemesi), alınan: {risk_level}"
         assert match_reason == "PARTIAL_MATCH_REQUIRES_REVIEW"
         assert ReasonCode.PARTIAL_MATCH_REQUIRES_REVIEW in reason_codes

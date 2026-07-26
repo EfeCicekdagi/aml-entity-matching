@@ -41,7 +41,8 @@ class ThresholdOptimizer:
         cur.execute("""
             SELECT id, experiment_id, fuzzy_weight, vector_weight, reranker_weight 
             FROM aml_experiment.weight_analysis 
-            ORDER BY f1_score DESC 
+            WHERE experiment_id = (SELECT MAX(experiment_id) FROM aml_experiment.weight_analysis)
+            ORDER BY f1_score DESC, accuracy DESC 
             LIMIT 1
         """)
         row = cur.fetchone()
@@ -88,8 +89,8 @@ class ThresholdOptimizer:
         logger.info(f"Model Base Metrics - ROC AUC: {roc_auc:.4f}, PR AUC: {pr_auc:.4f}")
         
         # Test Thresholds
-        high_thresholds = [round(x, 2) for x in np.arange(0.70, 0.96, 0.05)]
-        medium_thresholds = [round(x, 2) for x in np.arange(0.60, 0.81, 0.05)]
+        high_thresholds = [round(x, 2) for x in np.arange(0.65, 0.96, 0.05)]
+        medium_thresholds = [round(x, 2) for x in np.arange(0.45, 0.81, 0.05)]
         
         conn = self.repo.get_connection()
         cur = conn.cursor()
@@ -142,44 +143,57 @@ if __name__ == "__main__":
     cur.execute("""
         SELECT medium_threshold, high_threshold, f1_score, recall_score, precision_score, tp, fp, tn, fn
         FROM aml_experiment.threshold_analysis
-        ORDER BY f1_score DESC LIMIT 1
+        WHERE experiment_id = (SELECT MAX(experiment_id) FROM aml_experiment.threshold_analysis)
+        ORDER BY f1_score DESC, recall_score DESC LIMIT 1
     """)
     best_f1_row = cur.fetchone()
     
-    # B. HIGH/MEDIUM ayrımı analizi (sadece alert olan örneklerde)
-    # Ground truth'ta HIGH/MEDIUM ayrımı yoksa bu bölüm atlanır.
-    print("\n" + "="*60)
-    print("THRESHOLD RECOMMENDATION REPORT")
-    print("="*60)
-    print("[!] Bu rapor yalnızca öneridir. Production config değiştirilmedi.")
-    print()
+    # B. En yüksek Recall (Precision >= 0.85 şartıyla)
+    cur.execute("""
+        SELECT medium_threshold, high_threshold, f1_score, recall_score, precision_score, tp, fp, tn, fn
+        FROM aml_experiment.threshold_analysis
+        WHERE experiment_id = (SELECT MAX(experiment_id) FROM aml_experiment.threshold_analysis)
+          AND precision_score >= 0.85
+        ORDER BY recall_score DESC, f1_score DESC LIMIT 1
+    """)
+    best_rec_row = cur.fetchone()
+
+    # C. En yüksek Precision (Recall >= 0.40 şartıyla)
+    cur.execute("""
+        SELECT medium_threshold, high_threshold, f1_score, recall_score, precision_score, tp, fp, tn, fn
+        FROM aml_experiment.threshold_analysis
+        WHERE experiment_id = (SELECT MAX(experiment_id) FROM aml_experiment.threshold_analysis)
+          AND recall_score >= 0.40
+        ORDER BY precision_score DESC, f1_score DESC LIMIT 1
+    """)
+    best_prec_row = cur.fetchone()
     
-    if best_f1_row:
-        medium_thr, high_thr, f1, recall, precision, tp, fp, tn, fn = best_f1_row
+    print("\n" + "="*70)
+    print("THRESHOLD RECOMMENDATION REPORT & TRADE-OFF MATRIX")
+    print("="*70)
+    print("[!] Bu rapor yalnızca öneridir. Production config otomatik değiştirilmemiştir.")
+    print()
+
+    def print_profile_stats(title, row):
+        if not row: return
+        medium_thr, high_thr, f1, recall, precision, tp, fp, tn, fn = row
         fpr = fp / (fp + tn) if (fp + tn) > 0 else 0
         fnr = fn / (fn + tp) if (fn + tp) > 0 else 0
         alert_count = tp + fp
         total = tp + fp + tn + fn
         alerts_per_1k = (alert_count / total * 1000) if total > 0 else 0
-        print(f"[A] Alert/No-Alert Threshold Önerisi (Best F1):")
+        print(f"{title}:")
         print(f"    medium_threshold : {medium_thr}")
         print(f"    high_threshold   : {high_thr}")
-        print(f"    F1               : {f1:.4f}")
-        print(f"    Precision        : {precision:.4f}")
-        print(f"    Recall           : {recall:.4f}")
-        print(f"    FPR              : {fpr:.4f}")
-        print(f"    FNR              : {fnr:.4f}")
-        print(f"    Alert Count      : {alert_count}")
-        print(f"    Alerts/1000 tx   : {alerts_per_1k:.1f}")
+        print(f"    F1 Skoru         : {f1:.4f} | Recall: {recall:.4f} | Precision: {precision:.4f}")
+        print(f"    Alert Count      : {alert_count} ({alerts_per_1k:.1f}/1000 tx) | FPR: {fpr:.4f}, FNR: {fnr:.4f}")
+        print("-" * 70)
+
+    print_profile_stats("[A] EN OPTIMIZE (Best F1 - Dengeli Strateji)", best_f1_row)
+    print_profile_stats("[B] EN YUKSEK RECALL (Maksimum Yakalama - AML Onerisi, Prec >= %85)", best_rec_row)
+    print_profile_stats("[C] EN YUKSEK PRECISION (Minimum Hatali Alarm, Recall >= %40)", best_prec_row)
     
-    print()
-    print("[B] HIGH/MEDIUM Ayrımı:")
-    print("    Ground truth'ta HIGH ve MEDIUM etiketleri ayrı tanımlı değil.")
-    print("    Bu nedenle HIGH/MEDIUM ayrım eşiği yalnızca Alert olan kayıtlar üzerinde")
-    print("    iş kuralına göre belirlenebilir (örn. risk skoru >= 0.85 -> HIGH).")
-    print("    Şu an için HIGH/MEDIUM ayrımı optimize edilememektedir.")
-    print("    Bu analiz P1 aşamasına bırakılmıştır.")
-    print("="*60)
+    print("="*70)
     
     cur.close()
     opt.repo.release_connection(conn)

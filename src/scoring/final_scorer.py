@@ -1,15 +1,10 @@
 """
-final_scorer.py — AML eşleştirme nihai skor hesaplayıcı.
+final_scorer.py — AML eşleştirme nihai skor ve risk atama motoru.
 
-Değişiklikler (v3):
-  - Exact match override artık koşulsuz uygulanmıyor.
-    Kısa/genel isimler (token sayısı < 2, uzunluk < 4) için
-    final_score 1.0'a çıkarılmaz; ensemble sonucu korunur.
-  - reason_codes listesi üretiliyor.
-  - calibrated_probability alanı ayrı tutulıyor.
-  - HIGH >= 0.70, MEDIUM >= 0.60, NO_MATCH < 0.60 sınırları
-    assign_risk_level içinde net biçimde uygulanıyor.
-  - decision_status alanı üretiliyor.
+Özellikler:
+  - Kısa ve genel isimler (token sayısı < 2, uzunluk < 4) için exact match override uygulanmaz; yapay zeka ensemble sonucu korunur.
+  - Denetim izi (audit trail) için reason_codes, decision_status ve calibrated_probability alanlarını üretir.
+  - Konfigürasyon tabanlı eşik değerleriyle (HIGH, MEDIUM, LOW/NO_MATCH) katmanlı risk sınıflandırması sağlar.
 """
 
 import logging
@@ -64,11 +59,11 @@ class FinalScorer:
 
         # Default fallback değerler (DB'den okuma başarısız olursa)
         self.weights: dict[str, float] = {
-            "fuzzy_weight":    0.20,
-            "vector_weight":   0.60,
+            "fuzzy_weight":    0.10,
+            "vector_weight":   0.50,
             "acronym_weight":  0.0,
             "rule_weight":     0.0,
-            "reranker_weight": 0.20,
+            "reranker_weight": 0.40,
         }
         self.thresholds: list[dict] = []
         self._load_config_from_db()
@@ -387,12 +382,12 @@ class FinalScorer:
             if ReasonCode.PARTIAL_MATCH_REQUIRES_REVIEW not in reason_codes:
                 reason_codes.append(ReasonCode.PARTIAL_MATCH_REQUIRES_REVIEW)
             match_reason = "PARTIAL_MATCH_REQUIRES_REVIEW"
-            # Doğrudan yüksek risk vermek yerine analist incelemesine (orta risk bandı: 0.60 - 0.68) gönder
-            if final_score >= 0.70:
-                final_score = 0.68
-            elif final_score < 0.60 and scores.get("fuzzy_score", 0.0) >= 0.40:
+            # Doğrudan yüksek risk vermek yerine analist incelemesine (orta risk bandı: 0.45 - 0.64) gönder
+            if final_score >= 0.65:
+                final_score = 0.64
+            elif final_score < 0.45 and scores.get("fuzzy_score", 0.0) >= 0.40:
                 # Kısmi bilgi yeterliyse en azından analist incelemesi oluşturabilmeli (aday kaybolmamalı)
-                final_score = max(final_score, 0.61)
+                final_score = max(final_score, 0.50)
 
         if not reason_codes:
             reason_codes.append(ReasonCode.LOW_CONFIDENCE)
@@ -424,9 +419,9 @@ class FinalScorer:
                         return t["risk_level"]
 
         # DB'den threshold yüklenemezse veya aralık dışındaysa fallback
-        if final_score >= 0.70:
+        if final_score >= 0.65:
             return "HIGH"
-        elif final_score >= 0.60:
+        elif final_score >= 0.45:
             return "MEDIUM"
         else:
             return "NO_MATCH"

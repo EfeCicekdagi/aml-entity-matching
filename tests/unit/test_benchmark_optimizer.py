@@ -58,7 +58,8 @@ class TestBenchmarkAndOptimizer:
             raw_scores_list,
             fuzzy_range=[0.20, 0.50],
             vector_range=[0.10, 0.60],
-            reranker_range=[0.20, 0.40]
+            reranker_range=[0.20, 0.40],
+            save_to_db=False
         )
         
         assert res is not None

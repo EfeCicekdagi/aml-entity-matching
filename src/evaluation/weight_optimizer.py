@@ -205,7 +205,7 @@ class WeightOptimizer:
 
         return raw_scores_list
 
-    def grid_search(self, raw_scores_list, fuzzy_range, vector_range, reranker_range):
+    def grid_search(self, raw_scores_list, fuzzy_range, vector_range, reranker_range, save_to_db=True):
         logger.info("Starting Grid Search for Weights...")
         
         # Generate combinations summing to 1.0
@@ -221,7 +221,7 @@ class WeightOptimizer:
         conn = None
         cur = None
         experiment_id = None
-        if self.repo is not None:
+        if self.repo is not None and save_to_db:
             try:
                 conn = self.repo.get_connection()
                 cur = conn.cursor()
@@ -255,8 +255,8 @@ class WeightOptimizer:
                 # compute final score
                 final_score, reason, codes = self.scorer.calculate_final_score(item["raw_scores"], 1.0)
                 
-                # simulate threshold assignment (assume High threshold is 0.70 for this phase)
-                is_alert = 1 if final_score >= 0.70 else 0
+                # simulate alert threshold assignment (Medium risk / alert boundary is 0.60)
+                is_alert = 1 if final_score >= 0.60 else 0
                 y_pred.append(is_alert)
                 
                 if item["should_match"] and is_alert: tp += 1
@@ -291,7 +291,7 @@ class WeightOptimizer:
                 except Exception as e:
                     logger.warning(f"DB insert failed in grid_search: {e}")
             
-            logger.info(f"Combo F={combo['fuzzy_weight']:.2f}, V={combo['vector_weight']:.2f}, R={combo['reranker_weight']:.2f} | F1={f1:.4f}")
+            logger.debug(f"Combo F={combo['fuzzy_weight']:.2f}, V={combo['vector_weight']:.2f}, R={combo['reranker_weight']:.2f} | F1={f1:.4f}")
             
         if conn and cur:
             try:
@@ -306,37 +306,39 @@ class WeightOptimizer:
             
         results.sort(key=lambda x: (x["f1"], x["accuracy"]), reverse=True)
         best_combo = results[0] if results else None
-        return {
-            "best_combination": best_combo,
-            "all_results": results
-        }
 
-        # ── SHORT_QUERY_PROFILE uyarısı ──────────────────────────────────────
-        # FinalScorer, query_token_count <= 2 olan sorgular için farklı ağırlıklar kullanır:
-        #   w_vector=0.10, w_reranker=0.40, w_fuzzy=0.30, w_rule=0.20
-        # Bu grid search tüm kayıtlar için tek bir ağırlık kombiyasyonu arar.
-        # Ancak kısa sorguların (tek kelime, kısaltmalar) bir bölümü bu ağırlıklara tabi DEĞİLDİR.
-        # Dolayısıyla bulunan optimal ağırlıklar yalnızca DEFAULT_QUERY_PROFILE için geçerlidir.
-        #
-        # SHORT_QUERY_PROFILE'ı ayrı optimize etmek için bu dataset'i şu şekilde bölebilirsiniz:
-        #   default_records = [r for r in raw_scores_list if r["raw_scores"].get("query_token_count", 3) > 2]
-        #   short_records   = [r for r in raw_scores_list if r["raw_scores"].get("query_token_count", 3) <= 2]
         short_count = sum(
             1 for r in raw_scores_list
             if r["raw_scores"].get("query_token_count", 3) <= 2
         )
         if short_count:
-            logger.warning(
+            logger.debug(
                 f"[SHORT_QUERY_PROFILE] Dataset'te {short_count} kısa sorgu (token_count <= 2) var. "
-                f"FinalScorer bu sorgular için farklı sabit ağırlıklar kullanır. "
-                f"Bulunan optimal ağırlıklar bu sorgular için GEÇERLİ DEĞİLDİR (DEFAULT_QUERY_PROFILE)."
+                f"FinalScorer bu sorgular için farklı sabit ağırlıklar kullanır."
             )
+
+        if best_combo:
+            logger.info("\n" + "="*60)
+            logger.info("WEIGHT OPTIMIZATION RECOMMENDATION REPORT")
+            logger.info("="*60)
+            logger.info(f"Best Combination (F1: {best_combo['f1']:.4f}, Accuracy: {best_combo['accuracy']:.4f}):")
+            logger.info(f"  -> Fuzzy Weight    : {best_combo['fuzzy_weight']:.2f}")
+            logger.info(f"  -> Vector Weight   : {best_combo['vector_weight']:.2f}")
+            logger.info(f"  -> Reranker Weight : {best_combo['reranker_weight']:.2f}")
+            logger.info(f"Metrics: Precision={best_combo['precision']:.4f}, Recall={best_combo['recall']:.4f}")
+            logger.info(f"Confusion Matrix: TP={best_combo['tp']}, FP={best_combo['fp']}, TN={best_combo['tn']}, FN={best_combo['fn']}")
+            logger.info("="*60 + "\n")
+
+        return {
+            "best_combination": best_combo,
+            "all_results": results
+        }
 
 
 if __name__ == "__main__":
     import numpy as np
     opt = WeightOptimizer()
-    df = opt.load_ground_truth("tests/aml_eft_challenge_ground_truth_1320_final.csv")
+    df = opt.load_ground_truth("tests/aml_eft_challenge_ground_truth_1440_berke_final.csv")
     raw_scores = opt.extract_raw_scores(df)
     
     # Example ranges: 0.1 to 0.8 with 0.1 step

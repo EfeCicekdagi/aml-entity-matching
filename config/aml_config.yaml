@@ -24,7 +24,7 @@ retrieval:
   enable_blocking_prescreen: false # Ön eleme (Trigram) filtresi KAPATILDI
   reranker_prefilter_score: 0.30
 
-# [EXPERIMENTAL] Entity Extraction
+# Entity Extraction (NER & NLP Katmanı)
 ner:
   enabled: true
   model_name: savasy/bert-base-turkish-ner-cased
@@ -37,7 +37,7 @@ entity_extraction:
   max_entity_length: 100
   use_full_text_fallback: false  # True: son çare olarak tüm metin kullanılır
 
-# [EXPERIMENTAL] Cross-Encoder Reranking
+# Cross-Encoder Reranking (Derin Öğrenme Yeniden Sıralama Katmanı)
 reranker:
   enabled: true
   model_name: BAAI/bge-reranker-v2-m3
@@ -55,18 +55,25 @@ processing:
 scoring:
   scoring_config_version: scoring_v2_reranker
   threshold_config_version: threshold_v3_bge_m3
-  # Fallback thresholds (DB'den yüklenemezse kullanılır)
-  high_threshold: 0.70
-  medium_threshold: 0.60
-  # LOW ve NO_MATCH artık alert tablosuna yazılmaz — sadece match_result'a
+  # Optimum Ağırlık Konfigürasyonu (1440 TX Weight Optimizer Çıktısı - Exp ID 53)
+  weights:
+    fuzzy_weight: 0.10
+    vector_weight: 0.50
+    reranker_weight: 0.40
+    acronym_weight: 0.00
+    rule_weight: 0.00
+  # Optimum Eşik Değerleri (1440 TX Threshold Optimizer Çıktısı - En Optimize [A] & AML Önerisi [B])
+  high_threshold: 0.65
+  medium_threshold: 0.45
+  # LOW ve NO_MATCH denetim izi için sadece aml_core.match_result tablosuna yazılır
   exact_compact_match:
     enabled: true
     min_length: 10
     score_floor: 0.98
 
-# [EXPERIMENTAL] Score Calibration
+# Score Calibration (Olasılık Kalibrasyon Katmanı)
 calibration:
-  # Kalibrasyon modeli mevcut değilse sistem eski normalize skoru kullanır
+  # Kalibrasyon modeli mevcut değilse sistem doğrudan uncalibrated (ham) skoru kullanır
   # (calibration_applied=False olarak işaretlenir)
   enabled: false
   model_path: null              # "models/calibration/platt_v1.pkl"

@@ -1,11 +1,10 @@
 """
-aml_repository.py — AML veritabanı erişim katmanı.
+aml_repository.py — AML veritabanı erişim ve yönetim katmanı.
 
-Değişiklikler (v3):
-  - connection() context manager eklendi (pool connection leak önlemi).
-  - start_run_log / finish_run_log / insert_match_results_bulk /
-    insert_alerts_bulk artık exception'ı raise ediyor (P0).
-  - populate_alert_export context manager kullanıyor.
+Özellikler:
+  - ThreadedConnectionPool ve context manager yapısıyla güvenli bağlantı yönetimi (connection leak koruması) sağlar.
+  - Toplu yazma (bulk insert) ve denetim izi (audit log) operasyonlarını transactional bütünlük içinde yürütür.
+  - Alert dışa aktarma (alert_export) ve run log durum takibini veritabanı seviyesinde otomatize eder.
 """
 
 import json

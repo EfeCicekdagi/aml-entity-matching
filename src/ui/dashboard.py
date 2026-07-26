@@ -348,7 +348,7 @@ elif page == "📈 Run Detayları":
     st.divider()
 
     # ── Grafikler ─────────────────────────────────────────────────────────────────
-    tab1, tab2, tab3 = st.tabs(["📊 Dağılım Analizi", "📋 Alert Listesi", "🏢 Şirket Analizi"])
+    tab1, tab2, tab3, tab4 = st.tabs(["📊 Dağılım Analizi", "📋 Alert Listesi", "🏢 Şirket Analizi", "⚖️ Vektör vs Fuzzy (AI Sapma)"])
 
     with tab1:
         if alerts_df.empty:
@@ -506,6 +506,63 @@ elif page == "📈 Run Detayları":
                 'medium_cnt':'MEDIUM'
             }), use_container_width=True)
 
+    with tab4:
+        st.subheader("⚖️ Vektör (Yapay Zeka) vs. Fuzzy (Karakter) Karşılaştırmalı Sapma Analizi")
+        st.markdown("Bu ekranda **BGE-M3 Vektör (AI)** modeli ile **Fuzzy (Karakter)** algoritması arasındaki skorsal sapmaları analiz edebilirsiniz. **Çizginin üstünde kalanlar yapay zekanın yakaladıkları (anlamsal eşleşmeler), çizginin altında kalanlar karakter algoritmamızın yakaladıklarıdır (tuzak ve kamuflaj koruması).**")
+        
+        if alerts_df.empty:
+            st.info("Analiz yapılabilecek bir alert verisi bulunamadı.")
+        else:
+            # 1. Scatter Plot (Saçılım Grafiği)
+            fig_div = px.scatter(
+                alerts_df, x='fuzzy_score', y='vector_score', color='risk_level',
+                color_discrete_map={"HIGH":"#ef4444","MEDIUM":"#f97316","LOW":"#6b7280"},
+                hover_data=['original_company_name', 'matched_variant_name', 'original_explanation'],
+                title="Vektör vs. Fuzzy Skoru Matrisi (Diyagonal Üstü: Yapay Zeka Gücü | Altı: Karakter & Kamuflaj)",
+                labels={'fuzzy_score':'Fuzzy (Karakter Benzerliği) Skoru', 'vector_score':'Vektör (AI Anlamsal) Skoru'},
+                opacity=0.85
+            )
+            fig_div.add_shape(type="line", x0=0, y0=0, x1=1, y1=1, line=dict(color="White", width=2, dash="dash"))
+            fig_div.update_layout(height=450)
+            st.plotly_chart(fig_div, use_container_width=True)
+            
+            st.divider()
+            
+            # 2. Etkileşimli Eşik Slider'ı
+            min_sapma = st.slider("🔍 Minimum Sapma (Skor Farkı) Eşiği:", min_value=0.05, max_value=0.50, value=0.15, step=0.05, help="İki model arasındaki minimum puan farkını belirleyerek tabloları filtreleyin.")
+            
+            sub1, sub2 = st.tabs(["🟢 Vektör > Fuzzy (Yapay Zeka Yakalamaları)", "🔵 Fuzzy > Vektör (Karakter Gücü & Kamuflaj)"])
+            
+            with sub1:
+                st.markdown("**💡 Yapay Zekanın Gücü:** Harfler benzemediği halde (düşük Fuzzy), anlamsal veya sektörel olarak eşleştiği için Vektör yapay zekamızın yüksek skor verdiği işlemler.")
+                v_gt_f = alerts_df[alerts_df['vector_score'] - alerts_df['fuzzy_score'] >= min_sapma].copy()
+                if not v_gt_f.empty:
+                    v_gt_f['sapma'] = (v_gt_f['vector_score'] - v_gt_f['fuzzy_score']).round(3)
+                    v_gt_f = v_gt_f.sort_values('sapma', ascending=False)
+                    st.success(f"**{len(v_gt_f)}** adet işlemde Vektör skoru Fuzzy skorundan `{min_sapma}` puan veya daha fazla yüksektir.")
+                    st.dataframe(v_gt_f[['eft_id', 'original_explanation', 'matched_variant_name', 'vector_score', 'fuzzy_score', 'reranker_score', 'final_score', 'risk_level', 'sapma']].rename(columns={
+                        'eft_id':'EFT ID', 'original_explanation':'EFT Açıklaması', 'matched_variant_name':'Eşleşen Şirket',
+                        'vector_score':'Vektör', 'fuzzy_score':'Fuzzy', 'reranker_score':'Reranker', 'final_score':'Final Skor',
+                        'risk_level':'Risk', 'sapma':'Fark (+)'
+                    }), use_container_width=True)
+                else:
+                    st.info(f"Bu eşikte (`>={min_sapma}`) Vektör > Fuzzy sapma kaydı bulunamadı. Eşiği düşürebilirsiniz.")
+
+            with sub2:
+                st.markdown("**💡 Karakter & Normalizasyon Gücü:** Harf benzerliği yüksek olup (yüksek Fuzzy), leetspeak/kamuflaj yakalamaları veya Vektörün farklı sektör diye ayırt ettiği işlemler.")
+                f_gt_v = alerts_df[alerts_df['fuzzy_score'] - alerts_df['vector_score'] >= min_sapma].copy()
+                if not f_gt_v.empty:
+                    f_gt_v['sapma'] = (f_gt_v['fuzzy_score'] - f_gt_v['vector_score']).round(3)
+                    f_gt_v = f_gt_v.sort_values('sapma', ascending=False)
+                    st.success(f"**{len(f_gt_v)}** adet işlemde Fuzzy skoru Vektör skorundan `{min_sapma}` puan veya daha fazla yüksektir.")
+                    st.dataframe(f_gt_v[['eft_id', 'original_explanation', 'matched_variant_name', 'fuzzy_score', 'vector_score', 'reranker_score', 'final_score', 'risk_level', 'sapma']].rename(columns={
+                        'eft_id':'EFT ID', 'original_explanation':'EFT Açıklaması', 'matched_variant_name':'Eşleşen Şirket',
+                        'fuzzy_score':'Fuzzy', 'vector_score':'Vektör', 'reranker_score':'Reranker', 'final_score':'Final Skor',
+                        'risk_level':'Risk', 'sapma':'Fark (+)'
+                    }), use_container_width=True)
+                else:
+                    st.info(f"Bu eşikte (`>={min_sapma}`) Fuzzy > Vektör sapma kaydı bulunamadı. Eşiği düşürebilirsiniz.")
+
 
 # ── Benchmark sayfası ─────────────────────────────────────────────────────────
 elif page == "🧪 Benchmark":
@@ -604,27 +661,62 @@ elif page == "📊 Model Optimizasyon":
             weight_df = pd.read_sql("""
                 SELECT fuzzy_weight, vector_weight, reranker_weight, f1_score, precision_score, recall_score
                 FROM aml_experiment.weight_analysis
-                WHERE experiment_id = (SELECT MAX(experiment_id) FROM aml_experiment.weight_analysis)
+                WHERE experiment_id = (
+                    SELECT experiment_id FROM aml_experiment.weight_analysis 
+                    GROUP BY experiment_id 
+                    HAVING count(*) >= 10 
+                    ORDER BY experiment_id DESC 
+                    LIMIT 1
+                )
                 ORDER BY f1_score DESC
             """, conn)
             
             if not weight_df.empty:
+                weight_df = weight_df.drop_duplicates(subset=["fuzzy_weight", "vector_weight", "reranker_weight"]).reset_index(drop=True)
                 weight_df["Model Konfigürasyonu (F/V/R)"] = weight_df.apply(
                     lambda row: f"F:{row['fuzzy_weight']:.1f} V:{row['vector_weight']:.1f} R:{row['reranker_weight']:.1f}", axis=1)
                 
-                # En iyi 10 sonucu bar chart ile göster
-                top_weights = weight_df.head(10).sort_values("f1_score", ascending=True)
-                fig1 = px.bar(top_weights, x="f1_score", y="Model Konfigürasyonu (F/V/R)", orientation='h',
-                              title="En İyi 10 Ağırlık Konfigürasyonu (F1 Skoru)",
+                best_w = weight_df.iloc[0]
+                st.success(f"**🌟 En İyi Konfigürasyon:** **Fuzzy: `{best_w['fuzzy_weight']:.2f}` | Vector: `{best_w['vector_weight']:.2f}` | Reranker: `{best_w['reranker_weight']:.2f}`**\n\n"
+                           f"• **F1 Skoru:** `{best_w['f1_score']:.4f}` | **Recall:** `{best_w['recall_score']:.4f}` | **Precision:** `{best_w['precision_score']:.4f}`\n\n"
+                           f"*Bu konfigürasyon F1 skorunu maksimize ettiği için sistemin aktif varsayılan ağırlıkları olarak seçilmiştir.*")
+                
+                # Tüm denemeleri (kombinasyonları) bar chart ile göster
+                all_weights_sorted = weight_df.sort_values("f1_score", ascending=True)
+                fig1 = px.bar(all_weights_sorted, x="f1_score", y="Model Konfigürasyonu (F/V/R)", orientation='h',
+                              title="Tüm Ağırlık Konfigürasyonlarının F1 Skoru Karşılaştırması (Tam Liste)",
                               color="f1_score", color_continuous_scale="Viridis",
                               labels={'f1_score': 'F1 Skoru'})
+                fig1.update_layout(height=800)
                 st.plotly_chart(fig1, use_container_width=True)
                 
-                with st.expander("Tabloyu Görüntüle"):
-                    st.dataframe(weight_df.style.highlight_max(subset=['f1_score', 'precision_score'], color='lightgreen'))
-                    
-                best_w = weight_df.iloc[0]
-                st.success(f"**Sonuç:** En iyi performansı (F1: {best_w['f1_score']:.4f}) gösteren konfigürasyon F={best_w['fuzzy_weight']:.2f}, V={best_w['vector_weight']:.2f}, R={best_w['reranker_weight']:.2f} olarak tespit edilip sisteme tanımlanmıştır.")
+                # Tüm kombinasyon listesini doğrudan, gizlemeden açıkça gösterelim
+                st.markdown("#### 📋 Tüm Ağırlık Kombinasyonları Karşılaştırma Listesi (Tam Tablo)")
+                st.markdown("*Aşağıdaki tabloda denenen **tüm ağırlık kombinasyonları** (örneğin 0.1 / 0.1 / 0.8 gibi) F1 Skoruna göre sıralanmıştır. Sütun başlıklarına tıklayarak sıralamayı değiştirebilir veya arama yapabilirsiniz.*")
+                
+                display_df = weight_df[["fuzzy_weight", "vector_weight", "reranker_weight", "f1_score", "precision_score", "recall_score"]].copy()
+                display_df = display_df.rename(columns={
+                    "fuzzy_weight": "Fuzzy Ağırlığı",
+                    "vector_weight": "Vector Ağırlığı",
+                    "reranker_weight": "Reranker Ağırlığı",
+                    "f1_score": "F1 Skoru",
+                    "precision_score": "Kesinlik (Precision)",
+                    "recall_score": "Duyarlılık (Recall)"
+                })
+                
+                st.dataframe(
+                    display_df.style.format({
+                        "Fuzzy Ağırlığı": "{:.2f}",
+                        "Vector Ağırlığı": "{:.2f}",
+                        "Reranker Ağırlığı": "{:.2f}",
+                        "F1 Skoru": "{:.4f}",
+                        "Kesinlik (Precision)": "{:.4f}",
+                        "Duyarlılık (Recall)": "{:.4f}"
+                    }).highlight_max(subset=["F1 Skoru", "Kesinlik (Precision)", "Duyarlılık (Recall)"], color="#d4edda")
+                      .highlight_min(subset=["F1 Skoru"], color="#f8d7da"),
+                    use_container_width=True,
+                    height=450
+                )
             else:
                 st.info("Ağırlık optimizasyonu verisi bulunamadı.")
                 
@@ -637,31 +729,85 @@ elif page == "📊 Model Optimizasyon":
             thresh_df = pd.read_sql("""
                 SELECT medium_threshold, high_threshold, f1_score, precision_score, recall_score
                 FROM aml_experiment.threshold_analysis
-                WHERE experiment_id = (SELECT MAX(experiment_id) FROM aml_experiment.threshold_analysis)
+                WHERE experiment_id = (
+                    SELECT experiment_id FROM aml_experiment.threshold_analysis 
+                    GROUP BY experiment_id 
+                    HAVING count(*) >= 5 
+                    ORDER BY experiment_id DESC 
+                    LIMIT 1
+                )
                 ORDER BY f1_score DESC
             """, conn)
             
             if not thresh_df.empty:
+                thresh_df = thresh_df.drop_duplicates(subset=["high_threshold", "medium_threshold"]).reset_index(drop=True)
                 thresh_df["Eşik Seçimi (High/Medium)"] = thresh_df.apply(
                     lambda row: f"H:{row['high_threshold']:.2f} / M:{row['medium_threshold']:.2f}", axis=1)
                 
-                top_thresh = thresh_df.head(10).sort_values("f1_score", ascending=True)
+                all_thresh_sorted = thresh_df.sort_values("f1_score", ascending=True)
                 fig2 = px.scatter(thresh_df, x="recall_score", y="precision_score", 
                                   color="f1_score", hover_name="Eşik Seçimi (High/Medium)",
                                   title="Precision vs Recall - Eşik Analizi",
                                   labels={'recall_score': 'Duyarlılık (Recall)', 'precision_score': 'Kesinlik (Precision)'})
                 st.plotly_chart(fig2, use_container_width=True)
                 
-                fig3 = px.bar(top_thresh, x="f1_score", y="Eşik Seçimi (High/Medium)", orientation='h',
-                              title="En İyi 10 Eşik Konfigürasyonu (F1 Skoru)",
+                fig3 = px.bar(all_thresh_sorted, x="f1_score", y="Eşik Seçimi (High/Medium)", orientation='h',
+                              title="Tüm Eşik Konfigürasyonlarının F1 Skoru Karşılaştırması (Tam Liste)",
                               color="f1_score", color_continuous_scale="Blues")
+                fig3.update_layout(height=700)
                 st.plotly_chart(fig3, use_container_width=True)
                 
-                with st.expander("Tüm Eşik Testlerini Görüntüle"):
-                    st.dataframe(thresh_df.style.highlight_max(subset=['f1_score'], color='lightblue'))
+                st.markdown("#### 📋 Tüm Eşik Testleri Karşılaştırma Listesi (Tam Tablo)")
+                st.markdown("*Aşağıdaki tabloda denenen **tüm risk eşiği kombinasyonları** (High / Medium) F1 Skoruna göre sıralanmıştır.*")
+                
+                t_display_df = thresh_df[["high_threshold", "medium_threshold", "f1_score", "precision_score", "recall_score"]].copy()
+                t_display_df = t_display_df.rename(columns={
+                    "high_threshold": "High Eşik (Yüksek Risk)",
+                    "medium_threshold": "Medium Eşik (Orta Risk)",
+                    "f1_score": "F1 Skoru",
+                    "precision_score": "Kesinlik (Precision)",
+                    "recall_score": "Duyarlılık (Recall)"
+                })
+                
+                st.dataframe(
+                    t_display_df.style.format({
+                        "High Eşik (Yüksek Risk)": "{:.2f}",
+                        "Medium Eşik (Orta Risk)": "{:.2f}",
+                        "F1 Skoru": "{:.4f}",
+                        "Kesinlik (Precision)": "{:.4f}",
+                        "Duyarlılık (Recall)": "{:.4f}"
+                    }).highlight_max(subset=["F1 Skoru", "Kesinlik (Precision)", "Duyarlılık (Recall)"], color="#d4edda")
+                      .highlight_min(subset=["F1 Skoru"], color="#f8d7da"),
+                    use_container_width=True,
+                    height=450
+                )
                     
-                best_t = thresh_df.iloc[0]
-                st.success(f"**Sonuç:** F1 skorunu ({best_t['f1_score']:.4f}) maksimize eden en optimal karar sınırları **Yüksek Risk (High): {best_t['high_threshold']:.2f}** ve **Orta Risk (Medium): {best_t['medium_threshold']:.2f}** olarak seçilmiştir.")
+                best_f1 = thresh_df.iloc[0]
+                best_recall_df = thresh_df[thresh_df["precision_score"] >= 0.85].sort_values(by=["recall_score", "f1_score"], ascending=False)
+                best_rec = best_recall_df.iloc[0] if not best_recall_df.empty else best_f1
+                best_prec_df = thresh_df[thresh_df["recall_score"] >= 0.40].sort_values(by=["precision_score", "f1_score"], ascending=False)
+                best_prec = best_prec_df.iloc[0] if not best_prec_df.empty else best_f1
+
+                st.markdown("#### 🎯 Eşik Stratejisi Karar Matrisi & Öneriler")
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.success(f"**⚖️ En Optimize (Best F1)**\n\n"
+                               f"**High:** `{best_f1['high_threshold']:.2f}` | **Medium:** `{best_f1['medium_threshold']:.2f}`\n\n"
+                               f"• **F1 Skoru:** `{best_f1['f1_score']:.4f}`\n"
+                               f"• **Recall:** `{best_f1['recall_score']:.4f}`\n"
+                               f"• **Precision:** `{best_f1['precision_score']:.4f}`")
+                with col2:
+                    st.info(f"**🛡️ En Yüksek Recall (AML Önerisi)**\n*(Precision ≥ %85 şartıyla)*\n\n"
+                            f"**High:** `{best_rec['high_threshold']:.2f}` | **Medium:** `{best_rec['medium_threshold']:.2f}`\n\n"
+                            f"• **F1 Skoru:** `{best_rec['f1_score']:.4f}`\n"
+                            f"• **Recall:** `{best_rec['recall_score']:.4f}`\n"
+                            f"• **Precision:** `{best_rec['precision_score']:.4f}`")
+                with col3:
+                    st.warning(f"**🎯 En Yüksek Precision (Az Alarm)**\n*(Recall ≥ %40 şartıyla)*\n\n"
+                               f"**High:** `{best_prec['high_threshold']:.2f}` | **Medium:** `{best_prec['medium_threshold']:.2f}`\n\n"
+                               f"• **F1 Skoru:** `{best_prec['f1_score']:.4f}`\n"
+                               f"• **Recall:** `{best_prec['recall_score']:.4f}`\n"
+                               f"• **Precision:** `{best_prec['precision_score']:.4f}`")
             else:
                 st.info("Threshold optimizasyonu verisi bulunamadı.")
                 

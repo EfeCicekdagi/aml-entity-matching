@@ -24,7 +24,7 @@ def main():
         INSERT INTO aml_config.scoring_weight (
             config_version, fuzzy_weight, vector_weight, acronym_weight, rule_weight, reranker_weight, is_active
         )
-        VALUES ('scoring_v2_reranker', 0.20, 0.60, 0.00, 0.00, 0.20, true)
+        VALUES ('scoring_v2_reranker', 0.10, 0.50, 0.00, 0.00, 0.40, true)
         ON CONFLICT (config_version) DO UPDATE SET
             fuzzy_weight = EXCLUDED.fuzzy_weight,
             vector_weight = EXCLUDED.vector_weight,
@@ -39,9 +39,9 @@ def main():
         cur.execute("""
             INSERT INTO aml_config.threshold (config_version, risk_level, min_score, max_score, is_active)
             VALUES 
-                (%s, 'HIGH', 0.70, 1.00, true),
-                (%s, 'MEDIUM', 0.60, 0.70, true),
-                (%s, 'NO_MATCH', 0.00, 0.60, true)
+                (%s, 'HIGH', 0.65, 1.00, true),
+                (%s, 'MEDIUM', 0.45, 0.65, true),
+                (%s, 'NO_MATCH', 0.00, 0.45, true)
             ON CONFLICT (config_version, risk_level) DO UPDATE SET
                 min_score = EXCLUDED.min_score,
                 max_score = EXCLUDED.max_score,

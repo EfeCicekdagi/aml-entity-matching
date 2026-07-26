@@ -9,7 +9,7 @@ from src.config.config_loader import ConfigLoader
 from src.repository.aml_repository import AMLRepository
 
 def load_data():
-    csv_path = "data/aml_eft_challenge_dataset_1320_final.csv"
+    csv_path = "data/aml_eft_challenge_dataset_1440_berke_final.csv"
     if not os.path.exists(csv_path):
         print(f"Error: {csv_path} not found.")
         sys.exit(1)

@@ -20,30 +20,30 @@ TABLES = {
     "company_embedding":  "aml_ml.company_embedding",
     "reranker_cache":     "aml_ml.reranker_cache",
 
-    # Core — eşleştirme sonuçları
-    "match_result":       "aml_core.match_result",      # YENİ: tüm sonuçlar
-    "candidate_match":    "aml_core.candidate_match",   # Eski (uyumluluk)
-    "scoring_result":     "aml_core.scoring_result",    # Eski (uyumluluk)
-    "alert":              "aml_core.alert",             # Sadece HIGH/MEDIUM
-    "alert_export":       "aml_core.alert_export",      # YENİ (Flat export tablo)
+    # Core — Eşleştirme ve alert sonuçları
+    "match_result":       "aml_core.match_result",      # Ana eşleştirme sonuç tablosu (Tüm işlemler)
+    "candidate_match":    "aml_core.candidate_match",   # Geriye dönük şema uyumluluğu
+    "scoring_result":     "aml_core.scoring_result",    # Geriye dönük şema uyumluluğu
+    "alert":              "aml_core.alert",             # Riskli varlıklar tablosu (Sadece HIGH/MEDIUM)
+    "alert_export":       "aml_core.alert_export",      # Dışa aktarma ve analitik raporlama tablosu
 
     # Config
     "scoring_weight":     "aml_config.scoring_weight",
     "threshold":          "aml_config.threshold",
-    "model_registry":     "aml_config.model_registry",          # YENİ
-    "model_governance":   "aml_eval.model_governance",          # YENİ
-    "threshold_validation": "aml_config.threshold_validation",  # YENİ
-    "calibration_model":  "aml_config.calibration_model",       # YENİ
+    "model_registry":     "aml_config.model_registry",
+    "model_governance":   "aml_eval.model_governance",
+    "threshold_validation": "aml_config.threshold_validation",
+    "calibration_model":  "aml_config.calibration_model",
 
     # Audit
     "run_log":            "aml_audit.run_log",
     "quality_check":      "aml_audit.quality_check_result",
     "performance_log":    "aml_audit.performance_log",
-    "alert_history":      "aml_audit.alert_status_history",     # YENİ
+    "alert_history":      "aml_audit.alert_status_history",
 
     # Evaluation
-    "test_case":          "aml_eval.test_case",                 # YENİ
-    "benchmark_result":   "aml_eval.benchmark_result",          # YENİ
+    "test_case":          "aml_eval.test_case",
+    "benchmark_result":   "aml_eval.benchmark_result",
     "experiment_run":     "aml_experiment.experiment_run",
     "experiment_result":  "aml_experiment.experiment_result",
 }

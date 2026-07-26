@@ -1319,3 +1319,123 @@
 1000053,Finspire Solutions Private Limited,True,unicode,hard,Finspiré Solutions Private Limited
 1000335,Tesla Motors Ltd,True,typo,hard,Telsa Motros Limited
 1001162,Finspire Solutions Private Limited,True,intermediary_beneficiary_context,hard,Finspire Solutions
+1001321,Berke Plastik Sanayi,True,direct_exact,easy,Berke Plastik Sanayi firmasına hammadde ödemesi
+1001322,Berke Plastik Sanayi,True,direct_exact,easy,BERKE PLASTİK SANAYİ
+1001323,Berke Plastik Sanayi,True,direct_exact,easy,berke plastik sanayi
+1001324,Berke Plastik Sanayi,True,direct_exact,easy,Payment to Berke Plastik Sanayi for invoice 78214
+1001325,Berke Plastik Sanayi,True,legal_suffix_variation,medium,Berke Plastik Sanayi Ltd. Şti. hizmet bedeli
+1001326,Berke Plastik Sanayi,True,legal_suffix_variation,medium,Berke Plastik San. Tic. Ltd. Sti.
+1001327,Berke Plastik Sanayi,True,legal_suffix_variation,medium,Berke Plastik Sanayi A.Ş.
+1001328,Berke Plastik Sanayi,True,legal_suffix_variation,medium,Berke Plastik San. ve Tic. Ltd. Şti.
+1001329,Berke Plastik Sanayi,True,abbreviation,hard,Berke Plst. San.
+1001330,Berke Plastik Sanayi,True,abbreviation,hard,Berke Plastik San.
+1001331,Berke Plastik Sanayi,True,abbreviation,hard,B. Plastik Sanayi
+1001332,Berke Plastik Sanayi,True,abbreviation,hard,BPS plastik hammadde ödemesi
+1001333,Berke Plastik Sanayi,True,mixed_case,medium,BeRkE PlAsTiK SaNaYi
+1001334,Berke Plastik Sanayi,True,mixed_case,medium,bERKE pLASTİK sANAYİ
+1001335,Berke Plastik Sanayi,True,mixed_case,medium,BERke PLASTik SANayi
+1001336,Berke Plastik Sanayi,True,mixed_case,medium,BerKE PlaSTİK SanaYİ
+1001337,Berke Plastik Sanayi,True,punctuation_noise,medium,Berke-Plastik-Sanayi
+1001338,Berke Plastik Sanayi,True,punctuation_noise,medium,Berke/Plastik/Sanayi
+1001339,Berke Plastik Sanayi,True,punctuation_noise,medium,Berke.Plastik.Sanayi
+1001340,Berke Plastik Sanayi,True,punctuation_noise,medium,Berke_Plastic_Sanayi
+1001341,Berke Plastik Sanayi,True,whitespace_obfuscation,hard,B e r k e  P l a s t i k  S a n a y i
+1001342,Berke Plastik Sanayi,True,whitespace_obfuscation,hard,Berke    Plastik     Sanayi
+1001343,Berke Plastik Sanayi,True,whitespace_obfuscation,hard,B erke Pl astik Sana yi
+1001344,Berke Plastik Sanayi,True,whitespace_obfuscation,hard,B-E-R-K-E P-L-A-S-T-I-K S-A-N-A-Y-I
+1001345,Berke Plastik Sanayi,True,concatenated_tokens,hard,BerkePlastikSanayi
+1001346,Berke Plastik Sanayi,True,concatenated_tokens,hard,BERKEPLASTIKSANAYI
+1001347,Berke Plastik Sanayi,True,concatenated_tokens,hard,berkeplastiksanayi
+1001348,Berke Plastik Sanayi,True,concatenated_tokens,hard,TRF/BERKEPLASTIKSANAYI
+1001349,Berke Plastik Sanayi,True,word_order_change,hard,Plastik Sanayi Berke firmasına
+1001350,Berke Plastik Sanayi,True,word_order_change,hard,Sanayi Plastik Berke
+1001351,Berke Plastik Sanayi,True,word_order_change,hard,Plastik Berke Sanayi
+1001352,Berke Plastik Sanayi,True,word_order_change,hard,SANAYI BERKE PLASTIK
+1001353,Berke Plastik Sanayi,True,single_typo,medium,Berke Plasik Sanayi
+1001354,Berke Plastik Sanayi,True,single_typo,medium,Berke Plastik Sanay
+1001355,Berke Plastik Sanayi,True,single_typo,medium,Berke Plastık Sanayi
+1001356,Berke Plastik Sanayi,True,single_typo,medium,Berke Platik Sanayi
+1001357,Berke Plastik Sanayi,True,multiple_typo,hard,Berkee Plstik Sanayii
+1001358,Berke Plastik Sanayi,True,multiple_typo,hard,Berke Pilastik Sanyi
+1001359,Berke Plastik Sanayi,True,multiple_typo,hard,Berk Plastik Sanayii
+1001360,Berke Plastik Sanayi,True,multiple_typo,hard,Berke Plasstik Sanaayi
+1001361,Berke Plastik Sanayi,True,leetspeak_obfuscation,hard,B3rke Plast1k Sanay1
+1001362,Berke Plastik Sanayi,True,leetspeak_obfuscation,hard,Berk3 Pl4stik S4nayi
+1001363,Berke Plastik Sanayi,True,leetspeak_obfuscation,hard,B3rk3 Pl4st1k S4n4y1
+1001364,Berke Plastik Sanayi,True,leetspeak_obfuscation,hard,BERKE PLAST1K SANAYI
+1001365,Berke Plastik Sanayi,True,homoglyph_unicode,hard,Bеrke Plastik Sanayi
+1001366,Berke Plastik Sanayi,True,homoglyph_unicode,hard,Berke Plаstik Sanayi
+1001367,Berke Plastik Sanayi,True,homoglyph_unicode,hard,Berke Plastik Sаnayi
+1001368,Berke Plastik Sanayi,True,homoglyph_unicode,hard,Βerke Plastik Sanayi
+1001369,Berke Plastik Sanayi,True,masked_name,hard,Ber** Plastik Sanayi
+1001370,Berke Plastik Sanayi,True,masked_name,hard,Berke Pla*** Sanayi
+1001371,Berke Plastik Sanayi,True,masked_name,hard,B*rke Pl*stik Sanayi
+1001372,Berke Plastik Sanayi,True,masked_name,hard,Berke Plastik Sana??
+1001373,Berke Plastik Sanayi,True,phonetic_transliteration,hard,Berke Pilastik Sanayi
+1001374,Berke Plastik Sanayi,True,phonetic_transliteration,hard,Berke Plastik Sanayii
+1001375,Berke Plastik Sanayi,True,phonetic_transliteration,hard,Berke Plastik Senayi
+1001376,Berke Plastik Sanayi,True,phonetic_transliteration,hard,Berke Plastikh Sanayi
+1001377,Berke Plastik Sanayi,True,long_context,medium,15.07.2026 tarihli 56291 numaralı sözleşme kapsamında Berke Plastik Sanayi firmasına granül hammadde ödemesidir
+1001378,Berke Plastik Sanayi,True,long_context,medium,Yurt içi tedarik anlaşmasına istinaden kalıp üretimi için Berke Plastik Sanayi adına yapılan ödeme
+1001379,Berke Plastik Sanayi,True,long_context,medium,Dönemsel ambalaj malzemesi alımına ilişkin Berke Plastik Sanayi tarafından düzenlenen 88921 numaralı fatura bedeli
+1001380,Berke Plastik Sanayi,True,long_context,medium,Kurumsal satın alma siparişi PO-7219 kapsamında beneficiary Berke Plastik Sanayi payment
+1001381,Berke Plastik Sanayi,True,banking_noise,hard,TRF/MT103/BERKE PLASTIK SANAYI/INV78291/REF991
+1001382,Berke Plastik Sanayi,True,banking_noise,hard,FAST-BERKEPLASTIKSANAYI-B20260726-2281
+1001383,Berke Plastik Sanayi,True,banking_noise,hard,EFT 992810 BERKE PLST SAN FATURA 88211
+1001384,Berke Plastik Sanayi,True,banking_noise,hard,COMM.PAYMNT//BERKE PLASTIK SAN.//CTR-5521
+1001385,Berke Plastik Sanayi,True,account_reference_noise,hard,TR368575038001-BERKE-PLASTIK-SANAYI-REF4492
+1001386,Berke Plastik Sanayi,True,account_reference_noise,hard,BENEFICIARY:BERKE PLASTIK SANAYI IBAN TR459922
+1001387,Berke Plastik Sanayi,True,account_reference_noise,hard,BPS-INV-22891-PO-7712-HAMMADDE
+1001388,Berke Plastik Sanayi,True,account_reference_noise,hard,BERKEPLASTIK-2026Q3-SETTLEMENT-9912
+1001389,Berke Plastik Sanayi,True,beneficiary_context,medium,Berke Plastik Sanayi adına yapılan ödeme
+1001390,Berke Plastik Sanayi,True,beneficiary_context,medium,Berke Plastik Sanayi hesabına aktarılmak üzere
+1001391,Berke Plastik Sanayi,True,beneficiary_context,medium,For the benefit of Berke Plastik Sanayi
+1001392,Berke Plastik Sanayi,True,beneficiary_context,medium,Nihai lehtar Berke Plastik Sanayi fatura tahsilatı
+1001393,Berke Plastik Sanayi,True,intermediary_context,hard,Berke Plastik Sanayi yararına aracı banka üzerinden ödeme
+1001394,Berke Plastik Sanayi,True,intermediary_context,hard,Payment via intermediary for Berke Plastik Sanayi
+1001395,Berke Plastik Sanayi,True,intermediary_context,hard,Muhabir banka aracılığıyla Berke Plastik Sanayi adına transfer
+1001396,Berke Plastik Sanayi,True,intermediary_context,hard,Berke Plastik Sanayi için üçüncü taraf tahsilat ödemesi
+1001397,Berke Plastik Sanayi,True,refund_reversal,hard,Berke Plastik Sanayi fatura ödemesi iadesi
+1001398,Berke Plastik Sanayi,True,refund_reversal,hard,Berke Plastik Sanayi işlemi ters kayıt
+1001399,Berke Plastik Sanayi,True,refund_reversal,hard,Refund for payment to Berke Plastik Sanayi
+1001400,Berke Plastik Sanayi,True,refund_reversal,hard,Berke Plastik Sanayi chargeback INV-8821
+1001401,Berke Plastik Sanayi,True,negation_context,hard,Bu ödeme Berke Plastik Sanayi ile ilgili değildir
+1001402,Berke Plastik Sanayi,True,negation_context,hard,Berke Plastik Sanayi adına yapılmamıştır
+1001403,Berke Plastik Sanayi,True,negation_context,hard,Berke Plastik Sanayi faturası iptal edilmiştir
+1001404,Berke Plastik Sanayi,True,negation_context,hard,Not a payment to Berke Plastik Sanayi; reference only
+1001405,Berke Plastik Sanayi,True,multilingual_context,hard,Payment for goods supplied by Berke Plastik Sanayi
+1001406,Berke Plastik Sanayi,True,multilingual_context,hard,Zahlung an Berke Plastik Sanayi für Rechnung 8821
+1001407,Berke Plastik Sanayi,True,multilingual_context,hard,Paiement à Berke Plastik Sanayi facture 7211
+1001408,Berke Plastik Sanayi,True,multilingual_context,hard,Pago a Berke Plastik Sanayi por materiales
+1001409,Berke Plastik Sanayi|Microsoft Corporation,True,multi_entity,hard,Berke Plastik Sanayi ve Microsoft Corporation ortak proje ödemesi
+1001410,Berke Plastik Sanayi|Oracle Corporation,True,multi_entity,hard,Oracle Corporation lisansı Berke Plastik Sanayi üzerinden tahsil edildi
+1001411,Berke Plastik Sanayi|Google LLC,True,multi_entity,hard,Berke Plastik Sanayi adına Google LLC aracılığıyla ödeme
+1001412,Berke Plastik Sanayi|Apple Inc,True,multi_entity,hard,Apple Inc ekipmanı için Berke Plastik Sanayi firmasına transfer
+1001413,Berke Plastik Sanayi,True,alias_brand_reference,hard,Berke Plastik ürünleri alım bedeli
+1001414,Berke Plastik Sanayi,True,alias_brand_reference,hard,BERKEPLASTIK sipariş ödemesi
+1001415,Berke Plastik Sanayi,True,alias_brand_reference,hard,BPS Ambalaj
+1001416,Berke Plastik Sanayi,True,alias_brand_reference,hard,Berke Plastics
+1001417,,False,person_name_decoy,hard,
+1001418,,False,person_name_decoy,hard,
+1001419,,False,person_name_decoy,hard,
+1001420,,False,person_name_decoy,hard,
+1001421,,False,generic_sector_decoy,hard,
+1001422,,False,generic_sector_decoy,hard,
+1001423,,False,generic_sector_decoy,hard,
+1001424,,False,generic_sector_decoy,hard,
+1001425,,False,similar_company_decoy,hard,
+1001426,,False,similar_company_decoy,hard,
+1001427,,False,similar_company_decoy,hard,
+1001428,,False,similar_company_decoy,hard,
+1001429,,False,substring_decoy,hard,
+1001430,,False,substring_decoy,hard,
+1001431,,False,substring_decoy,hard,
+1001432,,False,substring_decoy,hard,
+1001433,,False,negative_context_decoy,hard,
+1001434,,False,negative_context_decoy,hard,
+1001435,,False,negative_context_decoy,hard,
+1001436,,False,negative_context_decoy,hard,
+1001437,,False,ambiguous_acronym_decoy,hard,
+1001438,,False,ambiguous_acronym_decoy,hard,
+1001439,,False,ambiguous_acronym_decoy,hard,
+1001440,,False,ambiguous_acronym_decoy,hard,
