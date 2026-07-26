@@ -15,7 +15,6 @@ Kullanım:
 """
 
 import logging
-import json
 import pickle
 import os
 from dataclasses import dataclass
@@ -160,6 +159,32 @@ class CalibrationWrapper:
         return [self.calibrate(s) for s in raw_scores]
 
 
+class IsotonicWrapper:
+    def __init__(self, iso_model):
+        self._iso = iso_model
+
+    def predict_proba(self, X_2d):
+        import numpy as np
+        scores = np.asarray(X_2d, dtype=float).reshape(-1)
+        probs = self._iso.predict(scores)
+        return np.column_stack([1.0 - probs, probs])
+
+
+def _validate_calibration_inputs(
+    raw_scores: list[float], labels: list[int]
+) -> Optional[dict]:
+    if not raw_scores or not labels:
+        return {"error": "raw_scores and labels must not be empty"}
+    if len(raw_scores) != len(labels):
+        return {"error": "raw_scores and labels must have equal length"}
+    unique_labels = set(labels)
+    if not unique_labels.issubset({0, 1}):
+        return {"error": "labels must contain only 0 and 1"}
+    if 0 not in unique_labels or 1 not in unique_labels:
+        return {"error": "both positive and negative classes must be present"}
+    return None
+
+
 def train_platt_scaling(
     raw_scores: list[float],
     labels: list[int],
@@ -178,9 +203,12 @@ def train_platt_scaling(
     Returns:
         Eğitim metrikleri dict
     """
+    err = _validate_calibration_inputs(raw_scores, labels)
+    if err:
+        return err
+
     try:
         from sklearn.linear_model import LogisticRegression
-        from sklearn.calibration import CalibratedClassifierCV
         from sklearn.metrics import brier_score_loss
         import numpy as np
 
@@ -192,6 +220,10 @@ def train_platt_scaling(
 
         probs = model.predict_proba(X)[:, 1]
         brier = brier_score_loss(y, probs)
+
+        output_dir = os.path.dirname(output_path)
+        if output_dir:
+            os.makedirs(output_dir, exist_ok=True)
 
         with open(output_path, "wb") as f:
             pickle.dump(model, f)
@@ -230,11 +262,14 @@ def train_isotonic_regression(
     Returns:
         Eğitim metrikleri dict
     """
+    err = _validate_calibration_inputs(raw_scores, labels)
+    if err:
+        return err
+
     try:
         from sklearn.isotonic import IsotonicRegression
         from sklearn.metrics import brier_score_loss
         import numpy as np
-        import pickle
 
         X = np.array(raw_scores)
         y = np.array(labels, dtype=float)
@@ -245,18 +280,11 @@ def train_isotonic_regression(
         probs = model.predict(X)
         brier = brier_score_loss(y, probs)
 
-        # Wrapper sınıfı: CalibrationWrapper predict_proba bekliyor
-        class IsotonicWrapper:
-            def __init__(self, iso_model):
-                self._iso = iso_model
-
-            def predict_proba(self, X_2d):
-                import numpy as np
-                scores = np.array(X_2d).flatten()
-                probs = self._iso.predict(scores)
-                return np.column_stack([1 - probs, probs])
-
         wrapper = IsotonicWrapper(model)
+
+        output_dir = os.path.dirname(output_path)
+        if output_dir:
+            os.makedirs(output_dir, exist_ok=True)
 
         with open(output_path, "wb") as f:
             pickle.dump(wrapper, f)

@@ -6,6 +6,7 @@ Yeni tablo eklenince sadece bu dosyayı güncellemek yeterli.
 
 TABLES = {
     # Source / Input
+    "bronze_eft_raw":     "public.bronze_eft_raw",
     "eft_input":          "aml_source.v_eft_input",
     "company_input":      "aml_source.v_company_input",
 
@@ -40,10 +41,12 @@ TABLES = {
     "quality_check":      "aml_audit.quality_check_result",
     "performance_log":    "aml_audit.performance_log",
     "alert_history":      "aml_audit.alert_status_history",
+    "schema_migration":   "aml_audit.schema_migration",
 
     # Evaluation
     "test_case":          "aml_eval.test_case",
     "benchmark_result":   "aml_eval.benchmark_result",
     "experiment_run":     "aml_experiment.experiment_run",
     "experiment_result":  "aml_experiment.experiment_result",
+    "decision_analysis":  "aml_experiment.decision_analysis",
 }

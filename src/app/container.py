@@ -52,8 +52,23 @@ class ApplicationContainer:
             config_version=self.scoring_config.get("scoring_config_version", "scoring_v2_reranker"),
             threshold_version=self.scoring_config.get("threshold_config_version", "threshold_v2_reranker")
         )
-        if self.config.get("scoring", {}).get("enable_isotonic_calibration"):
-            self.calibration = CalibrationWrapper(self.repo, "bge-m3-isotonic-v1")
+        calibration_config = self.config.get("scoring", {}).get("calibration", {})
+        calibration_enabled = (
+            self.config.get("scoring", {}).get("enable_isotonic_calibration", False)
+            or calibration_config.get("enabled", False)
+        )
+        if calibration_enabled:
+            self.calibration = CalibrationWrapper(
+                calibration_model_path=calibration_config.get("model_path"),
+                calibration_version=calibration_config.get(
+                    "version",
+                    "bge-m3-isotonic-v1"
+                ),
+                calibration_method=calibration_config.get(
+                    "method",
+                    "ISOTONIC_REGRESSION"
+                ),
+            )
             
         # 4. Entity Extractor
         ner_enabled = self.config.get("ner", {}).get("enabled", False)
