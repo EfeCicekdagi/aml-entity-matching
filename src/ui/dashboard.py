@@ -12,7 +12,7 @@ from src.config.config_loader import ConfigLoader
 from src.repository.aml_repository import AMLRepository
 from src.utils.text_utils import normalize_text, get_normalized_core_name, is_consonant_match
 from src.config.db_tables import TABLES
-from src.scoring.score_features import _acronym_score, _rule_score, _exact_name_score
+from src.scoring.score_features import _acronym_score, _rule_score, _exact_name_score, build_score_features
 
 # ── Sayfa ayarlari ───────────────────────────────────────────────────────────
 st.set_page_config(
@@ -215,7 +215,7 @@ if page == "🏠 Ana Sayfa":
                     
                     # 5. Scoring
                     results = []
-                        from src.scoring.score_features import build_score_features
+                    for cand in strong:
                         cand_copy = dict(cand)
                         if "pg_trgm" in cand.get("sources", []):
                             cand_copy["trgm_score"] = cand.get("candidate_score", 0.0)
@@ -365,8 +365,8 @@ elif page == "📈 Run Detayları":
                                    labels={"final_score":"Final Score","count":"Alert Sayısı"})
                 fig.add_vline(x=0.70, line_dash="dash", line_color="#ef4444",
                               annotation_text="HIGH eşiği (0.70)")
-                fig.add_vline(x=0.62, line_dash="dash", line_color="#f97316",
-                              annotation_text="MEDIUM eşiği (0.62)")
+                fig.add_vline(x=0.60, line_dash="dash", line_color="#f97316",
+                              annotation_text="MEDIUM eşiği (0.60)")
                 fig.update_layout(bargap=0.05, height=400)
                 st.plotly_chart(fig, use_container_width=True)
 

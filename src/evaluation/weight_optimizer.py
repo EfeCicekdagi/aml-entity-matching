@@ -336,7 +336,7 @@ class WeightOptimizer:
 if __name__ == "__main__":
     import numpy as np
     opt = WeightOptimizer()
-    df = opt.load_ground_truth("tests/aml_eft_challenge_ground_truth_1100 (1).csv")
+    df = opt.load_ground_truth("tests/aml_eft_challenge_ground_truth_1320_final.csv")
     raw_scores = opt.extract_raw_scores(df)
     
     # Example ranges: 0.1 to 0.8 with 0.1 step

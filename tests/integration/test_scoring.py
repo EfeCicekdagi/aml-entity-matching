@@ -67,12 +67,12 @@ def test_low_confidence_mismatch_gives_low_score():
     """Farklı şirketler → düşük final skor."""
     scorer = FinalScorer(MockRepository())
     scorer.weights = {
-        "fuzzy_weight": 0.20, "vector_weight": 0.20, "reranker_weight": 0.60,
+        "fuzzy_weight": 0.20, "vector_weight": 0.60, "reranker_weight": 0.20,
         "acronym_weight": 0.0, "rule_weight": 0.0
     }
     scores = _make_scores("Apple", "Google LLC", fuzzy=0.20, vector=0.50, reranker=0.01)
     final_score, match_reason, reason_codes = scorer.calculate_final_score(scores)
-    assert final_score < 0.62, f"Düşük skorlu uyuşmazlık için final_score < 0.62 bekleniyor, got: {final_score}"
+    assert final_score < 0.60, f"Düşük skorlu uyuşmazlık için final_score < 0.60 bekleniyor, got: {final_score}"
     assert match_reason == "LOW_CONFIDENCE", f"Beklenen: LOW_CONFIDENCE, got: {match_reason}"
 
 

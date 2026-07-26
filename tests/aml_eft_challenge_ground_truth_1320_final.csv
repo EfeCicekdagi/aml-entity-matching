@@ -1,0 +1,1321 @@
+﻿eft_id,expected_company,should_match,case_type,difficulty,embedded_variant
+1000800,Tesla Motors Ltd,True,mixed_case,hard,TeSlA MoToRs lTd
+1001122,Finspire Solutions Private Limited,True,leetspeak_obfuscation,hard,F1nsp1re S0lut10ns Private Limited
+1001314,,False,ambiguous_acronym_decoy,hard,
+1000511,,False,negative_decoy,hard,
+1001099,,False,negative_decoy,hard,
+1000672,Mehar Entertainment Private Limited,True,mixed_case,hard,MeHaR EnTeRtAiNmEnT PrIvAtE LiMiTeD
+1000729,Apple Inc,True,compressed,hard,AppleInc
+1001212,Finspire Solutions Private Limited,True,transaction_code_noise,medium,FINSPIRE SOLUTIONS
+1000694,Indiaforensic Services Pvt Ltd,True,mixed_case,hard,InDiAfOrEnSiC SeRvIcEs pVt lTd
+1001075,,False,negative_decoy,medium,
+1000762,Mehar Entertainment Private Limited,True,separator,hard,Mehar/Entertainment/Private/Limited
+1000367,IBM Corporation,True,typo,hard,lBM Corporation
+1000067,Finspire Solutions Private Limited,True,legal_suffix,easy,Finspire Solutions Pvt Ltd
+1000389,IBM Corporation,True,typo,hard,IBN Corporaton
+1000999,,False,negative_decoy,hard,
+1001185,Apple Inc,True,negation_context,hard,Apple Inc
+1000188,Apple Inc,True,exact,easy,Apple Inc
+1001117,Amazon Technologies Inc,True,unicode_homoglyph,hard,Amazоn Technolоgies Inc
+1001049,,False,negative_decoy,medium,
+1000441,Oracle Corporation,True,typo,hard,Оracle Corporation
+1000605,Amazon Technologies Inc,True,abbreviation,medium,AMZN TECH INC
+1001172,Finspire Solutions Private Limited,True,refund_reversal_context,hard,Finspire Solutions
+1000302,Amazon Technologies Inc,True,legal_suffix,easy,Amazon Technologies Incorporated
+1000354,Tesla Motors Ltd,True,legal_suffix,easy,Tesla Motors Limited
+1000974,Mehar Entertainment Private Limited,True,mixed_case,hard,MeHaR EnTeRtAiNmEnT PrIvAtE LiMiTeD
+1001102,Finspire Solutions Private Limited,True,long_noisy_context,medium,Finspire Solutions Private Limited
+1000286,Amazon Technologies Inc,True,punctuation,medium,"Amazon-Technologies, Inc."
+1000403,IBM Corporation,True,typo,hard,IBN Corporaton
+1000169,Microsoft Corporation,True,unicode,hard,Microsoft Corporatión
+1000199,Apple Inc,True,legal_suffix,easy,Apple Incorporated
+1001197,Amazon Technologies Inc,True,multilingual_context,hard,Amazon Tech Inc
+1000844,Amazon Technologies Inc,True,partial,medium,Amazon Technologies
+1001196,Google LLC,True,multilingual_context,hard,Google LLC
+1000677,IBM Corporation,True,abbreviation,hard,INTL BUS MACH CORP
+1001290,,False,similar_unrelated_entity,hard,
+1001007,,False,negative_decoy,hard,
+1000361,IBM Corporation,True,exact,easy,IBM Corporation
+1000241,Google LLC,True,spacing,hard,GOO GLE LLC
+1000197,Apple Inc,True,spacing,hard,APP LE INC
+1000478,,False,negative_decoy,hard,
+1000777,Apple Inc,True,abbreviation,medium,AAPL INC
+1000676,Amazon Technologies Inc,True,partial,medium,Amazon Technologies
+1001254,Microsoft Corporation|Apple Inc,True,multi_entity,hard,Microsoft Corp | Apple Inc
+1000069,Finspire Solutions Private Limited,True,abbreviation,hard,FSPL
+1000817,Google LLC,True,abbreviation,medium,GOOG LLC
+1000415,Oracle Corporation,True,concatenated,medium,oraclecorporation
+1001003,,False,negative_decoy,hard,
+1001166,Google LLC,True,intermediary_beneficiary_context,hard,Google LLC
+1000702,Oracle Corporation,True,compressed,hard,OracleCorporation
+1000451,,False,negative_decoy,medium,
+1001214,Microsoft Corporation,True,transaction_code_noise,medium,MICROSOFT CORP
+1001310,,False,common_word_context,hard,
+1001273,Mehar Entertainment Private Limited,True,mixed_obfuscation,hard,Mehar*Enterta1nment
+1000826,Microsoft Corporation,True,separator,hard,Microsoft/Corporation
+1000806,Finspire Solutions Private Limited,True,separator,hard,Finspire/Solutions/Private/Limited
+1000176,Microsoft Corporation,True,legal_suffix,easy,Microsoft Corp.
+1000386,IBM Corporation,True,typo,hard,IBN Corporaton
+1000616,IBM Corporation,True,masked,hard,IBM***rporation
+1001199,IBM Corporation,True,multilingual_context,hard,IBM Corp
+1000423,Oracle Corporation,True,abbreviation,hard,ORC Corporation
+1001259,IBM Corporation|Oracle Corporation,True,multi_entity,hard,IBM Corp | Oracle Corp
+1000278,Amazon Technologies Inc,True,typo,hard,Amzon Technolgies Inc
+1001025,,False,negative_decoy,hard,
+1000455,,False,negative_decoy,medium,
+1000865,IBM Corporation,True,separator,hard,IBM/Corporation
+1001285,,False,similar_unrelated_entity,hard,
+1000138,Microsoft Corporation,True,abbreviation,hard,M.S. Corporation
+1000237,Google LLC,True,masked,hard,G**gle LLC
+1001178,Tesla Motors Ltd,True,refund_reversal_context,hard,Tesla Motors
+1000481,,False,negative_decoy,medium,
+1000149,Microsoft Corporation,True,punctuation,medium,Micro-Soft Corp.
+1000862,Mehar Entertainment Private Limited,True,partial,medium,Mehar Entertainment Private
+1001246,Google LLC,True,heavy_masking,hard,Goo*** LLC
+1000514,,False,negative_decoy,medium,
+1000967,Amazon Technologies Inc,True,separator,hard,Amazon/Technologies/Inc
+1000493,,False,negative_decoy,hard,
+1000970,Apple Inc,True,separator,hard,Apple/Inc
+1000422,Oracle Corporation,True,typo,hard,Оracle Corporation
+1000724,Amazon Technologies Inc,True,compressed,hard,AmazonTechnologiesInc
+1000890,Finspire Solutions Private Limited,True,partial,medium,Finspire Solutions Private
+1000710,Amazon Technologies Inc,True,compressed,hard,AmazonTechnologiesInc
+1000706,Amazon Technologies Inc,True,separator,hard,Amazon/Technologies/Inc
+1001279,IBM Corporation,True,mixed_obfuscation,hard,IBM*C0rp
+1000235,Google LLC,True,typo,hard,Googel LCC
+1001288,,False,similar_unrelated_entity,hard,
+1000080,Finspire Solutions Private Limited,True,typo,hard,Finspire Solutons Pvt Lmtd
+1000629,Mehar Entertainment Private Limited,True,partial,medium,Mehar Entertainment Private
+1001211,Indiaforensic Services Pvt Ltd,True,transaction_code_noise,medium,INDIAFORENSIC SERVICES
+1001088,,False,negative_decoy,hard,
+1000325,Tesla Motors Ltd,True,typo,hard,TesIa Motors Ltd
+1000627,Mehar Entertainment Private Limited,True,abbreviation,hard,MHR ENTMNT PVT LTD
+1000814,Microsoft Corporation,True,separator,hard,Microsoft/Corporation
+1000194,Apple Inc,True,legal_suffix,easy,Apple Incorporated
+1001010,,False,negative_decoy,hard,
+1000143,Microsoft Corporation,True,legal_suffix,easy,Microsoft Corp.
+1001133,Mehar Entertainment Private Limited,True,character_spacing_obfuscation,hard,M e h a r Entertainment
+1000017,Indiaforensic Services Pvt Ltd,True,abbreviation,hard,IFS Pvt. Ltd.
+1001316,,False,ambiguous_acronym_decoy,hard,
+1000128,Mehar Entertainment Private Limited,True,masked,hard,MHR Entertainment P Ltd
+1000927,Mehar Entertainment Private Limited,True,partial,medium,Mehar Entertainment Private
+1001141,Indiaforensic Services Pvt Ltd,True,alias_brand_reference,medium,Indiaforensics
+1000813,Indiaforensic Services Pvt Ltd,True,compressed,hard,IndiaforensicServicesPvtLtd
+1000012,Indiaforensic Services Pvt Ltd,True,unicode,hard,İndiaforensic Servicés Pvt Ltd
+1001159,IBM Corporation,True,product_service_reference,hard,IBM Watson
+1000189,Apple Inc,True,spacing,hard,APP LE INC
+1000153,Microsoft Corporation,True,masked,hard,M*crosoft Corp
+1000987,,False,negative_decoy,medium,
+1000334,Tesla Motors Ltd,True,unicode,hard,Tésla Motors Ltd
+1000479,,False,negative_decoy,medium,
+1000253,Google LLC,True,masked,hard,G**gle LLC
+1001087,,False,negative_decoy,medium,
+1000811,IBM Corporation,True,abbreviation,hard,INTL BUS MACH CORP
+1000715,Microsoft Corporation,True,mixed_case,hard,MiCrOsOfT CoRpOrAtIoN
+1001230,Oracle Corporation,True,ticker_reference,hard,ORCL
+1000093,Mehar Entertainment Private Limited,True,typo,hard,Mehar Entertaınment Pvt Ltd
+1000339,Tesla Motors Ltd,True,abbreviation,medium,TSLA Motors Ltd.
+1000115,Mehar Entertainment Private Limited,True,concatenated,hard,meharentertainmentprivatelimited
+1000034,Indiaforensic Services Pvt Ltd,True,typo,hard,Indiaforensic Servces Pvt Lmt
+1000596,,False,negative_decoy,hard,
+1001312,,False,ambiguous_acronym_decoy,hard,
+1000038,Indiaforensic Services Pvt Ltd,True,spacing,medium,INDIA FORENSIC SERVICES PVT LTD
+1000696,Tesla Motors Ltd,True,separator,hard,Tesla/Motors/Ltd
+1000126,Mehar Entertainment Private Limited,True,token_swap,hard,Entertainment Mehar Pvt Limited
+1000301,Amazon Technologies Inc,True,unicode,hard,Amazon Technologiés Inc
+1000773,Mehar Entertainment Private Limited,True,partial,medium,Mehar Entertainment Private
+1000678,IBM Corporation,True,abbreviation,hard,INTL BUS MACH CORP
+1000181,Apple Inc,True,masked,hard,A**le Inc.
+1000623,Finspire Solutions Private Limited,True,abbreviation,hard,FNSP SLTNS PVT LTD
+1001190,Oracle Corporation,True,negation_context,hard,Oracle Corp
+1000749,Amazon Technologies Inc,True,mixed_case,hard,AmAzOn tEcHnOlOgIeS InC
+1000177,Microsoft Corporation,True,typo,hard,Microsft Corporatoin
+1000340,Tesla Motors Ltd,True,unicode,hard,Tésla Motors Ltd
+1000040,Indiaforensic Services Pvt Ltd,True,abbreviation,medium,Indiaforensic Svcs P Ltd
+1001306,,False,common_word_context,hard,
+1000338,Tesla Motors Ltd,True,exact,easy,Tesla Motors Ltd
+1000821,Mehar Entertainment Private Limited,True,compressed,hard,MeharEntertainmentPrivateLimited
+1001089,,False,negative_decoy,medium,
+1000203,Apple Inc,True,concatenated,medium,appleincorporated
+1001189,IBM Corporation,True,negation_context,hard,IBM Corp
+1000105,Mehar Entertainment Private Limited,True,concatenated,hard,meharentertainmentprivatelimited
+1000238,Google LLC,True,typo,hard,Gооgle LLC
+1001302,,False,common_word_context,hard,
+1000190,Apple Inc,True,token_swap,medium,Inc Apple
+1000918,Microsoft Corporation,True,abbreviation,medium,MSFT CORP
+1000973,Oracle Corporation,True,compressed,hard,OracleCorporation
+1000085,Finspire Solutions Private Limited,True,legal_suffix,easy,Finspire Solutions Pvt Ltd
+1000111,Mehar Entertainment Private Limited,True,token_swap,hard,Entertainment Mehar Pvt Limited
+1001252,Finspire Solutions Private Limited|Mehar Entertainment Private Limited,True,multi_entity,hard,Finspire Solutions | Mehar Entertainment
+1000061,Finspire Solutions Private Limited,True,spacing,hard,FIN SPIRE SOLUTIONS PRIVATE LIMITED
+1000446,Oracle Corporation,True,legal_suffix,easy,Oracle Corp.
+1000598,,False,negative_decoy,hard,
+1000243,Google LLC,True,abbreviation,hard,GGL L.L.C.
+1000888,Finspire Solutions Private Limited,True,partial,medium,Finspire Solutions Private
+1000496,,False,negative_decoy,hard,
+1000565,,False,negative_decoy,medium,
+1001004,,False,negative_decoy,medium,
+1000755,Indiaforensic Services Pvt Ltd,True,abbreviation,hard,INDFRNSC SRVCS PVT LTD
+1000965,Amazon Technologies Inc,True,compressed,hard,AmazonTechnologiesInc
+1000232,Google LLC,True,punctuation,easy,"Google, L.L.C."
+1001255,Apple Inc|Google LLC,True,multi_entity,hard,Apple Inc | Google LLC
+1000020,Indiaforensic Services Pvt Ltd,True,spacing,medium,INDIA FORENSIC SERVICES PVT LTD
+1000636,Finspire Solutions Private Limited,True,abbreviation,hard,FNSP SLTNS PVT LTD
+1000851,Mehar Entertainment Private Limited,True,masked,hard,Meh***Entertainment Private Limited
+1001296,,False,substring_decoy_extended,hard,
+1001318,,False,ambiguous_acronym_decoy,hard,
+1000603,IBM Corporation,True,compressed,hard,IBMCorporation
+1000638,IBM Corporation,True,partial,medium,IBM
+1000568,,False,negative_decoy,medium,
+1000845,Apple Inc,True,partial,medium,Apple
+1000830,Oracle Corporation,True,abbreviation,medium,ORCL CORP
+1000935,Finspire Solutions Private Limited,True,masked,hard,Fin***re Solutions Private Limited
+1001299,,False,substring_decoy_extended,hard,
+1000050,Finspire Solutions Private Limited,True,unicode,hard,Finspiré Solutions Private Limited
+1000670,Mehar Entertainment Private Limited,True,mixed_case,hard,MeHaR EnTeRtAiNmEnT PrIvAtE LiMiTeD
+1000490,,False,negative_decoy,hard,
+1000025,Indiaforensic Services Pvt Ltd,True,spacing,medium,INDIA FORENSIC SERVICES PVT LTD
+1000593,,False,negative_decoy,hard,
+1001151,Indiaforensic Services Pvt Ltd,True,product_service_reference,hard,Indiaforensics AML platform
+1000052,Finspire Solutions Private Limited,True,legal_suffix,easy,Finspire Solutions Pvt Ltd
+1001154,Microsoft Corporation,True,product_service_reference,hard,Office 365
+1001182,Finspire Solutions Private Limited,True,negation_context,hard,Finspire Solutions
+1000395,IBM Corporation,True,typo,hard,IBN Corporaton
+1001233,Mehar Entertainment Private Limited,True,phonetic_transliteration,hard,Mehar Enterteynmınt Private Limited
+1000775,Amazon Technologies Inc,True,mixed_case,hard,AmAzOn tEcHnOlOgIeS InC
+1000276,Amazon Technologies Inc,True,concatenated,medium,amazontechnologiesinc
+1000782,Finspire Solutions Private Limited,True,compressed,hard,FinspireSolutionsPrivateLimited
+1000802,Mehar Entertainment Private Limited,True,mixed_case,hard,MeHaR EnTeRtAiNmEnT PrIvAtE LiMiTeD
+1000975,Amazon Technologies Inc,True,separator,hard,Amazon/Technologies/Inc
+1001228,Tesla Motors Ltd,True,ticker_reference,hard,TSLA
+1000870,Google LLC,True,separator,hard,Google/LLC
+1000990,,False,negative_decoy,hard,
+1000087,Finspire Solutions Private Limited,True,punctuation,medium,Finspire-Solutions (Pvt.) Ltd.
+1001287,,False,similar_unrelated_entity,hard,
+1000272,Amazon Technologies Inc,True,masked,medium,AMZN Technologies Inc
+1000310,Amazon Technologies Inc,True,typo,hard,Amzon Technolgies Inc
+1000652,Amazon Technologies Inc,True,compressed,hard,AmazonTechnologiesInc
+1000501,,False,negative_decoy,hard,
+1000721,Indiaforensic Services Pvt Ltd,True,compressed,hard,IndiaforensicServicesPvtLtd
+1000470,,False,negative_decoy,hard,
+1000097,Mehar Entertainment Private Limited,True,token_swap,hard,Entertainment Mehar Pvt Limited
+1000819,IBM Corporation,True,compressed,hard,IBMCorporation
+1000522,,False,negative_decoy,hard,
+1001139,IBM Corporation,True,character_spacing_obfuscation,hard,I B M Corp
+1000202,Apple Inc,True,concatenated,medium,appleincorporated
+1000961,Oracle Corporation,True,separator,hard,Oracle/Corporation
+1000065,Finspire Solutions Private Limited,True,punctuation,medium,Finspire-Solutions (Pvt.) Ltd.
+1001238,Tesla Motors Ltd,True,phonetic_transliteration,hard,Tesıla Motors Limited
+1000532,,False,negative_decoy,medium,
+1000006,Indiaforensic Services Pvt Ltd,True,token_swap,hard,Services Indiaforensic Pvt Ltd
+1000251,Google LLC,True,abbreviation,medium,GOOG LLC
+1001293,,False,substring_decoy_extended,hard,
+1000158,Microsoft Corporation,True,typo,hard,Microsft Corporatoin
+1000679,Amazon Technologies Inc,True,masked,hard,Ama*** Technologies Inc
+1000013,Indiaforensic Services Pvt Ltd,True,masked,hard,I***aForensic Services Pvt. Ltd.
+1000768,Amazon Technologies Inc,True,compressed,hard,AmazonTechnologiesInc
+1000062,Finspire Solutions Private Limited,True,legal_suffix,easy,Finspire Solutions Pvt Ltd
+1001135,Apple Inc,True,character_spacing_obfuscation,hard,A p p l e Inc
+1001304,,False,common_word_context,hard,
+1000795,Microsoft Corporation,True,separator,hard,Microsoft/Corporation
+1000174,Microsoft Corporation,True,exact,easy,Microsoft Corporation
+1000037,Indiaforensic Services Pvt Ltd,True,unicode,hard,İndiaforensic Servicés Pvt Ltd
+1000424,Oracle Corporation,True,unicode,hard,Oraclé Corporation
+1000877,Oracle Corporation,True,mixed_case,hard,OrAcLe cOrPoRaTiOn
+1000969,Microsoft Corporation,True,separator,hard,Microsoft/Corporation
+1000418,Oracle Corporation,True,legal_suffix,easy,Oracle Corp.
+1000365,IBM Corporation,True,typo,hard,lBM Corporation
+1001271,Indiaforensic Services Pvt Ltd,True,mixed_obfuscation,hard,Ind1af0rens1c*Serv1ces
+1000572,,False,negative_decoy,hard,
+1000113,Mehar Entertainment Private Limited,True,punctuation,medium,Mehar-Entertainment (Private) Ltd.
+1000712,Microsoft Corporation,True,abbreviation,medium,MSFT CORP
+1000998,,False,negative_decoy,hard,
+1000319,Tesla Motors Ltd,True,concatenated,medium,teslamotorslimited
+1000788,Amazon Technologies Inc,True,compressed,hard,AmazonTechnologiesInc
+1000761,Tesla Motors Ltd,True,separator,hard,Tesla/Motors/Ltd
+1001242,Finspire Solutions Private Limited,True,heavy_masking,hard,Finsp*** Solutions Private Limited
+1000909,Indiaforensic Services Pvt Ltd,True,masked,hard,Ind***orensic Services Pvt Ltd
+1000136,Microsoft Corporation,True,token_swap,medium,Corporation Microsoft
+1000076,Finspire Solutions Private Limited,True,typo,hard,Finspire Solutons Pvt Lmtd
+1000691,Google LLC,True,compressed,hard,GoogleLLC
+1000291,Amazon Technologies Inc,True,unicode,hard,Amazon Technologiés Inc
+1000549,,False,negative_decoy,medium,
+1000517,,False,negative_decoy,hard,
+1000738,Mehar Entertainment Private Limited,True,separator,hard,Mehar/Entertainment/Private/Limited
+1000002,Indiaforensic Services Pvt Ltd,True,typo,hard,Indiaforensıc Servıces Pvt Ltd
+1000032,Indiaforensic Services Pvt Ltd,True,token_swap,hard,Services Indiaforensic Pvt Ltd
+1000077,Finspire Solutions Private Limited,True,typo,hard,Finspıre Solutıons Private Limited
+1000854,Google LLC,True,masked,hard,Goo*** LLC
+1000363,IBM Corporation,True,typo,hard,IBN Corporaton
+1000790,Apple Inc,True,separator,hard,Apple/Inc
+1001095,,False,negative_decoy,hard,
+1000118,Mehar Entertainment Private Limited,True,spacing,hard,ME HAR ENTERTAINMENT PVT LTD
+1000465,,False,negative_decoy,medium,
+1000204,Apple Inc,True,token_swap,medium,Inc Apple
+1001018,,False,negative_decoy,hard,
+1000556,,False,negative_decoy,hard,
+1000091,Mehar Entertainment Private Limited,True,unicode,hard,Méhar Entertainment Private Limited
+1000653,Tesla Motors Ltd,True,abbreviation,medium,TSLA MTRS LTD
+1000924,Apple Inc,True,mixed_case,hard,ApPlE InC
+1001031,,False,negative_decoy,medium,
+1000690,Finspire Solutions Private Limited,True,partial,medium,Finspire Solutions Private
+1000045,Indiaforensic Services Pvt Ltd,True,punctuation,medium,India-Forensic Services (P) Ltd.
+1000135,Mehar Entertainment Private Limited,True,abbreviation,hard,MEPL
+1000613,Finspire Solutions Private Limited,True,compressed,hard,FinspireSolutionsPrivateLimited
+1000799,Microsoft Corporation,True,separator,hard,Microsoft/Corporation
+1001123,Mehar Entertainment Private Limited,True,leetspeak_obfuscation,hard,M3har Enterta1nment Private Limited
+1000047,Finspire Solutions Private Limited,True,token_swap,hard,Solutions Finspire Private Limited
+1000876,Oracle Corporation,True,abbreviation,medium,ORCL CORP
+1000929,Mehar Entertainment Private Limited,True,abbreviation,hard,MHR ENTMNT PVT LTD
+1000380,IBM Corporation,True,exact,easy,IBM Corporation
+1000977,,False,negative_decoy,hard,
+1000440,Oracle Corporation,True,token_swap,medium,Corporation Oracle
+1001220,Oracle Corporation,True,transaction_code_noise,medium,ORACLE CORP
+1001291,,False,substring_decoy_extended,hard,
+1000563,,False,negative_decoy,hard,
+1000263,Google LLC,True,exact,easy,Google LLC
+1000630,Indiaforensic Services Pvt Ltd,True,masked,hard,Ind***orensic Services Pvt Ltd
+1000216,Apple Inc,True,token_swap,medium,Inc Apple
+1000277,Amazon Technologies Inc,True,abbreviation,medium,Amazon Tech Inc
+1000449,Oracle Corporation,True,concatenated,medium,oraclecorporation
+1001086,,False,negative_decoy,hard,
+1000996,,False,negative_decoy,medium,
+1000284,Amazon Technologies Inc,True,abbreviation,hard,ATI Inc.
+1001144,Microsoft Corporation,True,alias_brand_reference,medium,Microsoft Azure
+1000098,Mehar Entertainment Private Limited,True,spacing,hard,ME HAR ENTERTAINMENT PVT LTD
+1000891,Tesla Motors Ltd,True,abbreviation,medium,TSLA MTRS LTD
+1000956,IBM Corporation,True,separator,hard,IBM/Corporation
+1000074,Finspire Solutions Private Limited,True,abbreviation,hard,FSPL
+1000464,,False,negative_decoy,medium,
+1000857,Amazon Technologies Inc,True,abbreviation,medium,AMZN TECH INC
+1001198,Tesla Motors Ltd,True,multilingual_context,hard,Tesla Motors
+1001039,,False,negative_decoy,hard,
+1001245,Apple Inc,True,heavy_masking,hard,App** Inc
+1000200,Apple Inc,True,punctuation,easy,"Apple, Inc."
+1000394,IBM Corporation,True,masked,hard,I*M Corp.
+1000257,Google LLC,True,abbreviation,hard,GGL L.L.C.
+1000601,Finspire Solutions Private Limited,True,masked,hard,Fin***re Solutions Private Limited
+1000580,,False,negative_decoy,medium,
+1000163,Microsoft Corporation,True,punctuation,medium,Micro-Soft Corp.
+1000445,Oracle Corporation,True,exact,easy,Oracle Corporation
+1000347,Tesla Motors Ltd,True,exact,easy,Tesla Motors Ltd
+1000186,Apple Inc,True,masked,hard,A**le Inc.
+1001298,,False,substring_decoy_extended,hard,
+1000747,Oracle Corporation,True,masked,hard,Ora*** Corporation
+1000867,Oracle Corporation,True,masked,hard,Ora*** Corporation
+1000946,Mehar Entertainment Private Limited,True,mixed_case,hard,MeHaR EnTeRtAiNmEnT PrIvAtE LiMiTeD
+1001176,Google LLC,True,refund_reversal_context,hard,Google LLC
+1000758,Tesla Motors Ltd,True,mixed_case,hard,TeSlA MoToRs lTd
+1000972,Amazon Technologies Inc,True,mixed_case,hard,AmAzOn tEcHnOlOgIeS InC
+1000486,,False,negative_decoy,hard,
+1000166,Microsoft Corporation,True,typo,hard,Mıcrosоft Corporation
+1000330,Tesla Motors Ltd,True,concatenated,medium,teslamotorslimited
+1001079,,False,negative_decoy,hard,
+1000951,Finspire Solutions Private Limited,True,partial,medium,Finspire Solutions Private
+1000179,Microsoft Corporation,True,typo,hard,Microsft Corporatoin
+1000570,,False,negative_decoy,medium,
+1000316,Tesla Motors Ltd,True,typo,hard,Telsa Motros Limited
+1001000,,False,negative_decoy,medium,
+1000640,Tesla Motors Ltd,True,partial,medium,Tesla Motors
+1000908,Indiaforensic Services Pvt Ltd,True,abbreviation,hard,INDFRNSC SRVCS PVT LTD
+1001277,Amazon Technologies Inc,True,mixed_obfuscation,hard,Amaz0n*Tech*Inc
+1000916,Finspire Solutions Private Limited,True,separator,hard,Finspire/Solutions/Private/Limited
+1001125,Apple Inc,True,leetspeak_obfuscation,hard,App1e 1nc
+1000552,,False,negative_decoy,medium,
+1000543,,False,negative_decoy,medium,
+1000896,Amazon Technologies Inc,True,abbreviation,medium,AMZN TECH INC
+1001033,,False,negative_decoy,medium,
+1001160,Oracle Corporation,True,product_service_reference,hard,Oracle Cloud Infrastructure
+1000396,IBM Corporation,True,unicode,hard,İBM Corporatión
+1000850,Google LLC,True,masked,hard,Goo*** LLC
+1000185,Apple Inc,True,typo,hard,Aple Incorporatd
+1000383,IBM Corporation,True,legal_suffix,easy,IBM Corp.
+1001041,,False,negative_decoy,medium,
+1001061,,False,negative_decoy,medium,
+1000944,Indiaforensic Services Pvt Ltd,True,masked,hard,Ind***orensic Services Pvt Ltd
+1000155,Microsoft Corporation,True,token_swap,medium,Corporation Microsoft
+1001297,,False,substring_decoy_extended,hard,
+1000323,Tesla Motors Ltd,True,token_swap,medium,Motors Tesla Limited
+1000904,Finspire Solutions Private Limited,True,abbreviation,hard,FNSP SLTNS PVT LTD
+1000452,,False,negative_decoy,hard,
+1001219,IBM Corporation,True,transaction_code_noise,medium,IBM CORP
+1000534,,False,negative_decoy,hard,
+1001097,,False,negative_decoy,hard,
+1000005,Indiaforensic Services Pvt Ltd,True,concatenated,hard,indiaforensicservicespvtltd
+1001240,Oracle Corporation,True,phonetic_transliteration,hard,Orakıl Corporation
+1000997,,False,negative_decoy,hard,
+1000405,IBM Corporation,True,exact,easy,IBM Corporation
+1000589,,False,negative_decoy,medium,
+1000409,Oracle Corporation,True,typo,hard,Оracle Corporation
+1000337,Tesla Motors Ltd,True,masked,hard,T*SLA Motors Ltd
+1000096,Mehar Entertainment Private Limited,True,punctuation,medium,Mehar-Entertainment (Private) Ltd.
+1001150,Oracle Corporation,True,alias_brand_reference,medium,Oracle Cloud
+1000521,,False,negative_decoy,medium,
+1000353,Tesla Motors Ltd,True,exact,easy,Tesla Motors Ltd
+1000152,Microsoft Corporation,True,exact,easy,Microsoft Corporation
+1000487,,False,negative_decoy,medium,
+1001204,Microsoft Corporation,True,translated_company_tokens,hard,Microsoft Şirketi
+1001258,Tesla Motors Ltd|IBM Corporation,True,multi_entity,hard,Tesla Motors | IBM Corp
+1000060,Finspire Solutions Private Limited,True,typo,hard,Finspıre Solutıons Private Limited
+1000010,Indiaforensic Services Pvt Ltd,True,spacing,medium,INDIA FORENSIC SERVICES PVT LTD
+1000379,IBM Corporation,True,masked,hard,I*M Corp.
+1001263,Mehar Entertainment Private Limited,True,embedded_account_reference,hard,MeharEntertainment
+1001029,,False,negative_decoy,medium,
+1000943,Finspire Solutions Private Limited,True,partial,medium,Finspire Solutions Private
+1000035,Indiaforensic Services Pvt Ltd,True,token_swap,hard,Services Indiaforensic Pvt Ltd
+1000838,Apple Inc,True,partial,medium,Apple
+1000432,Oracle Corporation,True,abbreviation,hard,ORC Corporation
+1000713,Oracle Corporation,True,separator,hard,Oracle/Corporation
+1000103,Mehar Entertainment Private Limited,True,typo,hard,Mehar Entertainmnt Private Lmtd
+1000120,Mehar Entertainment Private Limited,True,legal_suffix,easy,Mehar Entertainment Pvt Ltd
+1000933,Google LLC,True,compressed,hard,GoogleLLC
+1001044,,False,negative_decoy,medium,
+1000483,,False,negative_decoy,medium,
+1000791,Mehar Entertainment Private Limited,True,compressed,hard,MeharEntertainmentPrivateLimited
+1000834,Google LLC,True,separator,hard,Google/LLC
+1000173,Microsoft Corporation,True,token_swap,medium,Corporation Microsoft
+1000046,Finspire Solutions Private Limited,True,abbreviation,medium,Finspire Solns P. Ltd.
+1000071,Finspire Solutions Private Limited,True,concatenated,hard,finspiresolutionsprivatelimited
+1000195,Apple Inc,True,spacing,hard,APP LE INC
+1000574,,False,negative_decoy,medium,
+1000655,Finspire Solutions Private Limited,True,masked,hard,Fin***re Solutions Private Limited
+1000991,,False,negative_decoy,hard,
+1001152,Finspire Solutions Private Limited,True,product_service_reference,hard,Finspire analytics platform
+1000461,,False,negative_decoy,medium,
+1000266,Google LLC,True,spacing,hard,GOO GLE LLC
+1000400,IBM Corporation,True,punctuation,easy,IBM-Corporation
+1000633,Microsoft Corporation,True,compressed,hard,MicrosoftCorporation
+1000682,Amazon Technologies Inc,True,masked,hard,Ama*** Technologies Inc
+1000767,Finspire Solutions Private Limited,True,separator,hard,Finspire/Solutions/Private/Limited
+1001030,,False,negative_decoy,medium,
+1001092,,False,negative_decoy,hard,
+1000206,Apple Inc,True,punctuation,easy,"Apple, Inc."
+1001317,,False,ambiguous_acronym_decoy,hard,
+1000954,Tesla Motors Ltd,True,abbreviation,medium,TSLA MTRS LTD
+1000505,,False,negative_decoy,hard,
+1000982,,False,negative_decoy,medium,
+1000438,Oracle Corporation,True,abbreviation,medium,ORCL Corp
+1000739,Google LLC,True,separator,hard,Google/LLC
+1000555,,False,negative_decoy,medium,
+1000577,,False,negative_decoy,hard,
+1000849,IBM Corporation,True,compressed,hard,IBMCorporation
+1000178,Microsoft Corporation,True,punctuation,medium,Micro-Soft Corp.
+1000288,Amazon Technologies Inc,True,legal_suffix,easy,Amazon Technologies Incorporated
+1000398,IBM Corporation,True,typo,hard,IBN Corporaton
+1000504,,False,negative_decoy,medium,
+1001295,,False,substring_decoy_extended,hard,
+1000296,Amazon Technologies Inc,True,legal_suffix,easy,Amazon Technologies Incorporated
+1000041,Indiaforensic Services Pvt Ltd,True,legal_suffix,easy,Indiaforensic Services Private Limited
+1000585,,False,negative_decoy,medium,
+1000871,Mehar Entertainment Private Limited,True,partial,medium,Mehar Entertainment Private
+1000746,Amazon Technologies Inc,True,separator,hard,Amazon/Technologies/Inc
+1001108,Tesla Motors Ltd,True,long_noisy_context,medium,Tesla Motors Ltd
+1000161,Microsoft Corporation,True,punctuation,medium,Micro-Soft Corp.
+1000343,Tesla Motors Ltd,True,concatenated,medium,teslamotorslimited
+1000770,Google LLC,True,masked,hard,Goo*** LLC
+1000193,Apple Inc,True,typo,hard,Αpple Inc
+1001157,Amazon Technologies Inc,True,product_service_reference,hard,AWS cloud
+1001161,Indiaforensic Services Pvt Ltd,True,intermediary_beneficiary_context,hard,Indiaforensic Services
+1001202,Finspire Solutions Private Limited,True,translated_company_tokens,hard,Finspire Çözümleri Özel Limited
+1000122,Mehar Entertainment Private Limited,True,punctuation,medium,Mehar-Entertainment (Private) Ltd.
+1001098,,False,negative_decoy,medium,
+1001300,,False,substring_decoy_extended,hard,
+1000776,Tesla Motors Ltd,True,partial,medium,Tesla Motors
+1001131,Indiaforensic Services Pvt Ltd,True,character_spacing_obfuscation,hard,I n d i a f o r e n s i c Services
+1001070,,False,negative_decoy,hard,
+1001163,Mehar Entertainment Private Limited,True,intermediary_beneficiary_context,hard,Mehar Entertainment
+1000607,IBM Corporation,True,mixed_case,hard,IbM CoRpOrAtIoN
+1001105,Apple Inc,True,long_noisy_context,medium,Apple Inc
+1000468,,False,negative_decoy,hard,
+1000055,Finspire Solutions Private Limited,True,token_swap,hard,Solutions Finspire Private Limited
+1000766,Finspire Solutions Private Limited,True,compressed,hard,FinspireSolutionsPrivateLimited
+1000342,Tesla Motors Ltd,True,abbreviation,medium,TSLA Motors Ltd.
+1000140,Microsoft Corporation,True,typo,hard,Microsft Corporatoin
+1000142,Microsoft Corporation,True,typo,hard,Mıcrosоft Corporation
+1001104,Microsoft Corporation,True,long_noisy_context,medium,Microsoft Corporation
+1001014,,False,negative_decoy,hard,
+1001225,Apple Inc,True,ticker_reference,hard,AAPL
+1001020,,False,negative_decoy,medium,
+1000914,Apple Inc,True,compressed,hard,AppleInc
+1000299,Amazon Technologies Inc,True,concatenated,medium,amazontechnologiesinc
+1000680,Apple Inc,True,separator,hard,Apple/Inc
+1000938,IBM Corporation,True,masked,hard,IBM***rporation
+1000673,Microsoft Corporation,True,abbreviation,medium,MSFT CORP
+1000608,Amazon Technologies Inc,True,mixed_case,hard,AmAzOn tEcHnOlOgIeS InC
+1000048,Finspire Solutions Private Limited,True,unicode,hard,Finspiré Solutions Private Limited
+1000726,Amazon Technologies Inc,True,compressed,hard,AmazonTechnologiesInc
+1000215,Apple Inc,True,unicode,hard,Applé Inc
+1000698,Google LLC,True,partial,medium,Google
+1000416,Oracle Corporation,True,unicode,hard,Oraclé Corporation
+1000986,,False,negative_decoy,medium,
+1000248,Google LLC,True,masked,hard,G**gle LLC
+1000962,Microsoft Corporation,True,partial,medium,Microsoft
+1000393,IBM Corporation,True,token_swap,medium,Corporation IBM
+1000426,Oracle Corporation,True,punctuation,easy,Oracle-Corporation
+1000544,,False,negative_decoy,medium,
+1000731,Tesla Motors Ltd,True,separator,hard,Tesla/Motors/Ltd
+1000503,,False,negative_decoy,medium,
+1000883,Oracle Corporation,True,partial,medium,Oracle
+1000059,Finspire Solutions Private Limited,True,typo,hard,Finspıre Solutıons Private Limited
+1000825,Tesla Motors Ltd,True,abbreviation,medium,TSLA MTRS LTD
+1000082,Finspire Solutions Private Limited,True,abbreviation,hard,FSPL
+1000861,Oracle Corporation,True,separator,hard,Oracle/Corporation
+1001043,,False,negative_decoy,medium,
+1001226,Google LLC,True,ticker_reference,hard,GOOGL
+1000364,IBM Corporation,True,exact,easy,IBM Corporation
+1000488,,False,negative_decoy,hard,
+1000699,Indiaforensic Services Pvt Ltd,True,masked,hard,Ind***orensic Services Pvt Ltd
+1000326,Tesla Motors Ltd,True,spacing,hard,TES LA MOTORS LIMITED
+1001239,IBM Corporation,True,phonetic_transliteration,hard,Ay Bi Em Corporation
+1000886,Apple Inc,True,compressed,hard,AppleInc
+1000345,Tesla Motors Ltd,True,exact,easy,Tesla Motors Ltd
+1001195,Apple Inc,True,multilingual_context,hard,Apple Inc
+1001100,,False,negative_decoy,medium,
+1000442,Oracle Corporation,True,masked,hard,O**cle Corp.
+1000502,,False,negative_decoy,hard,
+1000657,Tesla Motors Ltd,True,abbreviation,medium,TSLA MTRS LTD
+1000564,,False,negative_decoy,hard,
+1000659,Apple Inc,True,mixed_case,hard,ApPlE InC
+1000349,Tesla Motors Ltd,True,abbreviation,hard,TML
+1000812,Amazon Technologies Inc,True,partial,medium,Amazon Technologies
+1000182,Apple Inc,True,typo,hard,Aple Incorporatd
+1000168,Microsoft Corporation,True,concatenated,medium,microsoftcorporation
+1000387,IBM Corporation,True,exact,easy,IBM Corporation
+1000705,Google LLC,True,partial,medium,Google
+1001057,,False,negative_decoy,medium,
+1001084,,False,negative_decoy,medium,
+1000428,Oracle Corporation,True,punctuation,easy,Oracle-Corporation
+1001132,Finspire Solutions Private Limited,True,character_spacing_obfuscation,hard,F i n s p i r e Solutions
+1000769,Apple Inc,True,abbreviation,medium,AAPL INC
+1000751,Amazon Technologies Inc,True,abbreviation,medium,AMZN TECH INC
+1001060,,False,negative_decoy,hard,
+1000351,Tesla Motors Ltd,True,unicode,hard,Tésla Motors Ltd
+1000042,Indiaforensic Services Pvt Ltd,True,abbreviation,medium,Indiaforensic Svcs P Ltd
+1000401,IBM Corporation,True,concatenated,medium,ibmcorporation
+1000510,,False,negative_decoy,medium,
+1000412,Oracle Corporation,True,unicode,hard,Oraclé Corporation
+1000763,Google LLC,True,abbreviation,medium,GOOG LLC
+1000373,IBM Corporation,True,abbreviation,medium,International Business Machines Corp
+1000614,Apple Inc,True,mixed_case,hard,ApPlE InC
+1000167,Microsoft Corporation,True,abbreviation,hard,M.S. Corporation
+1000141,Microsoft Corporation,True,typo,hard,Mıcrosоft Corporation
+1000624,Microsoft Corporation,True,separator,hard,Microsoft/Corporation
+1001169,IBM Corporation,True,intermediary_beneficiary_context,hard,IBM Corp
+1000805,IBM Corporation,True,separator,hard,IBM/Corporation
+1000231,Google LLC,True,unicode,hard,Googlé LLC
+1000056,Finspire Solutions Private Limited,True,punctuation,medium,Finspire-Solutions (Pvt.) Ltd.
+1000148,Microsoft Corporation,True,abbreviation,hard,M.S. Corporation
+1000526,,False,negative_decoy,hard,
+1000651,Amazon Technologies Inc,True,masked,hard,Ama*** Technologies Inc
+1001085,,False,negative_decoy,hard,
+1000674,Finspire Solutions Private Limited,True,masked,hard,Fin***re Solutions Private Limited
+1000528,,False,negative_decoy,hard,
+1000306,Amazon Technologies Inc,True,spacing,hard,AMA ZON TECHNOLOGIES INC
+1000619,IBM Corporation,True,mixed_case,hard,IbM CoRpOrAtIoN
+1000704,Amazon Technologies Inc,True,compressed,hard,AmazonTechnologiesInc
+1001250,Oracle Corporation,True,heavy_masking,hard,Orac?? Corporation
+1001272,Finspire Solutions Private Limited,True,mixed_obfuscation,hard,F1nsp1re*S0lut10ns
+1000530,,False,negative_decoy,hard,
+1000922,Oracle Corporation,True,separator,hard,Oracle/Corporation
+1000494,,False,negative_decoy,hard,
+1001019,,False,negative_decoy,medium,
+1001207,Amazon Technologies Inc,True,translated_company_tokens,hard,Amazon Teknolojileri şirketine
+1001072,,False,negative_decoy,hard,
+1000348,Tesla Motors Ltd,True,concatenated,medium,teslamotorslimited
+1000450,Oracle Corporation,True,abbreviation,hard,ORC Corporation
+1000519,,False,negative_decoy,hard,
+1000324,Tesla Motors Ltd,True,typo,hard,TesIa Motors Ltd
+1000852,Google LLC,True,separator,hard,Google/LLC
+1001054,,False,negative_decoy,hard,
+1000703,Apple Inc,True,masked,hard,App***Inc
+1001109,IBM Corporation,True,long_noisy_context,medium,IBM Corporation
+1000964,Oracle Corporation,True,partial,medium,Oracle
+1000270,Google LLC,True,unicode,hard,Googlé LLC
+1000385,IBM Corporation,True,concatenated,medium,ibmcorporation
+1001227,Amazon Technologies Inc,True,ticker_reference,hard,AMZN
+1000595,,False,negative_decoy,hard,
+1000114,Mehar Entertainment Private Limited,True,exact,easy,Mehar Entertainment Private Limited
+1001311,,False,ambiguous_acronym_decoy,hard,
+1000498,,False,negative_decoy,hard,
+1000764,Tesla Motors Ltd,True,separator,hard,Tesla/Motors/Ltd
+1000234,Google LLC,True,exact,easy,Google LLC
+1000089,Finspire Solutions Private Limited,True,concatenated,hard,finspiresolutionsprivatelimited
+1000610,IBM Corporation,True,mixed_case,hard,IbM CoRpOrAtIoN
+1001011,,False,negative_decoy,medium,
+1000507,,False,negative_decoy,medium,
+1000905,Indiaforensic Services Pvt Ltd,True,mixed_case,hard,InDiAfOrEnSiC SeRvIcEs pVt lTd
+1000068,Finspire Solutions Private Limited,True,token_swap,hard,Solutions Finspire Private Limited
+1000249,Google LLC,True,abbreviation,medium,GOOG LLC
+1000029,Indiaforensic Services Pvt Ltd,True,punctuation,medium,India-Forensic Services (P) Ltd.
+1001053,,False,negative_decoy,hard,
+1000374,IBM Corporation,True,exact,easy,IBM Corporation
+1001037,,False,negative_decoy,hard,
+1001173,Mehar Entertainment Private Limited,True,refund_reversal_context,hard,Mehar Entertainment
+1000261,Google LLC,True,typo,hard,Gооgle LLC
+1000836,Apple Inc,True,masked,hard,App***Inc
+1001051,,False,negative_decoy,hard,
+1001082,,False,negative_decoy,medium,
+1000831,Google LLC,True,separator,hard,Google/LLC
+1000214,Apple Inc,True,exact,easy,Apple Inc
+1001017,,False,negative_decoy,medium,
+1000201,Apple Inc,True,concatenated,medium,appleincorporated
+1000911,Google LLC,True,separator,hard,Google/LLC
+1000406,Oracle Corporation,True,abbreviation,medium,ORCL Corp
+1000635,Apple Inc,True,abbreviation,medium,AAPL INC
+1000225,Apple Inc,True,abbreviation,medium,AAPL Inc.
+1000573,,False,negative_decoy,hard,
+1001009,,False,negative_decoy,hard,
+1000661,Apple Inc,True,abbreviation,medium,AAPL INC
+1000727,Finspire Solutions Private Limited,True,mixed_case,hard,FiNsPiRe sOlUtIoNs pRiVaTe lImItEd
+1000858,IBM Corporation,True,mixed_case,hard,IbM CoRpOrAtIoN
+1000184,Apple Inc,True,legal_suffix,easy,Apple Incorporated
+1000660,Apple Inc,True,partial,medium,Apple
+1001013,,False,negative_decoy,medium,
+1000797,Google LLC,True,compressed,hard,GoogleLLC
+1000675,Mehar Entertainment Private Limited,True,partial,medium,Mehar Entertainment Private
+1000971,Oracle Corporation,True,compressed,hard,OracleCorporation
+1001194,Microsoft Corporation,True,multilingual_context,hard,Microsoft Corp
+1000259,Google LLC,True,token_swap,medium,LLC Google
+1000475,,False,negative_decoy,medium,
+1000709,IBM Corporation,True,partial,medium,IBM
+1000474,,False,negative_decoy,hard,
+1001275,Apple Inc,True,mixed_obfuscation,hard,Apple*Inc
+1000370,IBM Corporation,True,legal_suffix,easy,IBM Corp.
+1000303,Amazon Technologies Inc,True,abbreviation,hard,ATI Inc.
+1000462,,False,negative_decoy,hard,
+1000723,IBM Corporation,True,abbreviation,hard,INTL BUS MACH CORP
+1000735,Mehar Entertainment Private Limited,True,abbreviation,hard,MHR ENTMNT PVT LTD
+1001305,,False,common_word_context,hard,
+1000119,Mehar Entertainment Private Limited,True,masked,hard,MHR Entertainment P Ltd
+1001050,,False,negative_decoy,medium,
+1000388,IBM Corporation,True,abbreviation,medium,I.B.M. Corp
+1000939,Tesla Motors Ltd,True,separator,hard,Tesla/Motors/Ltd
+1000250,Google LLC,True,abbreviation,medium,GOOG LLC
+1000926,Google LLC,True,compressed,hard,GoogleLLC
+1000968,Oracle Corporation,True,masked,hard,Ora*** Corporation
+1000282,Amazon Technologies Inc,True,typo,hard,Amazоn Technologıes Inc
+1000293,Amazon Technologies Inc,True,abbreviation,hard,ATI Inc.
+1000317,Tesla Motors Ltd,True,unicode,hard,Tésla Motors Ltd
+1000722,IBM Corporation,True,mixed_case,hard,IbM CoRpOrAtIoN
+1000796,IBM Corporation,True,mixed_case,hard,IbM CoRpOrAtIoN
+1001138,Tesla Motors Ltd,True,character_spacing_obfuscation,hard,T e s l a Motors
+1000923,Google LLC,True,abbreviation,medium,GOOG LLC
+1000305,Amazon Technologies Inc,True,abbreviation,hard,ATI Inc.
+1000171,Microsoft Corporation,True,abbreviation,medium,MSFT Corp
+1000539,,False,negative_decoy,medium,
+1000620,Mehar Entertainment Private Limited,True,separator,hard,Mehar/Entertainment/Private/Limited
+1000778,Google LLC,True,masked,hard,Goo*** LLC
+1000681,Amazon Technologies Inc,True,compressed,hard,AmazonTechnologiesInc
+1000780,IBM Corporation,True,partial,medium,IBM
+1000066,Finspire Solutions Private Limited,True,legal_suffix,easy,Finspire Solutions Pvt Ltd
+1000611,Google LLC,True,separator,hard,Google/LLC
+1000131,Mehar Entertainment Private Limited,True,concatenated,hard,meharentertainmentprivatelimited
+1000992,,False,negative_decoy,hard,
+1000289,Amazon Technologies Inc,True,concatenated,medium,amazontechnologiesinc
+1000988,,False,negative_decoy,hard,
+1001028,,False,negative_decoy,hard,
+1000460,,False,negative_decoy,hard,
+1000300,Amazon Technologies Inc,True,abbreviation,hard,ATI Inc.
+1000718,Oracle Corporation,True,mixed_case,hard,OrAcLe cOrPoRaTiOn
+1000754,Google LLC,True,abbreviation,medium,GOOG LLC
+1000439,Oracle Corporation,True,masked,hard,O**cle Corp.
+1000981,,False,negative_decoy,medium,
+1000321,Tesla Motors Ltd,True,punctuation,medium,"Tesla-Motors, Ltd."
+1000014,Indiaforensic Services Pvt Ltd,True,token_swap,hard,Services Indiaforensic Pvt Ltd
+1001112,Finspire Solutions Private Limited,True,unicode_homoglyph,hard,Fіnspire Sоlutions Private Limited
+1000495,,False,negative_decoy,hard,
+1000948,Mehar Entertainment Private Limited,True,abbreviation,hard,MHR ENTMNT PVT LTD
+1000878,Oracle Corporation,True,mixed_case,hard,OrAcLe cOrPoRaTiOn
+1000548,,False,negative_decoy,hard,
+1000382,IBM Corporation,True,punctuation,easy,IBM-Corporation
+1000139,Microsoft Corporation,True,concatenated,medium,microsoftcorporation
+1001106,Google LLC,True,long_noisy_context,medium,Google LLC
+1000092,Mehar Entertainment Private Limited,True,abbreviation,medium,Mehar Ent. P Ltd
+1000759,Apple Inc,True,mixed_case,hard,ApPlE InC
+1001148,Tesla Motors Ltd,True,alias_brand_reference,medium,Tesla
+1000561,,False,negative_decoy,medium,
+1000129,Mehar Entertainment Private Limited,True,typo,hard,Mehar Entertaınment Pvt Ltd
+1001286,,False,similar_unrelated_entity,hard,
+1001247,Amazon Technologies Inc,True,heavy_masking,hard,Amaz*n Technologies Inc
+1001217,Amazon Technologies Inc,True,transaction_code_noise,medium,AMAZON TECH INC
+1000662,Finspire Solutions Private Limited,True,mixed_case,hard,FiNsPiRe sOlUtIoNs pRiVaTe lImItEd
+1000618,Mehar Entertainment Private Limited,True,abbreviation,hard,MHR ENTMNT PVT LTD
+1000101,Mehar Entertainment Private Limited,True,punctuation,medium,Mehar-Entertainment (Private) Ltd.
+1000897,IBM Corporation,True,partial,medium,IBM
+1001257,Amazon Technologies Inc|Tesla Motors Ltd,True,multi_entity,hard,Amazon Tech Inc | Tesla Motors
+1001111,Indiaforensic Services Pvt Ltd,True,unicode_homoglyph,hard,Indіaforensic Services Pvt Ltd
+1001313,,False,ambiguous_acronym_decoy,hard,
+1000803,Finspire Solutions Private Limited,True,partial,medium,Finspire Solutions Private
+1001042,,False,negative_decoy,hard,
+1000279,Amazon Technologies Inc,True,concatenated,medium,amazontechnologiesinc
+1000205,Apple Inc,True,exact,easy,Apple Inc
+1001078,,False,negative_decoy,hard,
+1000435,Oracle Corporation,True,unicode,hard,Oraclé Corporation
+1000537,,False,negative_decoy,medium,
+1000866,Oracle Corporation,True,mixed_case,hard,OrAcLe cOrPoRaTiOn
+1000887,Oracle Corporation,True,masked,hard,Ora*** Corporation
+1000934,Indiaforensic Services Pvt Ltd,True,partial,medium,Indiaforensic Services Pvt
+1000480,,False,negative_decoy,hard,
+1000151,Microsoft Corporation,True,abbreviation,hard,M.S. Corporation
+1000196,Apple Inc,True,typo,hard,Aple Incorporatd
+1000666,Oracle Corporation,True,abbreviation,medium,ORCL CORP
+1000384,IBM Corporation,True,abbreviation,medium,International Business Machines Corp
+1000245,Google LLC,True,masked,hard,G**gle LLC
+1001094,,False,negative_decoy,medium,
+1000793,Mehar Entertainment Private Limited,True,compressed,hard,MeharEntertainmentPrivateLimited
+1000687,Microsoft Corporation,True,mixed_case,hard,MiCrOsOfT CoRpOrAtIoN
+1001253,Mehar Entertainment Private Limited|Microsoft Corporation,True,multi_entity,hard,Mehar Entertainment | Microsoft Corp
+1000417,Oracle Corporation,True,legal_suffix,easy,Oracle Corp.
+1000376,IBM Corporation,True,typo,hard,IBN Corporaton
+1000940,Oracle Corporation,True,separator,hard,Oracle/Corporation
+1000567,,False,negative_decoy,medium,
+1001073,,False,negative_decoy,medium,
+1000290,Amazon Technologies Inc,True,concatenated,medium,amazontechnologiesinc
+1000733,IBM Corporation,True,masked,hard,IBM***rporation
+1000524,,False,negative_decoy,medium,
+1001218,Tesla Motors Ltd,True,transaction_code_noise,medium,TESLA MOTORS
+1000489,,False,negative_decoy,hard,
+1000414,Oracle Corporation,True,concatenated,medium,oraclecorporation
+1000314,Amazon Technologies Inc,True,typo,hard,Amazоn Technologıes Inc
+1001145,Apple Inc,True,alias_brand_reference,medium,Apple
+1001264,Microsoft Corporation,True,embedded_account_reference,hard,MicrosoftCorp
+1001022,,False,negative_decoy,hard,
+1000667,Tesla Motors Ltd,True,compressed,hard,TeslaMotorsLtd
+1000658,Oracle Corporation,True,partial,medium,Oracle
+1000654,Google LLC,True,mixed_case,hard,GoOgLe lLc
+1000907,Google LLC,True,partial,medium,Google
+1001235,Apple Inc,True,phonetic_transliteration,hard,Epıl İnk
+1000617,Google LLC,True,masked,hard,Goo*** LLC
+1000318,Tesla Motors Ltd,True,spacing,hard,TES LA MOTORS LIMITED
+1000130,Mehar Entertainment Private Limited,True,exact,easy,Mehar Entertainment Private Limited
+1001063,,False,negative_decoy,medium,
+1000538,,False,negative_decoy,medium,
+1000752,Google LLC,True,partial,medium,Google
+1001032,,False,negative_decoy,hard,
+1000473,,False,negative_decoy,medium,
+1000837,Tesla Motors Ltd,True,partial,medium,Tesla Motors
+1001035,,False,negative_decoy,hard,
+1001201,Indiaforensic Services Pvt Ltd,True,translated_company_tokens,hard,Indiaforensic Hizmetleri Özel Limited
+1001249,IBM Corporation,True,heavy_masking,hard,I*M Corporation
+1000779,Amazon Technologies Inc,True,partial,medium,Amazon Technologies
+1000869,Mehar Entertainment Private Limited,True,compressed,hard,MeharEntertainmentPrivateLimited
+1001127,Amazon Technologies Inc,True,leetspeak_obfuscation,hard,Am4z0n Techn0logies Inc
+1000641,Tesla Motors Ltd,True,compressed,hard,TeslaMotorsLtd
+1001248,Tesla Motors Ltd,True,heavy_masking,hard,Tes** Motors Ltd
+1001200,Oracle Corporation,True,multilingual_context,hard,Oracle Corp
+1000711,Oracle Corporation,True,separator,hard,Oracle/Corporation
+1000960,Microsoft Corporation,True,mixed_case,hard,MiCrOsOfT CoRpOrAtIoN
+1000903,Tesla Motors Ltd,True,mixed_case,hard,TeSlA MoToRs lTd
+1001119,IBM Corporation,True,unicode_homoglyph,hard,ІBM Corporation
+1000840,Tesla Motors Ltd,True,abbreviation,medium,TSLA MTRS LTD
+1000740,Apple Inc,True,mixed_case,hard,ApPlE InC
+1001062,,False,negative_decoy,hard,
+1000408,Oracle Corporation,True,punctuation,easy,Oracle-Corporation
+1000255,Google LLC,True,abbreviation,medium,GOOG LLC
+1001209,IBM Corporation,True,translated_company_tokens,hard,IBM Şirketi
+1000344,Tesla Motors Ltd,True,abbreviation,hard,TML
+1000535,,False,negative_decoy,medium,
+1000081,Finspire Solutions Private Limited,True,exact,easy,Finspire Solutions Private Limited
+1001243,Mehar Entertainment Private Limited,True,heavy_masking,hard,Mehar Entertainm*** Private Limited
+1000520,,False,negative_decoy,medium,
+1001183,Mehar Entertainment Private Limited,True,negation_context,hard,Mehar Entertainment
+1000157,Microsoft Corporation,True,masked,hard,M*crosoft Corp
+1000433,Oracle Corporation,True,abbreviation,hard,ORC Corporation
+1000920,Indiaforensic Services Pvt Ltd,True,compressed,hard,IndiaforensicServicesPvtLtd
+1000941,Tesla Motors Ltd,True,partial,medium,Tesla Motors
+1000875,Mehar Entertainment Private Limited,True,masked,hard,Meh***Entertainment Private Limited
+1000175,Microsoft Corporation,True,legal_suffix,easy,Microsoft Corp.
+1001056,,False,negative_decoy,medium,
+1000695,Finspire Solutions Private Limited,True,masked,hard,Fin***re Solutions Private Limited
+1000843,Tesla Motors Ltd,True,partial,medium,Tesla Motors
+1000499,,False,negative_decoy,medium,
+1000785,Tesla Motors Ltd,True,abbreviation,medium,TSLA MTRS LTD
+1000030,Indiaforensic Services Pvt Ltd,True,spacing,medium,INDIA FORENSIC SERVICES PVT LTD
+1000884,Tesla Motors Ltd,True,masked,hard,Tes***Motors Ltd
+1000664,Indiaforensic Services Pvt Ltd,True,masked,hard,Ind***orensic Services Pvt Ltd
+1000980,,False,negative_decoy,hard,
+1001265,Apple Inc,True,embedded_account_reference,hard,AppleInc
+1000294,Amazon Technologies Inc,True,abbreviation,medium,Amazon Tech Inc
+1001114,Microsoft Corporation,True,unicode_homoglyph,hard,Micrоsoft Cоrporation
+1000692,Microsoft Corporation,True,separator,hard,Microsoft/Corporation
+1000240,Google LLC,True,masked,hard,G**gle LLC
+1000571,,False,negative_decoy,medium,
+1000900,Google LLC,True,mixed_case,hard,GoOgLe lLc
+1000957,IBM Corporation,True,separator,hard,IBM/Corporation
+1000509,,False,negative_decoy,medium,
+1000311,Amazon Technologies Inc,True,abbreviation,medium,Amazon Tech Inc
+1000557,,False,negative_decoy,medium,
+1000154,Microsoft Corporation,True,exact,easy,Microsoft Corporation
+1000463,,False,negative_decoy,medium,
+1000628,Indiaforensic Services Pvt Ltd,True,mixed_case,hard,InDiAfOrEnSiC SeRvIcEs pVt lTd
+1000604,Finspire Solutions Private Limited,True,abbreviation,hard,FNSP SLTNS PVT LTD
+1000219,Apple Inc,True,unicode,hard,Applé Inc
+1000210,Apple Inc,True,typo,hard,Aple Incorporatd
+1000001,Indiaforensic Services Pvt Ltd,True,punctuation,medium,India-Forensic Services (P) Ltd.
+1000192,Apple Inc,True,punctuation,easy,"Apple, Inc."
+1001002,,False,negative_decoy,medium,
+1000327,Tesla Motors Ltd,True,punctuation,medium,"Tesla-Motors, Ltd."
+1000427,Oracle Corporation,True,abbreviation,hard,ORC Corporation
+1000357,Tesla Motors Ltd,True,typo,hard,TesIa Motors Ltd
+1001069,,False,negative_decoy,hard,
+1000542,,False,negative_decoy,medium,
+1000297,Amazon Technologies Inc,True,unicode,hard,Amazon Technologiés Inc
+1000429,Oracle Corporation,True,abbreviation,hard,ORC Corporation
+1000031,Indiaforensic Services Pvt Ltd,True,typo,hard,Indiaforensic Servces Pvt Lmt
+1000229,Google LLC,True,abbreviation,hard,GGL L.L.C.
+1001065,,False,negative_decoy,medium,
+1000622,Apple Inc,True,masked,hard,App***Inc
+1001167,Amazon Technologies Inc,True,intermediary_beneficiary_context,hard,Amazon Tech Inc
+1000901,Google LLC,True,abbreviation,medium,GOOG LLC
+1001283,,False,similar_unrelated_entity,hard,
+1000984,,False,negative_decoy,hard,
+1000454,,False,negative_decoy,hard,
+1001269,IBM Corporation,True,embedded_account_reference,hard,IBMCorp
+1000599,,False,negative_decoy,medium,
+1001208,Tesla Motors Ltd,True,translated_company_tokens,hard,Tesla Motorları Limited
+1001170,Oracle Corporation,True,intermediary_beneficiary_context,hard,Oracle Corp
+1000648,Oracle Corporation,True,partial,medium,Oracle
+1000717,IBM Corporation,True,masked,hard,IBM***rporation
+1000794,IBM Corporation,True,separator,hard,IBM/Corporation
+1000615,Microsoft Corporation,True,partial,medium,Microsoft
+1000073,Finspire Solutions Private Limited,True,unicode,hard,Finspiré Solutions Private Limited
+1000434,Oracle Corporation,True,spacing,hard,ORA CLE CORPORATION
+1000784,Amazon Technologies Inc,True,compressed,hard,AmazonTechnologiesInc
+1000874,Mehar Entertainment Private Limited,True,compressed,hard,MeharEntertainmentPrivateLimited
+1000292,Amazon Technologies Inc,True,unicode,hard,Amazon Technologiés Inc
+1001303,,False,common_word_context,hard,
+1001280,Oracle Corporation,True,mixed_obfuscation,hard,0racle*C0rp
+1000953,Oracle Corporation,True,mixed_case,hard,OrAcLe cOrPoRaTiOn
+1000144,Microsoft Corporation,True,token_swap,medium,Corporation Microsoft
+1000856,Finspire Solutions Private Limited,True,abbreviation,hard,FNSP SLTNS PVT LTD
+1000094,Mehar Entertainment Private Limited,True,abbreviation,hard,MEPL
+1000668,Apple Inc,True,mixed_case,hard,ApPlE InC
+1001260,Oracle Corporation|Indiaforensic Services Pvt Ltd,True,multi_entity,hard,Oracle Corp | Indiaforensic Services
+1000146,Microsoft Corporation,True,typo,hard,Microsft Corporatoin
+1000576,,False,negative_decoy,medium,
+1001236,Google LLC,True,phonetic_transliteration,hard,Gugıl LLC
+1000104,Mehar Entertainment Private Limited,True,exact,easy,Mehar Entertainment Private Limited
+1000271,Amazon Technologies Inc,True,abbreviation,medium,Amazon Tech Inc
+1000808,Oracle Corporation,True,separator,hard,Oracle/Corporation
+1000621,Google LLC,True,abbreviation,medium,GOOG LLC
+1001093,,False,negative_decoy,medium,
+1000824,Indiaforensic Services Pvt Ltd,True,partial,medium,Indiaforensic Services Pvt
+1000578,,False,negative_decoy,medium,
+1000592,,False,negative_decoy,medium,
+1000064,Finspire Solutions Private Limited,True,typo,hard,Finspıre Solutıons Private Limited
+1000287,Amazon Technologies Inc,True,punctuation,medium,"Amazon-Technologies, Inc."
+1000947,Oracle Corporation,True,partial,medium,Oracle
+1001276,Google LLC,True,mixed_obfuscation,hard,G00gle*LLC
+1000685,IBM Corporation,True,separator,hard,IBM/Corporation
+1000976,,False,negative_decoy,medium,
+1000529,,False,negative_decoy,hard,
+1000371,IBM Corporation,True,typo,hard,lBM Corporation
+1000771,IBM Corporation,True,abbreviation,hard,INTL BUS MACH CORP
+1000609,Finspire Solutions Private Limited,True,masked,hard,Fin***re Solutions Private Limited
+1000863,Mehar Entertainment Private Limited,True,partial,medium,Mehar Entertainment Private
+1001083,,False,negative_decoy,hard,
+1000684,Amazon Technologies Inc,True,compressed,hard,AmazonTechnologiesInc
+1000404,IBM Corporation,True,token_swap,medium,Corporation IBM
+1001124,Microsoft Corporation,True,leetspeak_obfuscation,hard,M1cr0s0ft C0rp0rat10n
+1000765,Microsoft Corporation,True,masked,hard,Mic***oft Corporation
+1000671,Tesla Motors Ltd,True,masked,hard,Tes***Motors Ltd
+1001130,Oracle Corporation,True,leetspeak_obfuscation,hard,0racle C0rp0rat10n
+1000252,Google LLC,True,exact,easy,Google LLC
+1000792,Finspire Solutions Private Limited,True,mixed_case,hard,FiNsPiRe sOlUtIoNs pRiVaTe lImItEd
+1000531,,False,negative_decoy,medium,
+1001278,Tesla Motors Ltd,True,mixed_obfuscation,hard,Tesla*M0t0rs
+1001213,Mehar Entertainment Private Limited,True,transaction_code_noise,medium,MEHAR ENTERTAINMENT
+1001177,Amazon Technologies Inc,True,refund_reversal_context,hard,Amazon Tech Inc
+1000626,Amazon Technologies Inc,True,abbreviation,medium,AMZN TECH INC
+1000283,Amazon Technologies Inc,True,spacing,hard,AMA ZON TECHNOLOGIES INC
+1001149,IBM Corporation,True,alias_brand_reference,medium,IBM Global Services
+1000846,Amazon Technologies Inc,True,partial,medium,Amazon Technologies
+1000827,Finspire Solutions Private Limited,True,partial,medium,Finspire Solutions Private
+1000634,Apple Inc,True,abbreviation,medium,AAPL INC
+1001281,,False,similar_unrelated_entity,hard,
+1000898,Apple Inc,True,masked,hard,App***Inc
+1000016,Indiaforensic Services Pvt Ltd,True,concatenated,hard,indiaforensicservicespvtltd
+1000828,Amazon Technologies Inc,True,separator,hard,Amazon/Technologies/Inc
+1000781,Microsoft Corporation,True,mixed_case,hard,MiCrOsOfT CoRpOrAtIoN
+1001026,,False,negative_decoy,hard,
+1000586,,False,negative_decoy,medium,
+1001319,,False,ambiguous_acronym_decoy,hard,
+1000298,Amazon Technologies Inc,True,concatenated,medium,amazontechnologiesinc
+1000078,Finspire Solutions Private Limited,True,typo,hard,Finspire Solutons Pvt Lmtd
+1000527,,False,negative_decoy,hard,
+1000084,Finspire Solutions Private Limited,True,spacing,hard,FIN SPIRE SOLUTIONS PRIVATE LIMITED
+1001282,,False,similar_unrelated_entity,hard,
+1000719,Tesla Motors Ltd,True,abbreviation,medium,TSLA MTRS LTD
+1000054,Finspire Solutions Private Limited,True,legal_suffix,easy,Finspire Solutions Pvt Ltd
+1000209,Apple Inc,True,abbreviation,medium,AAPL Inc.
+1000772,Tesla Motors Ltd,True,partial,medium,Tesla Motors
+1000732,Indiaforensic Services Pvt Ltd,True,separator,hard,Indiaforensic/Services/Pvt/Ltd
+1000027,Indiaforensic Services Pvt Ltd,True,abbreviation,medium,Indiaforensic Svcs P Ltd
+1000804,Google LLC,True,abbreviation,medium,GOOG LLC
+1001216,Google LLC,True,transaction_code_noise,medium,GOOGLE LLC
+1000162,Microsoft Corporation,True,token_swap,medium,Corporation Microsoft
+1000644,Tesla Motors Ltd,True,partial,medium,Tesla Motors
+1000894,Amazon Technologies Inc,True,separator,hard,Amazon/Technologies/Inc
+1000743,Oracle Corporation,True,masked,hard,Ora*** Corporation
+1000949,Oracle Corporation,True,partial,medium,Oracle
+1000562,,False,negative_decoy,hard,
+1000492,,False,negative_decoy,hard,
+1000106,Mehar Entertainment Private Limited,True,legal_suffix,easy,Mehar Entertainment Pvt Ltd
+1000430,Oracle Corporation,True,spacing,hard,ORA CLE CORPORATION
+1000650,Microsoft Corporation,True,mixed_case,hard,MiCrOsOfT CoRpOrAtIoN
+1000945,IBM Corporation,True,mixed_case,hard,IbM CoRpOrAtIoN
+1000356,Tesla Motors Ltd,True,typo,hard,TesIa Motors Ltd
+1000859,Indiaforensic Services Pvt Ltd,True,abbreviation,hard,INDFRNSC SRVCS PVT LTD
+1000959,Oracle Corporation,True,masked,hard,Ora*** Corporation
+1000868,Indiaforensic Services Pvt Ltd,True,separator,hard,Indiaforensic/Services/Pvt/Ltd
+1000989,,False,negative_decoy,medium,
+1000774,Amazon Technologies Inc,True,separator,hard,Amazon/Technologies/Inc
+1000985,,False,negative_decoy,medium,
+1000700,Microsoft Corporation,True,separator,hard,Microsoft/Corporation
+1000482,,False,negative_decoy,hard,
+1000043,Indiaforensic Services Pvt Ltd,True,typo,hard,Indiaforensic Servces Pvt Lmt
+1000853,Mehar Entertainment Private Limited,True,separator,hard,Mehar/Entertainment/Private/Limited
+1000375,IBM Corporation,True,abbreviation,medium,International Business Machines Corp
+1000447,Oracle Corporation,True,concatenated,medium,oraclecorporation
+1001101,Indiaforensic Services Pvt Ltd,True,long_noisy_context,medium,Indiaforensic Services Pvt Ltd
+1000295,Amazon Technologies Inc,True,punctuation,medium,"Amazon-Technologies, Inc."
+1000588,,False,negative_decoy,medium,
+1000110,Mehar Entertainment Private Limited,True,typo,hard,Mehar Entertaınment Pvt Ltd
+1000004,Indiaforensic Services Pvt Ltd,True,spacing,medium,INDIA FORENSIC SERVICES PVT LTD
+1000893,Oracle Corporation,True,partial,medium,Oracle
+1000701,Google LLC,True,mixed_case,hard,GoOgLe lLc
+1000280,Amazon Technologies Inc,True,masked,medium,AMZN Technologies Inc
+1000559,,False,negative_decoy,medium,
+1000647,Oracle Corporation,True,abbreviation,medium,ORCL CORP
+1000978,,False,negative_decoy,hard,
+1001036,,False,negative_decoy,medium,
+1001140,Oracle Corporation,True,character_spacing_obfuscation,hard,O r a c l e Corp
+1000491,,False,negative_decoy,hard,
+1000336,Tesla Motors Ltd,True,unicode,hard,Tésla Motors Ltd
+1000117,Mehar Entertainment Private Limited,True,punctuation,medium,Mehar-Entertainment (Private) Ltd.
+1000390,IBM Corporation,True,abbreviation,medium,I.B.M. Corp
+1000123,Mehar Entertainment Private Limited,True,typo,hard,Mehar Entertaınment Pvt Ltd
+1001192,Finspire Solutions Private Limited,True,multilingual_context,hard,Finspire Solutions
+1000315,Amazon Technologies Inc,True,abbreviation,hard,ATI Inc.
+1000995,,False,negative_decoy,hard,
+1000643,Google LLC,True,partial,medium,Google
+1001126,Google LLC,True,leetspeak_obfuscation,hard,G00gle LLC
+1000839,Microsoft Corporation,True,separator,hard,Microsoft/Corporation
+1001120,Oracle Corporation,True,unicode_homoglyph,hard,Оracle Corporation
+1000304,Amazon Technologies Inc,True,token_swap,hard,Technologies Amazon Incorporated
+1000816,IBM Corporation,True,masked,hard,IBM***rporation
+1001068,,False,negative_decoy,hard,
+1001107,Amazon Technologies Inc,True,long_noisy_context,medium,Amazon Technologies Inc
+1000275,Amazon Technologies Inc,True,unicode,hard,Amazon Technologiés Inc
+1000485,,False,negative_decoy,hard,
+1000226,Google LLC,True,concatenated,medium,googlellc
+1000500,,False,negative_decoy,medium,
+1000411,Oracle Corporation,True,legal_suffix,easy,Oracle Corp.
+1000881,Indiaforensic Services Pvt Ltd,True,partial,medium,Indiaforensic Services Pvt
+1001134,Microsoft Corporation,True,character_spacing_obfuscation,hard,M i c r o s o f t Corp
+1001234,Microsoft Corporation,True,phonetic_transliteration,hard,Maykrosoft Korporasyon
+1001113,Mehar Entertainment Private Limited,True,unicode_homoglyph,hard,Mehar Entertaіnment Private Limited
+1000558,,False,negative_decoy,hard,
+1000307,Amazon Technologies Inc,True,abbreviation,hard,ATI Inc.
+1000936,IBM Corporation,True,compressed,hard,IBMCorporation
+1000313,Amazon Technologies Inc,True,exact,easy,Amazon Technologies Inc
+1000221,Apple Inc,True,abbreviation,hard,APL Incorporated
+1000966,Indiaforensic Services Pvt Ltd,True,separator,hard,Indiaforensic/Services/Pvt/Ltd
+1000269,Google LLC,True,abbreviation,hard,GGL L.L.C.
+1001045,,False,negative_decoy,medium,
+1000789,Google LLC,True,mixed_case,hard,GoOgLe lLc
+1000823,Google LLC,True,mixed_case,hard,GoOgLe lLc
+1000820,Indiaforensic Services Pvt Ltd,True,partial,medium,Indiaforensic Services Pvt
+1000541,,False,negative_decoy,hard,
+1001205,Apple Inc,True,translated_company_tokens,hard,Apple Şirketi
+1000697,Tesla Motors Ltd,True,compressed,hard,TeslaMotorsLtd
+1000750,Finspire Solutions Private Limited,True,masked,hard,Fin***re Solutions Private Limited
+1001008,,False,negative_decoy,hard,
+1000264,Google LLC,True,exact,easy,Google LLC
+1001038,,False,negative_decoy,hard,
+1000915,Microsoft Corporation,True,masked,hard,Mic***oft Corporation
+1000807,Indiaforensic Services Pvt Ltd,True,compressed,hard,IndiaforensicServicesPvtLtd
+1000899,Microsoft Corporation,True,masked,hard,Mic***oft Corporation
+1001175,Apple Inc,True,refund_reversal_context,hard,Apple Inc
+1001284,,False,similar_unrelated_entity,hard,
+1000515,,False,negative_decoy,hard,
+1001074,,False,negative_decoy,medium,
+1001307,,False,common_word_context,hard,
+1000469,,False,negative_decoy,medium,
+1000855,Tesla Motors Ltd,True,partial,medium,Tesla Motors
+1000545,,False,negative_decoy,medium,
+1000260,Google LLC,True,typo,hard,Googel LCC
+1000254,Google LLC,True,concatenated,medium,googlellc
+1001223,Mehar Entertainment Private Limited,True,ticker_reference,hard,MEPL
+1000553,,False,negative_decoy,hard,
+1001191,Indiaforensic Services Pvt Ltd,True,multilingual_context,hard,Indiaforensic Services
+1000582,,False,negative_decoy,hard,
+1000028,Indiaforensic Services Pvt Ltd,True,token_swap,hard,Services Indiaforensic Pvt Ltd
+1000602,Apple Inc,True,masked,hard,App***Inc
+1000741,Apple Inc,True,compressed,hard,AppleInc
+1001058,,False,negative_decoy,medium,
+1000246,Google LLC,True,unicode,hard,Googlé LLC
+1001320,,False,ambiguous_acronym_decoy,hard,
+1000213,Apple Inc,True,legal_suffix,easy,Apple Incorporated
+1001048,,False,negative_decoy,medium,
+1000244,Google LLC,True,punctuation,easy,"Google, L.L.C."
+1000172,Microsoft Corporation,True,typo,hard,Mıcrosоft Corporation
+1000842,Mehar Entertainment Private Limited,True,partial,medium,Mehar Entertainment Private
+1000208,Apple Inc,True,spacing,hard,APP LE INC
+1000358,Tesla Motors Ltd,True,abbreviation,hard,TML
+1000822,Oracle Corporation,True,partial,medium,Oracle
+1000860,Finspire Solutions Private Limited,True,masked,hard,Fin***re Solutions Private Limited
+1000057,Finspire Solutions Private Limited,True,abbreviation,medium,Finspire Solns P. Ltd.
+1001118,Tesla Motors Ltd,True,unicode_homoglyph,hard,Teslа Motors Ltd
+1001077,,False,negative_decoy,medium,
+1000554,,False,negative_decoy,hard,
+1001232,Finspire Solutions Private Limited,True,phonetic_transliteration,hard,Finspayr Soluşıns Private Limited
+1000346,Tesla Motors Ltd,True,unicode,hard,Tésla Motors Ltd
+1000748,Google LLC,True,compressed,hard,GoogleLLC
+1000590,,False,negative_decoy,medium,
+1001274,Microsoft Corporation,True,mixed_obfuscation,hard,M1cr0s0ft*C0rp
+1000950,Apple Inc,True,compressed,hard,AppleInc
+1000021,Indiaforensic Services Pvt Ltd,True,concatenated,hard,indiaforensicservicespvtltd
+1000023,Indiaforensic Services Pvt Ltd,True,concatenated,hard,indiaforensicservicespvtltd
+1000885,Apple Inc,True,compressed,hard,AppleInc
+1000039,Indiaforensic Services Pvt Ltd,True,typo,hard,Indiaforensıc Servıces Pvt Ltd
+1000456,,False,negative_decoy,hard,
+1000191,Apple Inc,True,typo,hard,Αpple Inc
+1000864,Amazon Technologies Inc,True,separator,hard,Amazon/Technologies/Inc
+1001064,,False,negative_decoy,hard,
+1000983,,False,negative_decoy,medium,
+1000329,Tesla Motors Ltd,True,token_swap,medium,Motors Tesla Limited
+1000109,Mehar Entertainment Private Limited,True,abbreviation,medium,Mehar Ent. P Ltd
+1000506,,False,negative_decoy,medium,
+1001128,Tesla Motors Ltd,True,leetspeak_obfuscation,hard,T3sla M0t0rs Ltd
+1000019,Indiaforensic Services Pvt Ltd,True,unicode,hard,İndiaforensic Servicés Pvt Ltd
+1000239,Google LLC,True,abbreviation,hard,GGL L.L.C.
+1001266,Google LLC,True,embedded_account_reference,hard,GoogleLLC
+1000147,Microsoft Corporation,True,legal_suffix,easy,Microsoft Corp.
+1000540,,False,negative_decoy,hard,
+1000744,Microsoft Corporation,True,compressed,hard,MicrosoftCorporation
+1000689,Microsoft Corporation,True,mixed_case,hard,MiCrOsOfT CoRpOrAtIoN
+1000737,Google LLC,True,partial,medium,Google
+1000591,,False,negative_decoy,hard,
+1001047,,False,negative_decoy,medium,
+1000212,Apple Inc,True,unicode,hard,Applé Inc
+1001001,,False,negative_decoy,hard,
+1000285,Amazon Technologies Inc,True,spacing,hard,AMA ZON TECHNOLOGIES INC
+1000895,Apple Inc,True,compressed,hard,AppleInc
+1001129,IBM Corporation,True,leetspeak_obfuscation,hard,1BM C0rp0rat10n
+1000931,Indiaforensic Services Pvt Ltd,True,separator,hard,Indiaforensic/Services/Pvt/Ltd
+1000156,Microsoft Corporation,True,exact,easy,Microsoft Corporation
+1000584,,False,negative_decoy,hard,
+1000818,Google LLC,True,mixed_case,hard,GoOgLe lLc
+1001188,Tesla Motors Ltd,True,negation_context,hard,Tesla Motors
+1001262,Finspire Solutions Private Limited,True,embedded_account_reference,hard,FinspireSolutions
+1001256,Google LLC|Amazon Technologies Inc,True,multi_entity,hard,Google LLC | Amazon Tech Inc
+1000107,Mehar Entertainment Private Limited,True,typo,hard,Mehar Entertaınment Pvt Ltd
+1000912,Amazon Technologies Inc,True,separator,hard,Amazon/Technologies/Inc
+1001076,,False,negative_decoy,hard,
+1000902,Microsoft Corporation,True,masked,hard,Mic***oft Corporation
+1000873,Finspire Solutions Private Limited,True,mixed_case,hard,FiNsPiRe sOlUtIoNs pRiVaTe lImItEd
+1000072,Finspire Solutions Private Limited,True,legal_suffix,easy,Finspire Solutions Pvt Ltd
+1000809,Google LLC,True,separator,hard,Google/LLC
+1000377,IBM Corporation,True,spacing,medium,I B M CORPORATION
+1000637,Microsoft Corporation,True,masked,hard,Mic***oft Corporation
+1000049,Finspire Solutions Private Limited,True,concatenated,hard,finspiresolutionsprivatelimited
+1000477,,False,negative_decoy,hard,
+1000360,Tesla Motors Ltd,True,exact,easy,Tesla Motors Ltd
+1000258,Google LLC,True,typo,hard,Gооgle LLC
+1001024,,False,negative_decoy,hard,
+1000063,Finspire Solutions Private Limited,True,typo,hard,Finspıre Solutıons Private Limited
+1000734,Amazon Technologies Inc,True,compressed,hard,AmazonTechnologiesInc
+1001034,,False,negative_decoy,hard,
+1000134,Mehar Entertainment Private Limited,True,exact,easy,Mehar Entertainment Private Limited
+1000686,IBM Corporation,True,separator,hard,IBM/Corporation
+1000683,Google LLC,True,partial,medium,Google
+1000328,Tesla Motors Ltd,True,abbreviation,medium,TSLA Motors Ltd.
+1000841,Finspire Solutions Private Limited,True,abbreviation,hard,FNSP SLTNS PVT LTD
+1001156,Google LLC,True,product_service_reference,hard,Google Ads
+1000015,Indiaforensic Services Pvt Ltd,True,abbreviation,medium,Indiaforensic Svcs P Ltd
+1001315,,False,ambiguous_acronym_decoy,hard,
+1000716,Amazon Technologies Inc,True,masked,hard,Ama*** Technologies Inc
+1001021,,False,negative_decoy,medium,
+1000362,IBM Corporation,True,token_swap,medium,Corporation IBM
+1000281,Amazon Technologies Inc,True,abbreviation,hard,ATI Inc.
+1000810,Apple Inc,True,compressed,hard,AppleInc
+1000150,Microsoft Corporation,True,abbreviation,medium,MSFT Corp
+1000125,Mehar Entertainment Private Limited,True,spacing,hard,ME HAR ENTERTAINMENT PVT LTD
+1000546,,False,negative_decoy,hard,
+1001292,,False,substring_decoy_extended,hard,
+1001267,Amazon Technologies Inc,True,embedded_account_reference,hard,AmazonTechInc
+1001193,Mehar Entertainment Private Limited,True,multilingual_context,hard,Mehar Entertainment
+1000402,IBM Corporation,True,concatenated,medium,ibmcorporation
+1000569,,False,negative_decoy,medium,
+1000399,IBM Corporation,True,token_swap,medium,Corporation IBM
+1000420,Oracle Corporation,True,spacing,hard,ORA CLE CORPORATION
+1000026,Indiaforensic Services Pvt Ltd,True,legal_suffix,easy,Indiaforensic Services Private Limited
+1000099,Mehar Entertainment Private Limited,True,abbreviation,medium,Mehar Ent. P Ltd
+1000632,Amazon Technologies Inc,True,mixed_case,hard,AmAzOn tEcHnOlOgIeS InC
+1000359,Tesla Motors Ltd,True,legal_suffix,easy,Tesla Motors Limited
+1000913,IBM Corporation,True,separator,hard,IBM/Corporation
+1000459,,False,negative_decoy,medium,
+1001016,,False,negative_decoy,hard,
+1000033,Indiaforensic Services Pvt Ltd,True,spacing,medium,INDIA FORENSIC SERVICES PVT LTD
+1000145,Microsoft Corporation,True,spacing,hard,MICRO SOFT CORPORATION
+1000164,Microsoft Corporation,True,typo,hard,Microsft Corporatoin
+1000872,Tesla Motors Ltd,True,partial,medium,Tesla Motors
+1000247,Google LLC,True,punctuation,easy,"Google, L.L.C."
+1000594,,False,negative_decoy,medium,
+1001110,Oracle Corporation,True,long_noisy_context,medium,Oracle Corporation
+1000646,Apple Inc,True,masked,hard,App***Inc
+1000471,,False,negative_decoy,hard,
+1000267,Google LLC,True,exact,easy,Google LLC
+1000223,Apple Inc,True,abbreviation,hard,APL Incorporated
+1000472,,False,negative_decoy,medium,
+1000090,Finspire Solutions Private Limited,True,token_swap,hard,Solutions Finspire Private Limited
+1000228,Google LLC,True,unicode,hard,Googlé LLC
+1001040,,False,negative_decoy,medium,
+1001174,Microsoft Corporation,True,refund_reversal_context,hard,Microsoft Corp
+1000513,,False,negative_decoy,hard,
+1000083,Finspire Solutions Private Limited,True,masked,hard,FNSPR Solutions Pvt Ltd
+1000322,Tesla Motors Ltd,True,unicode,hard,Tésla Motors Ltd
+1001142,Finspire Solutions Private Limited,True,alias_brand_reference,medium,Finspire
+1000587,,False,negative_decoy,hard,
+1000756,Mehar Entertainment Private Limited,True,compressed,hard,MeharEntertainmentPrivateLimited
+1000448,Oracle Corporation,True,punctuation,easy,Oracle-Corporation
+1000880,Apple Inc,True,masked,hard,App***Inc
+1000095,Mehar Entertainment Private Limited,True,masked,hard,MHR Entertainment P Ltd
+1000051,Finspire Solutions Private Limited,True,masked,hard,FNSPR Solutions Pvt Ltd
+1000547,,False,negative_decoy,medium,
+1001237,Amazon Technologies Inc,True,phonetic_transliteration,hard,Emazon Teknolojis İnk
+1000523,,False,negative_decoy,hard,
+1000497,,False,negative_decoy,hard,
+1000536,,False,negative_decoy,medium,
+1000757,Google LLC,True,separator,hard,Google/LLC
+1001301,,False,common_word_context,hard,
+1000207,Apple Inc,True,concatenated,medium,appleincorporated
+1000121,Mehar Entertainment Private Limited,True,punctuation,medium,Mehar-Entertainment (Private) Ltd.
+1000708,Google LLC,True,mixed_case,hard,GoOgLe lLc
+1000352,Tesla Motors Ltd,True,legal_suffix,easy,Tesla Motors Limited
+1001147,Amazon Technologies Inc,True,alias_brand_reference,medium,Amazon Web Services
+1000079,Finspire Solutions Private Limited,True,exact,easy,Finspire Solutions Private Limited
+1001181,Indiaforensic Services Pvt Ltd,True,negation_context,hard,Indiaforensic Services
+1000224,Apple Inc,True,typo,hard,Αpple Inc
+1000579,,False,negative_decoy,medium,
+1001158,Tesla Motors Ltd,True,product_service_reference,hard,Tesla fleet services
+1000925,Oracle Corporation,True,separator,hard,Oracle/Corporation
+1001215,Apple Inc,True,transaction_code_noise,medium,APPLE INC
+1000760,Mehar Entertainment Private Limited,True,masked,hard,Meh***Entertainment Private Limited
+1001006,,False,negative_decoy,medium,
+1001096,,False,negative_decoy,hard,
+1000835,Amazon Technologies Inc,True,abbreviation,medium,AMZN TECH INC
+1000419,Oracle Corporation,True,exact,easy,Oracle Corporation
+1000308,Amazon Technologies Inc,True,abbreviation,medium,Amazon Tech Inc
+1000466,,False,negative_decoy,medium,
+1000133,Mehar Entertainment Private Limited,True,abbreviation,medium,Mehar Ent. P Ltd
+1001046,,False,negative_decoy,hard,
+1000783,Indiaforensic Services Pvt Ltd,True,compressed,hard,IndiaforensicServicesPvtLtd
+1001023,,False,negative_decoy,medium,
+1000187,Apple Inc,True,typo,hard,Aple Incorporatd
+1000649,Finspire Solutions Private Limited,True,compressed,hard,FinspireSolutionsPrivateLimited
+1000742,Amazon Technologies Inc,True,abbreviation,medium,AMZN TECH INC
+1001103,Mehar Entertainment Private Limited,True,long_noisy_context,medium,Mehar Entertainment Private Limited
+1000160,Microsoft Corporation,True,abbreviation,medium,MSFT Corp
+1000512,,False,negative_decoy,hard,
+1001005,,False,negative_decoy,medium,
+1001143,Mehar Entertainment Private Limited,True,alias_brand_reference,medium,Mehar Entertainment
+1000833,Oracle Corporation,True,partial,medium,Oracle
+1000102,Mehar Entertainment Private Limited,True,unicode,hard,Méhar Entertainment Private Limited
+1000436,Oracle Corporation,True,spacing,hard,ORA CLE CORPORATION
+1000112,Mehar Entertainment Private Limited,True,punctuation,medium,Mehar-Entertainment (Private) Ltd.
+1000274,Amazon Technologies Inc,True,concatenated,medium,amazontechnologiesinc
+1001168,Tesla Motors Ltd,True,intermediary_beneficiary_context,hard,Tesla Motors
+1001187,Amazon Technologies Inc,True,negation_context,hard,Amazon Tech Inc
+1001251,Indiaforensic Services Pvt Ltd|Finspire Solutions Private Limited,True,multi_entity,hard,Indiaforensic Services | Finspire Solutions
+1000801,Amazon Technologies Inc,True,partial,medium,Amazon Technologies
+1000320,Tesla Motors Ltd,True,punctuation,medium,"Tesla-Motors, Ltd."
+1000921,Finspire Solutions Private Limited,True,abbreviation,hard,FNSP SLTNS PVT LTD
+1000431,Oracle Corporation,True,legal_suffix,easy,Oracle Corp.
+1000958,IBM Corporation,True,mixed_case,hard,IbM CoRpOrAtIoN
+1000218,Apple Inc,True,spacing,hard,APP LE INC
+1001308,,False,common_word_context,hard,
+1000132,Mehar Entertainment Private Limited,True,typo,hard,Mehar Entertaınment Pvt Ltd
+1000350,Tesla Motors Ltd,True,exact,easy,Tesla Motors Ltd
+1000612,Finspire Solutions Private Limited,True,masked,hard,Fin***re Solutions Private Limited
+1000003,Indiaforensic Services Pvt Ltd,True,typo,hard,Indiaforensıc Servıces Pvt Ltd
+1001206,Google LLC,True,translated_company_tokens,hard,Google Limited Şirketi
+1000688,Finspire Solutions Private Limited,True,mixed_case,hard,FiNsPiRe sOlUtIoNs pRiVaTe lImItEd
+1000566,,False,negative_decoy,medium,
+1000437,Oracle Corporation,True,punctuation,easy,Oracle-Corporation
+1000273,Amazon Technologies Inc,True,punctuation,medium,"Amazon-Technologies, Inc."
+1001155,Apple Inc,True,product_service_reference,hard,Apple Business Manager
+1000009,Indiaforensic Services Pvt Ltd,True,unicode,hard,İndiaforensic Servicés Pvt Ltd
+1001066,,False,negative_decoy,hard,
+1001055,,False,negative_decoy,medium,
+1000606,Finspire Solutions Private Limited,True,masked,hard,Fin***re Solutions Private Limited
+1000745,Google LLC,True,partial,medium,Google
+1000217,Apple Inc,True,typo,hard,Aple Incorporatd
+1000262,Google LLC,True,punctuation,easy,"Google, L.L.C."
+1000879,Apple Inc,True,abbreviation,medium,AAPL INC
+1000116,Mehar Entertainment Private Limited,True,unicode,hard,Méhar Entertainment Private Limited
+1001136,Google LLC,True,character_spacing_obfuscation,hard,G o o g l e LLC
+1000410,Oracle Corporation,True,unicode,hard,Oraclé Corporation
+1000044,Indiaforensic Services Pvt Ltd,True,typo,hard,Indiaforensıc Servıces Pvt Ltd
+1000656,Microsoft Corporation,True,partial,medium,Microsoft
+1000533,,False,negative_decoy,hard,
+1000484,,False,negative_decoy,medium,
+1000312,Amazon Technologies Inc,True,legal_suffix,easy,Amazon Technologies Incorporated
+1000550,,False,negative_decoy,hard,
+1000597,,False,negative_decoy,hard,
+1000753,Apple Inc,True,partial,medium,Apple
+1000256,Google LLC,True,abbreviation,medium,GOOG LLC
+1000551,,False,negative_decoy,hard,
+1000910,Oracle Corporation,True,masked,hard,Ora*** Corporation
+1000928,Google LLC,True,masked,hard,Goo*** LLC
+1000443,Oracle Corporation,True,abbreviation,medium,ORCL Corp
+1000372,IBM Corporation,True,unicode,hard,İBM Corporatión
+1000227,Google LLC,True,typo,hard,Googel LCC
+1000024,Indiaforensic Services Pvt Ltd,True,abbreviation,hard,IFS Pvt. Ltd.
+1000848,Tesla Motors Ltd,True,masked,hard,Tes***Motors Ltd
+1001221,Indiaforensic Services Pvt Ltd,True,ticker_reference,hard,IFSPL
+1001165,Apple Inc,True,intermediary_beneficiary_context,hard,Apple Inc
+1001067,,False,negative_decoy,hard,
+1001059,,False,negative_decoy,hard,
+1001186,Google LLC,True,negation_context,hard,Google LLC
+1000165,Microsoft Corporation,True,typo,hard,Mıcrosоft Corporation
+1000457,,False,negative_decoy,hard,
+1000233,Google LLC,True,spacing,hard,GOO GLE LLC
+1000421,Oracle Corporation,True,unicode,hard,Oraclé Corporation
+1001115,Apple Inc,True,unicode_homoglyph,hard,Aррle Inc
+1000714,Oracle Corporation,True,separator,hard,Oracle/Corporation
+1000366,IBM Corporation,True,typo,hard,IBN Corporaton
+1000391,IBM Corporation,True,spacing,medium,I B M CORPORATION
+1000369,IBM Corporation,True,exact,easy,IBM Corporation
+1000930,Indiaforensic Services Pvt Ltd,True,abbreviation,hard,INDFRNSC SRVCS PVT LTD
+1000381,IBM Corporation,True,concatenated,medium,ibmcorporation
+1000583,,False,negative_decoy,hard,
+1000669,Oracle Corporation,True,mixed_case,hard,OrAcLe cOrPoRaTiOn
+1000889,Apple Inc,True,abbreviation,medium,AAPL INC
+1000645,Indiaforensic Services Pvt Ltd,True,partial,medium,Indiaforensic Services Pvt
+1000333,Tesla Motors Ltd,True,masked,hard,T*SLA Motors Ltd
+1000341,Tesla Motors Ltd,True,abbreviation,medium,TSLA Motors Ltd.
+1000508,,False,negative_decoy,medium,
+1000242,Google LLC,True,abbreviation,medium,GOOG LLC
+1000728,Apple Inc,True,compressed,hard,AppleInc
+1001203,Mehar Entertainment Private Limited,True,translated_company_tokens,hard,Mehar Eğlence Özel Limited
+1000518,,False,negative_decoy,medium,
+1000955,Microsoft Corporation,True,compressed,hard,MicrosoftCorporation
+1000467,,False,negative_decoy,hard,
+1001180,Oracle Corporation,True,refund_reversal_context,hard,Oracle Corp
+1000124,Mehar Entertainment Private Limited,True,spacing,hard,ME HAR ENTERTAINMENT PVT LTD
+1000236,Google LLC,True,typo,hard,Googel LCC
+1001116,Google LLC,True,unicode_homoglyph,hard,Goоgle LLC
+1000736,Finspire Solutions Private Limited,True,mixed_case,hard,FiNsPiRe sOlUtIoNs pRiVaTe lImItEd
+1000425,Oracle Corporation,True,masked,hard,O**cle Corp.
+1000007,Indiaforensic Services Pvt Ltd,True,unicode,hard,İndiaforensic Servicés Pvt Ltd
+1001224,Microsoft Corporation,True,ticker_reference,hard,MSFT
+1000058,Finspire Solutions Private Limited,True,typo,hard,Finspire Solutons Pvt Lmtd
+1001184,Microsoft Corporation,True,negation_context,hard,Microsoft Corp
+1001171,Indiaforensic Services Pvt Ltd,True,refund_reversal_context,hard,Indiaforensic Services
+1000413,Oracle Corporation,True,punctuation,easy,Oracle-Corporation
+1000815,Tesla Motors Ltd,True,separator,hard,Tesla/Motors/Ltd
+1000919,Microsoft Corporation,True,abbreviation,medium,MSFT CORP
+1001222,Finspire Solutions Private Limited,True,ticker_reference,hard,FSPL
+1000798,Indiaforensic Services Pvt Ltd,True,compressed,hard,IndiaforensicServicesPvtLtd
+1001071,,False,negative_decoy,medium,
+1001146,Google LLC,True,alias_brand_reference,medium,Google Cloud
+1000198,Apple Inc,True,token_swap,medium,Inc Apple
+1000642,Microsoft Corporation,True,compressed,hard,MicrosoftCorporation
+1000022,Indiaforensic Services Pvt Ltd,True,token_swap,hard,Services Indiaforensic Pvt Ltd
+1001137,Amazon Technologies Inc,True,character_spacing_obfuscation,hard,A m a z o n Tech Inc
+1000086,Finspire Solutions Private Limited,True,unicode,hard,Finspiré Solutions Private Limited
+1001229,IBM Corporation,True,ticker_reference,hard,IBM
+1000265,Google LLC,True,punctuation,easy,"Google, L.L.C."
+1000159,Microsoft Corporation,True,spacing,hard,MICRO SOFT CORPORATION
+1000407,Oracle Corporation,True,concatenated,medium,oraclecorporation
+1000332,Tesla Motors Ltd,True,punctuation,medium,"Tesla-Motors, Ltd."
+1001091,,False,negative_decoy,medium,
+1001081,,False,negative_decoy,hard,
+1001121,Indiaforensic Services Pvt Ltd,True,leetspeak_obfuscation,hard,Ind1af0rensic Services Pvt Ltd
+1001052,,False,negative_decoy,hard,
+1001012,,False,negative_decoy,medium,
+1000979,,False,negative_decoy,medium,
+1000829,Tesla Motors Ltd,True,masked,hard,Tes***Motors Ltd
+1000018,Indiaforensic Services Pvt Ltd,True,concatenated,hard,indiaforensicservicespvtltd
+1000625,Mehar Entertainment Private Limited,True,separator,hard,Mehar/Entertainment/Private/Limited
+1000453,,False,negative_decoy,hard,
+1000180,Microsoft Corporation,True,token_swap,medium,Corporation Microsoft
+1000942,Google LLC,True,compressed,hard,GoogleLLC
+1000516,,False,negative_decoy,hard,
+1000952,Amazon Technologies Inc,True,separator,hard,Amazon/Technologies/Inc
+1000693,Oracle Corporation,True,abbreviation,medium,ORCL CORP
+1000397,IBM Corporation,True,legal_suffix,easy,IBM Corp.
+1000309,Amazon Technologies Inc,True,spacing,hard,AMA ZON TECHNOLOGIES INC
+1000444,Oracle Corporation,True,token_swap,medium,Corporation Oracle
+1000665,Apple Inc,True,separator,hard,Apple/Inc
+1000560,,False,negative_decoy,hard,
+1000581,,False,negative_decoy,hard,
+1000070,Finspire Solutions Private Limited,True,punctuation,medium,Finspire-Solutions (Pvt.) Ltd.
+1000631,Amazon Technologies Inc,True,separator,hard,Amazon/Technologies/Inc
+1000127,Mehar Entertainment Private Limited,True,exact,easy,Mehar Entertainment Private Limited
+1000331,Tesla Motors Ltd,True,abbreviation,medium,TSLA Motors Ltd.
+1000730,Mehar Entertainment Private Limited,True,partial,medium,Mehar Entertainment Private
+1000932,Finspire Solutions Private Limited,True,masked,hard,Fin***re Solutions Private Limited
+1000663,Finspire Solutions Private Limited,True,separator,hard,Finspire/Solutions/Private/Limited
+1000847,IBM Corporation,True,separator,hard,IBM/Corporation
+1001015,,False,negative_decoy,hard,
+1001241,Indiaforensic Services Pvt Ltd,True,heavy_masking,hard,Indiaforen*** Services Pvt Ltd
+1001244,Microsoft Corporation,True,heavy_masking,hard,M*****oft Corporation
+1001210,Oracle Corporation,True,translated_company_tokens,hard,Oracle Şirketi
+1000088,Finspire Solutions Private Limited,True,legal_suffix,easy,Finspire Solutions Pvt Ltd
+1001090,,False,negative_decoy,hard,
+1000458,,False,negative_decoy,hard,
+1000725,Mehar Entertainment Private Limited,True,separator,hard,Mehar/Entertainment/Private/Limited
+1000917,Oracle Corporation,True,masked,hard,Ora*** Corporation
+1000963,Microsoft Corporation,True,masked,hard,Mic***oft Corporation
+1001309,,False,common_word_context,hard,
+1001164,Microsoft Corporation,True,intermediary_beneficiary_context,hard,Microsoft Corp
+1000183,Apple Inc,True,unicode,hard,Applé Inc
+1000525,,False,negative_decoy,hard,
+1001294,,False,substring_decoy_extended,hard,
+1000008,Indiaforensic Services Pvt Ltd,True,abbreviation,hard,IFS Pvt. Ltd.
+1000355,Tesla Motors Ltd,True,typo,hard,Telsa Motros Limited
+1000220,Apple Inc,True,legal_suffix,easy,Apple Incorporated
+1000993,,False,negative_decoy,hard,
+1001268,Tesla Motors Ltd,True,embedded_account_reference,hard,TeslaMotors
+1001270,Oracle Corporation,True,embedded_account_reference,hard,OracleCorp
+1000994,,False,negative_decoy,hard,
+1000892,Indiaforensic Services Pvt Ltd,True,masked,hard,Ind***orensic Services Pvt Ltd
+1000211,Apple Inc,True,token_swap,medium,Inc Apple
+1000368,IBM Corporation,True,masked,hard,I*M Corp.
+1000230,Google LLC,True,typo,hard,Googel LCC
+1000707,Microsoft Corporation,True,compressed,hard,MicrosoftCorporation
+1000268,Google LLC,True,legal_suffix,medium,Google Limited Liability Company
+1000882,IBM Corporation,True,partial,medium,IBM
+1000786,Apple Inc,True,separator,hard,Apple/Inc
+1000787,Apple Inc,True,abbreviation,medium,AAPL INC
+1000075,Finspire Solutions Private Limited,True,abbreviation,medium,Finspire Solns P. Ltd.
+1001027,,False,negative_decoy,hard,
+1000100,Mehar Entertainment Private Limited,True,abbreviation,medium,Mehar Ent. P Ltd
+1000575,,False,negative_decoy,hard,
+1000720,IBM Corporation,True,compressed,hard,IBMCorporation
+1000137,Microsoft Corporation,True,abbreviation,hard,M.S. Corporation
+1000222,Apple Inc,True,concatenated,medium,appleincorporated
+1001261,Indiaforensic Services Pvt Ltd,True,embedded_account_reference,hard,IndiaforensicServices
+1000011,Indiaforensic Services Pvt Ltd,True,typo,hard,Indiaforensic Servces Pvt Lmt
+1001289,,False,similar_unrelated_entity,hard,
+1000108,Mehar Entertainment Private Limited,True,typo,hard,Mehar Entertaınment Pvt Ltd
+1000170,Microsoft Corporation,True,unicode,hard,Microsoft Corporatión
+1001153,Mehar Entertainment Private Limited,True,product_service_reference,hard,Mehar media licensing
+1001080,,False,negative_decoy,hard,
+1000937,Indiaforensic Services Pvt Ltd,True,mixed_case,hard,InDiAfOrEnSiC SeRvIcEs pVt lTd
+1000832,Mehar Entertainment Private Limited,True,mixed_case,hard,MeHaR EnTeRtAiNmEnT PrIvAtE LiMiTeD
+1000639,Microsoft Corporation,True,compressed,hard,MicrosoftCorporation
+1000036,Indiaforensic Services Pvt Ltd,True,abbreviation,medium,Indiaforensic Svcs P Ltd
+1000378,IBM Corporation,True,abbreviation,medium,International Business Machines Corp
+1000600,,False,negative_decoy,hard,
+1000476,,False,negative_decoy,medium,
+1000392,IBM Corporation,True,typo,hard,lBM Corporation
+1000906,Google LLC,True,compressed,hard,GoogleLLC
+1001231,Indiaforensic Services Pvt Ltd,True,phonetic_transliteration,hard,İndiaforensik Servisiz Pvt Ltd
+1001179,IBM Corporation,True,refund_reversal_context,hard,IBM Corp
+1000053,Finspire Solutions Private Limited,True,unicode,hard,Finspiré Solutions Private Limited
+1000335,Tesla Motors Ltd,True,typo,hard,Telsa Motros Limited
+1001162,Finspire Solutions Private Limited,True,intermediary_beneficiary_context,hard,Finspire Solutions

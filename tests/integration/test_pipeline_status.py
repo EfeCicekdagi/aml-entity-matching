@@ -40,11 +40,11 @@ class TestPipelineStatus(unittest.TestCase):
     def test_medium_score_gives_medium_risk(self):
         self.assertEqual(self.scorer.assign_risk_level(0.65), "MEDIUM")
 
-    def test_exactly_0_62_gives_medium_risk(self):
-        self.assertEqual(self.scorer.assign_risk_level(0.62), "MEDIUM")
+    def test_exactly_0_60_gives_medium_risk(self):
+        self.assertEqual(self.scorer.assign_risk_level(0.60), "MEDIUM")
 
-    def test_below_0_62_gives_no_match(self):
-        self.assertEqual(self.scorer.assign_risk_level(0.61), "NO_MATCH")
+    def test_below_0_60_gives_no_match(self):
+        self.assertEqual(self.scorer.assign_risk_level(0.59), "NO_MATCH")
         self.assertEqual(self.scorer.assign_risk_level(0.50), "NO_MATCH")
         self.assertEqual(self.scorer.assign_risk_level(0.00), "NO_MATCH")
 

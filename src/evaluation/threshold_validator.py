@@ -125,7 +125,7 @@ def find_optimal_threshold(
 def generate_report(
     scores: list[dict],
     current_high: float = 0.70,
-    current_medium: float = 0.62,
+    current_medium: float = 0.60,
     validation_dataset: str = "unknown",
 ) -> dict:
     """
@@ -223,7 +223,7 @@ if __name__ == "__main__":
     parser.add_argument("--scores",  required=True, help="CSV: score,label")
     parser.add_argument("--output",  default="outputs/threshold_report.json")
     parser.add_argument("--high",    type=float, default=0.70)
-    parser.add_argument("--medium",  type=float, default=0.62)
+    parser.add_argument("--medium",  type=float, default=0.60)
     parser.add_argument("--dataset", default="validation_v1")
     args = parser.parse_args()
 

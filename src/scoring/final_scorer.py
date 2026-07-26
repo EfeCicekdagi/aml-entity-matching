@@ -7,7 +7,7 @@ Değişiklikler (v3):
     final_score 1.0'a çıkarılmaz; ensemble sonucu korunur.
   - reason_codes listesi üretiliyor.
   - calibrated_probability alanı ayrı tutulıyor.
-  - HIGH >= 0.70, MEDIUM >= 0.62, NO_MATCH < 0.62 sınırları
+  - HIGH >= 0.70, MEDIUM >= 0.60, NO_MATCH < 0.60 sınırları
     assign_risk_level içinde net biçimde uygulanıyor.
   - decision_status alanı üretiliyor.
 """
@@ -64,11 +64,11 @@ class FinalScorer:
 
         # Default fallback değerler (DB'den okuma başarısız olursa)
         self.weights: dict[str, float] = {
-            "fuzzy_weight":    0.0,
-            "vector_weight":   0.30,
+            "fuzzy_weight":    0.20,
+            "vector_weight":   0.60,
             "acronym_weight":  0.0,
             "rule_weight":     0.0,
-            "reranker_weight": 0.70,
+            "reranker_weight": 0.20,
         }
         self.thresholds: list[dict] = []
         self._load_config_from_db()
@@ -86,15 +86,17 @@ class FinalScorer:
             with conn.cursor() as cur:
                 # ── Ağırlıklar ──────────────────────────────────────────────
                 cur.execute(f"""
-                    SELECT param_name, param_value
-                    FROM {TABLES['model_config']}
+                    SELECT fuzzy_weight, vector_weight, acronym_weight, rule_weight, reranker_weight
+                    FROM {TABLES['scoring_weight']}
                     WHERE config_version = %s AND is_active = true
                 """, (self.config_version,))
-                rows = cur.fetchall()
-                if rows:
-                    for row in rows:
-                        name, val = row[0], float(row[1])
-                        self.weights[name] = val
+                row = cur.fetchone()
+                if row:
+                    self.weights["fuzzy_weight"] = float(row[0] if row[0] is not None else 0.0)
+                    self.weights["vector_weight"] = float(row[1] if row[1] is not None else 0.0)
+                    self.weights["acronym_weight"] = float(row[2] if row[2] is not None else 0.0)
+                    self.weights["rule_weight"] = float(row[3] if row[3] is not None else 0.0)
+                    self.weights["reranker_weight"] = float(row[4] if row[4] is not None else 0.0)
                 else:
                     logger.warning(
                         f"Config version '{self.config_version}' not found in DB. "
@@ -356,7 +358,7 @@ class FinalScorer:
                 # Doğrudan yüksek risk (override) VERME! Bağlamı (ensemble skoru) değerlendir!
                 reason_codes.append(safe_code)
                 match_reason = "EXACT_NORMALIZED_MATCH_WITH_CAUTION"
-                logger.warning(
+                logger.debug(
                     f"Exact normalized match for short/ambiguous name '{query_str}' — "
                     f"no direct high risk override applied, relying on context ensemble (score: {final_score:.3f})"
                 )
@@ -385,12 +387,12 @@ class FinalScorer:
             if ReasonCode.PARTIAL_MATCH_REQUIRES_REVIEW not in reason_codes:
                 reason_codes.append(ReasonCode.PARTIAL_MATCH_REQUIRES_REVIEW)
             match_reason = "PARTIAL_MATCH_REQUIRES_REVIEW"
-            # Doğrudan yüksek risk vermek yerine analist incelemesine (orta risk bandı: 0.62 - 0.68) gönder
+            # Doğrudan yüksek risk vermek yerine analist incelemesine (orta risk bandı: 0.60 - 0.68) gönder
             if final_score >= 0.70:
                 final_score = 0.68
-            elif final_score < 0.62 and scores.get("fuzzy_score", 0.0) >= 0.40:
+            elif final_score < 0.60 and scores.get("fuzzy_score", 0.0) >= 0.40:
                 # Kısmi bilgi yeterliyse en azından analist incelemesi oluşturabilmeli (aday kaybolmamalı)
-                final_score = max(final_score, 0.63)
+                final_score = max(final_score, 0.61)
 
         if not reason_codes:
             reason_codes.append(ReasonCode.LOW_CONFIDENCE)
@@ -403,7 +405,7 @@ class FinalScorer:
 
         Öncelik sırası:
           1. DB threshold tablosundaki değerler
-          2. Fallback: HIGH >= 0.70, MEDIUM >= 0.62, NO_MATCH < 0.62
+          2. Fallback: HIGH >= 0.70, MEDIUM >= 0.60, NO_MATCH < 0.60
 
         Args:
             final_score: 0.0 - 1.0 arasında final skor
@@ -424,7 +426,7 @@ class FinalScorer:
         # DB'den threshold yüklenemezse veya aralık dışındaysa fallback
         if final_score >= 0.70:
             return "HIGH"
-        elif final_score >= 0.62:
+        elif final_score >= 0.60:
             return "MEDIUM"
         else:
             return "NO_MATCH"
