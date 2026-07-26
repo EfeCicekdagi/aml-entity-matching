@@ -7,7 +7,8 @@ from src.utils.text_utils import (
     is_consonant_match,
     compact_normalize,
     normalize_leetspeak,
-    check_leetspeak_evasion
+    check_leetspeak_evasion,
+    _AMBIGUOUS_SHORT_NAMES,
 )
 from src.utils.alias_utils import generate_acronym
 
@@ -37,6 +38,8 @@ def _acronym_score(explanation: str, variant_name: str, original_company_name: s
 
     for name in names_to_check:
         norm_name = normalize_text(name)
+        if norm_name in _AMBIGUOUS_SHORT_NAMES:
+            continue
         name_tokens = norm_name.split()
 
         # 1. Bilinen kısaltma veya adayın doğrudan kısa halinin eşleşmesi (ör. THY, IBM, NST, ASELS, TUPRAS, BIM)
@@ -48,13 +51,13 @@ def _acronym_score(explanation: str, variant_name: str, original_company_name: s
 
         # 2. Sistem tarafından üretilen baş harf kısaltması (acronym) kontrolü
         acronym = generate_acronym(name)
-        if acronym and len(acronym) >= 2 and acronym in exp_tokens:
+        if acronym and len(acronym) >= 2 and acronym not in _AMBIGUOUS_SHORT_NAMES and acronym in exp_tokens:
             return 1.0
 
         # 3. Sistem tarafından üretilen kısaltmalı alias varyasyonları (abbreviated aliases) kontrolü
         from src.utils.alias_utils import generate_abbreviated_aliases
         for abbr in generate_abbreviated_aliases(name, max_alias_count=15):
-            if abbr and len(abbr) >= 2 and abbr in norm_exp:
+            if abbr and len(abbr) >= 2 and abbr not in _AMBIGUOUS_SHORT_NAMES and abbr in norm_exp:
                 if len(abbr.split()) == 1 and abbr not in exp_tokens:
                     continue
                 return 1.0

@@ -72,6 +72,25 @@ class TestTypoFuzzyMatching:
             assert final_score >= 0.88
             assert match_reason == "HIGH_FUZZY_MATCH"
 
+    def test_ambiguous_short_name_does_not_override_when_query_has_unrelated_words(self, scorer):
+        """
+        'apple melon cost' gibi genel/tek kelimelik bir adayın (ör. Apple) alakasız ek kelimeler barındıran
+        sorgularda High Fuzzy Match veya Exact Match override tetikleyerek Yüksek Risk vermediğini doğrular.
+        """
+        query = "apple melon cost"
+        cand = {
+            "variant_name": "Apple",
+            "trgm_score": 0.30,
+            "vector_score": 0.50,
+            "normalized_reranker_score": 0.0001
+        }
+        scores = build_score_features(query, cand)
+        final_score, match_reason, reason_codes = scorer.calculate_final_score(scores)
+
+        # Override uygulanmadığı için skor düşük (NO_MATCH) kalmalı
+        assert final_score < 0.45, f"'{query}' vs 'Apple' skoru beklenen (0.45 altı) üzerinde çıktı: {final_score:.3f}"
+        assert match_reason != "HIGH_FUZZY_MATCH"
+
     def test_entity_extractor_fuzzy_candidate_fallback(self, extractor):
         """Katman 3 (Candidate-supported) içinde yazım hatalarında FUZZY_CANDIDATE_MATCH çalıştığını doğrular."""
         text = "transfer to indaforensic services pvt ltd for annual maintenance"

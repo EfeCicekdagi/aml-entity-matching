@@ -11,20 +11,9 @@ import logging
 from typing import Optional
 from src.config.db_tables import TABLES
 from src.scoring.reason_codes import ReasonCode, build_human_explanation, codes_to_list
+from src.utils.text_utils import _AMBIGUOUS_SHORT_NAMES
 
 logger = logging.getLogger(__name__)
-
-# Kısa veya genel isimlere (ör. Apple, Oracle gibi tek kelimelik genel adlar) exact match override UYGULANMAZ
-_AMBIGUOUS_SHORT_NAMES: set[str] = {
-    "abc", "star", "global", "trust", "united", "first", "best",
-    "prime", "apex", "nova", "alpha", "beta", "delta", "sigma",
-    "omega", "ace", "pro", "max", "tech", "plus", "net",
-    "apple", "oracle", "amazon", "target", "best", "shell", "caterpillar",
-    "vanguard", "fidelity", "pioneer", "horizon", "vision", "summit", "pinnacle",
-    "crest", "crestview", "beacon", "meridian", "spectrum", "nexus", "quantum",
-    "vertex", "matrix", "genesis", "legacy", "liberty", "patriot", "national",
-    "american", "pacific", "atlantic", "universal", "premier", "paramount", "meta", "google", "x",
-}
 
 # Exact override için minimum güvenli koşullar
 _EXACT_OVERRIDE_MIN_TOKEN_COUNT = 2   # En az 2 token (şirket eklerinden arındırılmış öz isim için)
@@ -138,35 +127,43 @@ class FinalScorer:
             (is_safe, reason_code)
         """
         from src.utils.text_utils import get_normalized_core_name
-        q_stripped = query.strip().casefold()
-        tokens = q_stripped.split()
-        char_len = len(q_stripped.replace(" ", ""))
-
-        # Çok kısa veya tek token
-        if len(tokens) < _EXACT_OVERRIDE_MIN_TOKEN_COUNT:
-            return False, ReasonCode.SHORT_AMBIGUOUS_EXACT_MATCH
-
-        if char_len < _EXACT_OVERRIDE_MIN_CHAR_LENGTH:
-            return False, ReasonCode.SHORT_AMBIGUOUS_EXACT_MATCH
-
-        # Öz ismin (core name) tek token veya çok kısa olması (ör. Apple Corp -> apple)
-        core_query = get_normalized_core_name(q_stripped).strip().casefold()
-        core_tokens = core_query.split()
-        if len(core_tokens) < _EXACT_OVERRIDE_MIN_TOKEN_COUNT:
-            if len(core_tokens) == 1 and len(core_query) >= 6 and len(tokens) >= 2 and core_query not in _AMBIGUOUS_SHORT_NAMES and q_stripped not in _AMBIGUOUS_SHORT_NAMES:
-                pass  # Uzun, ayırt edici tek kelime + legal suffix (ör. Indiaforensic Services, Finspire Solutions)
-            else:
-                return False, ReasonCode.SHORT_AMBIGUOUS_EXACT_MATCH
-        elif len(core_query.replace(" ", "")) < _EXACT_OVERRIDE_MIN_CHAR_LENGTH:
-            return False, ReasonCode.SHORT_AMBIGUOUS_EXACT_MATCH
-
-        # Genel/ambiguous kelime (hem tam hem core ad)
-        if q_stripped in _AMBIGUOUS_SHORT_NAMES or core_query in _AMBIGUOUS_SHORT_NAMES:
-            return False, ReasonCode.SHORT_AMBIGUOUS_EXACT_MATCH
 
         # Alias confidence düşükse (algoritmik typo vb.)
         if alias_confidence < 0.6:
             return False, ReasonCode.EXACT_MATCH_REQUIRES_REVIEW
+
+        for text in [query, variant_name]:
+            if not text or not text.strip():
+                return False, ReasonCode.SHORT_AMBIGUOUS_EXACT_MATCH
+            stripped = text.strip().casefold()
+            tokens = stripped.split()
+            char_len = len(stripped.replace(" ", ""))
+
+            # Çok kısa veya tek token
+            if len(tokens) < _EXACT_OVERRIDE_MIN_TOKEN_COUNT:
+                return False, ReasonCode.SHORT_AMBIGUOUS_EXACT_MATCH
+
+            if char_len < _EXACT_OVERRIDE_MIN_CHAR_LENGTH:
+                return False, ReasonCode.SHORT_AMBIGUOUS_EXACT_MATCH
+
+            # Öz ismin (core name) tek token veya çok kısa olması (ör. Apple Corp -> apple)
+            core_name = get_normalized_core_name(stripped).strip().casefold()
+            core_tokens = core_name.split()
+            if len(core_tokens) < _EXACT_OVERRIDE_MIN_TOKEN_COUNT:
+                if len(core_tokens) == 1 and len(core_name) >= 6 and len(tokens) >= 2 and core_name not in _AMBIGUOUS_SHORT_NAMES and stripped not in _AMBIGUOUS_SHORT_NAMES:
+                    pass  # Uzun, ayırt edici tek kelime + legal suffix (ör. Indiaforensic Services, Finspire Solutions)
+                else:
+                    return False, ReasonCode.SHORT_AMBIGUOUS_EXACT_MATCH
+            elif len(core_name.replace(" ", "")) < _EXACT_OVERRIDE_MIN_CHAR_LENGTH:
+                return False, ReasonCode.SHORT_AMBIGUOUS_EXACT_MATCH
+
+            # Genel/ambiguous kelime (hem tam hem core ad)
+            if stripped in _AMBIGUOUS_SHORT_NAMES or core_name in _AMBIGUOUS_SHORT_NAMES:
+                return False, ReasonCode.SHORT_AMBIGUOUS_EXACT_MATCH
+
+            # Core name içindeki herhangi bir token tek başına ambiguous listesindeyse ve sadece 1 kelime ise
+            if len(core_tokens) == 1 and core_tokens[0] in _AMBIGUOUS_SHORT_NAMES:
+                return False, ReasonCode.SHORT_AMBIGUOUS_EXACT_MATCH
 
         return True, ReasonCode.EXACT_CORE_MATCH
 
@@ -238,26 +235,29 @@ class FinalScorer:
 
         if scores.get("fuzzy_score", 0.0) > 0.85:
             reason_codes.append(ReasonCode.HIGH_FUZZY_SIMILARITY)
-            match_reason = "HIGH_FUZZY_MATCH"
 
         # ── Acronym / Abbreviation match override ────────────────────────────
         if scores.get("acronym_score", 0.0) >= 1.0:
             query_str = scores.get("_query_str", "")
             cand_str  = scores.get("_variant_str", "")
-            is_safe, safe_code = self._is_safe_exact_override(query_str, cand_str, alias_confidence)
+            from src.utils.text_utils import get_normalized_core_name
+            core_cand = get_normalized_core_name(cand_str).strip().casefold()
+            
+            if cand_str.strip().casefold() not in _AMBIGUOUS_SHORT_NAMES and core_cand not in _AMBIGUOUS_SHORT_NAMES:
+                is_safe, safe_code = self._is_safe_exact_override(query_str, cand_str, alias_confidence)
 
-            if ReasonCode.ACRONYM_MATCH not in reason_codes:
-                reason_codes.append(ReasonCode.ACRONYM_MATCH)
+                if ReasonCode.ACRONYM_MATCH not in reason_codes:
+                    reason_codes.append(ReasonCode.ACRONYM_MATCH)
 
-            # 3 ve daha fazla karakterli kısaltmalarda veya güvenli kabul edilen durumlarda doğrudan yüksek risk ver
-            if is_safe or len(cand_str.replace(" ", "")) >= 3:
-                final_score = max(final_score, 0.88)
-                match_reason = "ACRONYM_MATCH"
-            else:
-                # Çok kısa (2 harfli) ambiguous olabilecek kısaltmalarda orta risk ve inceleme kodu
-                final_score = max(final_score, 0.65)
-                if safe_code not in reason_codes:
-                    reason_codes.append(safe_code)
+                # 3 ve daha fazla karakterli kısaltmalarda veya güvenli kabul edilen durumlarda doğrudan yüksek risk ver
+                if is_safe or len(cand_str.replace(" ", "")) >= 3:
+                    final_score = max(final_score, 0.88)
+                    match_reason = "ACRONYM_MATCH"
+                else:
+                    # Çok kısa (2 harfli) ambiguous olabilecek kısaltmalarda orta risk ve inceleme kodu
+                    final_score = max(final_score, 0.65)
+                    if safe_code not in reason_codes:
+                        reason_codes.append(safe_code)
 
         if final_score >= 0.60 and not reason_codes:
             reason_codes.append(ReasonCode.SEMANTIC_MATCH)
@@ -293,10 +293,24 @@ class FinalScorer:
                 # Güvenli değil (tek kelimelik veya genel kelime: ör. Apple, Oracle, Amazon)
                 # Yalnızca hem sorgu hem aday çoklu kelimeden oluşuyorsa (ör. Amazn Technologies Inc)
                 # ve token sayısı benzerse makul bir destek ver
+                from src.utils.text_utils import get_normalized_core_name
                 q_tokens = query_str.split()
                 c_tokens = cand_str.split()
-                if len(q_tokens) >= 2 and len(c_tokens) >= 2 and abs(len(q_tokens) - len(c_tokens)) <= 1:
+                core_c = get_normalized_core_name(cand_str).strip().casefold()
+                core_c_toks = core_c.split()
+
+                cand_eligible = False
+                if len(core_c_toks) >= 2:
+                    cand_eligible = True
+                elif len(core_c_toks) == 1:
+                    if core_c_toks[0] in _AMBIGUOUS_SHORT_NAMES:
+                        cand_eligible = (len(c_tokens) >= 3)
+                    else:
+                        cand_eligible = (len(c_tokens) >= 2)
+
+                if cand_eligible and len(q_tokens) >= 2 and abs(len(q_tokens) - len(c_tokens)) <= 1:
                     final_score = max(final_score, fuzzy_val * 0.90)
+                    match_reason = "HIGH_FUZZY_MATCH"
                 if ReasonCode.HIGH_FUZZY_SIMILARITY not in reason_codes:
                     reason_codes.append(ReasonCode.HIGH_FUZZY_SIMILARITY)
 

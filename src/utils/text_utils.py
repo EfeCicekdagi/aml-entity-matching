@@ -106,6 +106,18 @@ _COMPACT_SUFFIX_STRINGS = sorted(list({
     re.sub(r'[\W_]', '', s.casefold()) for s in _ALL_SUFFIX_WORDS if len(s) > 2
 }), key=len, reverse=True)
 
+# Kısa veya genel isimlere (ör. Apple, Oracle gibi tek kelimelik genel adlar) exact match override UYGULANMAZ
+_AMBIGUOUS_SHORT_NAMES: set[str] = {
+    "abc", "star", "global", "trust", "united", "first", "best",
+    "prime", "apex", "nova", "alpha", "beta", "delta", "sigma",
+    "omega", "ace", "pro", "max", "tech", "plus", "net",
+    "apple", "oracle", "amazon", "target", "shell", "caterpillar",
+    "vanguard", "fidelity", "pioneer", "horizon", "vision", "summit", "pinnacle",
+    "crest", "crestview", "beacon", "meridian", "spectrum", "nexus", "quantum",
+    "vertex", "matrix", "genesis", "legacy", "liberty", "patriot", "national",
+    "american", "pacific", "atlantic", "universal", "premier", "paramount", "meta", "google", "x",
+}
+
 # ── Leetspeak haritası ───────────────────────────────────────────────────
 LEETSPEAK_MAP: dict[str, str] = {
     '0': 'o',
