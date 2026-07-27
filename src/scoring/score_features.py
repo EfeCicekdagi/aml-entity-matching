@@ -21,6 +21,15 @@ _RULE_STOPWORDS = {
     "logistics", "transport", "energy", "petroleum",
 }
 
+_TOKEN_MATCH_STOPWORDS = {
+    "to", "for", "in", "by", "on", "at", "from", "with", "and", "the", "of", "or", "via",
+    "ref", "inv", "no", "nr", "code", "payment", "odeme", "ödeme", "transfer", "trf",
+    "fatura", "invoice", "settlement", "contract", "sözleşme", "sozlesme", "hesabina",
+    "hesabına", "adina", "adına", "bedeli", "ucreti", "ücreti", "ltd", "pvt", "inc", "llc",
+    "corp", "co", "a.s", "as", "sti", "şti", "ve", "sanayi", "ticaret", "limited", "sirketi",
+    "şirketi", "anonim", "gmbh", "sa", "ag", "bv", "nv", "oy", "ab", "sendirian", "berhad", "tbk",
+}
+
 
 def _acronym_score(explanation: str, variant_name: str, original_company_name: str = None) -> float:
     """
@@ -214,12 +223,12 @@ def build_score_features(
                 base_rule_score = 1.0
 
     # ── Kısmi bilgi ve eksik bilgi tespiti (Substantial missing info) ──────────
-    cand_tokens = [w for w in core_cand.split() if len(w) > 1]
-    query_tokens = [w for w in (core_ext or core_query).split() if len(w) > 1]
+    cand_tokens = [w for w in core_cand.split() if len(w) > 1 and w.casefold() not in _TOKEN_MATCH_STOPWORDS]
+    query_tokens = [w for w in (core_ext or core_query).split() if len(w) > 1 and w.casefold() not in _TOKEN_MATCH_STOPWORDS]
     
     matched_tokens_count = 0
     for ct in cand_tokens:
-        if any(qt == ct or qt in ct or ct in qt or difflib.SequenceMatcher(None, qt, ct).ratio() >= 0.82 for qt in query_tokens):
+        if any(qt == ct or (len(min(qt, ct, key=len)) >= 4 and (qt in ct or ct in qt)) or difflib.SequenceMatcher(None, qt, ct).ratio() >= 0.82 for qt in query_tokens):
             matched_tokens_count += 1
             
     missing_tokens_count = len(cand_tokens) - matched_tokens_count
