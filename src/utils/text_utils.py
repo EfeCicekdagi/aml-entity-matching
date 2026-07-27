@@ -147,7 +147,15 @@ def normalize_leetspeak(text: Optional[str]) -> str:
         return ""
     text_str = str(text).casefold()
     trans_table = str.maketrans(LEETSPEAK_MAP)
-    return text_str.translate(trans_table)
+    # Saf rakamları (ör. referans numaraları, tarihler, tutarlar) leetspeak dönüşümünden koru:
+    tokens = re.split(r'(\s+|-|/|:|\.|,|\(|\)|\[|\]|;|_)', text_str)
+    res = []
+    for tok in tokens:
+        if tok.strip() and not tok.isdigit():
+            res.append(tok.translate(trans_table))
+        else:
+            res.append(tok)
+    return "".join(res)
 
 
 def check_leetspeak_evasion(query: Optional[str], candidate: Optional[str]) -> tuple[bool, float, str]:
@@ -279,6 +287,13 @@ def normalize_text(text: Optional[str]) -> str:
     # 1.5 Harf arasına boşluk konularak gizleme (obfuscation) temizliği
     text = clean_spaced_characters(text)
 
+    # 1.8 Transliterasyon (Kiril, Arapça vb. homoglyph karakterleri Latin alfabesine çevir)
+    try:
+        from src.utils.transliteration import transliterate
+        text = transliterate(text)
+    except Exception:
+        pass
+
     # 2. casefold (Türkçe "İ" → "i" için str.lower() yerine casefold)
     text = text.casefold()
 
@@ -295,6 +310,36 @@ def normalize_text(text: Optional[str]) -> str:
     normalized_tokens = [COMPANY_SUFFIX_MAP.get(token, token) for token in tokens]
 
     return " ".join(normalized_tokens)
+
+
+def normalize_for_matching(text: Optional[str]) -> str:
+    """
+    Vektör (Embedding), Reranker ve Veritabanı arama (Trigram/FTS) katmanlarının
+    tamamında ortak kullanılacak birleşik normalizasyon fonksiyonu.
+
+    Adımlar:
+      1. Unicode NFKC normalizasyonu
+      2. Transliterasyon (Kiril, Arapça vb. homoglyph karakterlerini Latin'e çevirir)
+      3. Leetspeak normalizasyonu (harf yerine kullanılan 0->o, 1->i vb. temizler)
+      4. Fazla boşlukları temizler
+    """
+    if not text:
+        return ""
+    # 1. Unicode NFKC & Harf arasına boşluk konularak gizleme temizliği
+    text = clean_spaced_characters(unicode_normalize(str(text)))
+
+    # 2. Transliterasyon (Kiril/Arapça/Türkçe -> Latin)
+    try:
+        from src.utils.transliteration import transliterate
+        text = transliterate(text)
+    except Exception:
+        pass
+
+    # 3. Leetspeak Normalizasyonu
+    text = normalize_leetspeak(text)
+
+    # 4. Boşluk temizliği
+    return " ".join(text.split())
 
 
 def tokenize(text: str) -> list[str]:

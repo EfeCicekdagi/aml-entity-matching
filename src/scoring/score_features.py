@@ -1,3 +1,4 @@
+import re
 import difflib
 from src.utils.text_utils import (
     normalize_text,
@@ -31,10 +32,39 @@ _TOKEN_MATCH_STOPWORDS = {
 }
 
 
+def _is_unrelated_acronym_in_text(acronym: str, explanation: str, company_name: str) -> bool:
+    norm_acc = normalize_text(acronym).strip()
+    norm_exp = normalize_text(explanation).strip()
+    norm_comp = normalize_text(company_name).strip()
+    if not norm_acc or len(norm_acc) < 2:
+        return False
+    exp_words = norm_exp.split()
+    comp_words = set(norm_comp.split())
+
+    # 1. Kısaltmanın açıklamadaki kelimelerin baş harflerinden oluşup oluşmadığı (ör. BPS = Basınç Pompa Sistemi)
+    for i in range(len(exp_words) - len(norm_acc) + 1):
+        window = exp_words[i:i+len(norm_acc)]
+        if ''.join(w[0] for w in window if w) == norm_acc:
+            if not any(w in comp_words for w in window):
+                return True
+
+    # 2. Kısaltmanın proje/masraf/işlem/referans kodu olarak kullanılıp kullanılmadığı (ör. BPS proje kodu 2281)
+    code_patterns = [
+        r'\b' + re.escape(norm_acc) + r'\s+(?:proje|masraf|islem|sube|banka|referans|ref|fatura|takip)?\s*(?:kodu|kod|no|numarasi|id)\b',
+        r'\b(?:proje|masraf|islem|sube|banka|referans|ref|fatura|takip)\s*(?:kodu|kod|no|numarasi|id)\s*[:=-]?\s*' + re.escape(norm_acc) + r'\b'
+    ]
+    for pat in code_patterns:
+        if re.search(pat, norm_exp):
+            return True
+    return False
+
+
 def _acronym_score(explanation: str, variant_name: str, original_company_name: str = None) -> float:
     """
-    EFT açıklamasında bilinen veya sistem tarafından üretilen şirket kısaltmalarını (acronym/abbreviation) arar.
-    1.0 veya 0.0 döner.
+    Basit kısaltma tespiti:
+    1) Doğrudan bilinen kısaltma eşleşmesi (ör. THY, IBM, NST, ASELS, TUPRAS, BIM)
+    2) Şirket adından oluşturulan baş harf kısaltmasının (acronym) açıklamada geçmesi
+    3) Sistem tarafından türetilen kısaltmalı alias varyasyonlarının açıklamada geçmesi
     """
     if not explanation or not variant_name:
         return 0.0
@@ -54,20 +84,25 @@ def _acronym_score(explanation: str, variant_name: str, original_company_name: s
         # 1. Bilinen kısaltma veya adayın doğrudan kısa halinin eşleşmesi (ör. THY, IBM, NST, ASELS, TUPRAS, BIM)
         if norm_name and len(norm_name) >= 2:
             if len(name_tokens) == 1 and norm_name in exp_tokens:
-                return 1.0
-            elif len(name_tokens) > 1 and len(norm_name) <= 15 and norm_name in norm_exp:
-                return 1.0
+                if not _is_unrelated_acronym_in_text(norm_name, explanation, name):
+                    return 1.0
+            elif len(name_tokens) > 1 and len(norm_name) <= 15:
+                if re.search(r'\b' + re.escape(norm_name) + r'\b', norm_exp):
+                    return 1.0
 
         # 2. Sistem tarafından üretilen baş harf kısaltması (acronym) kontrolü
         acronym = generate_acronym(name)
         if acronym and len(acronym) >= 2 and acronym not in _AMBIGUOUS_SHORT_NAMES and acronym in exp_tokens:
-            return 1.0
+            if not _is_unrelated_acronym_in_text(acronym, explanation, name):
+                return 1.0
 
         # 3. Sistem tarafından üretilen kısaltmalı alias varyasyonları (abbreviated aliases) kontrolü
         from src.utils.alias_utils import generate_abbreviated_aliases
         for abbr in generate_abbreviated_aliases(name, max_alias_count=15):
-            if abbr and len(abbr) >= 2 and abbr not in _AMBIGUOUS_SHORT_NAMES and abbr in norm_exp:
+            if abbr and len(abbr) >= 2 and abbr not in _AMBIGUOUS_SHORT_NAMES and re.search(r'\b' + re.escape(abbr) + r'\b', norm_exp):
                 if len(abbr.split()) == 1 and abbr not in exp_tokens:
+                    continue
+                if len(abbr.split()) == 1 and _is_unrelated_acronym_in_text(abbr, explanation, name):
                     continue
                 return 1.0
 
@@ -101,9 +136,9 @@ def _exact_name_score(norm_exp: str, variant_name: str) -> float:
     core_query = get_normalized_core_name(norm_exp)
     core_cand  = get_normalized_core_name(variant_name)
 
-    if norm_cand and norm_cand in norm_exp:
+    if norm_cand and re.search(r'\b' + re.escape(norm_cand) + r'\b', norm_exp):
         return 1.0
-    if core_cand and len(core_cand.replace(" ", "")) >= 4 and core_cand in core_query:
+    if core_cand and len(core_cand.replace(" ", "")) >= 4 and re.search(r'\b' + re.escape(core_cand) + r'\b', core_query):
         return 1.0
     cq = get_compact_core_name(norm_exp)
     cc = get_compact_core_name(variant_name)

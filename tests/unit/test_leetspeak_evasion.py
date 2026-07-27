@@ -4,7 +4,7 @@ girişimlerinin tespiti, normalizasyonu ve yüksek risk skoruna dönüştürülm
 """
 
 import pytest
-from src.utils.text_utils import normalize_leetspeak, check_leetspeak_evasion, get_leetspeak_compact_core_name
+from src.utils.text_utils import normalize_leetspeak, check_leetspeak_evasion, get_leetspeak_compact_core_name, normalize_for_matching
 from src.scoring.score_features import build_score_features
 from src.scoring.final_scorer import FinalScorer, ReasonCode
 from src.models.entity_extractor import EntityExtractor
@@ -81,3 +81,11 @@ class TestLeetspeakEvasion:
         result = extractor.extract(text, candidates=candidates)
         assert result.extracted_entity == "Microsoft Corporation"
         assert result.entity_extraction_status == "EXTRACTED"
+
+    def test_normalize_for_matching_unified(self):
+        # 1. Kiril homoglyph testi ('о' Kiril karakteri)
+        assert normalize_for_matching("Goоgle LLC") == "google llc"
+        # 2. Leetspeak testi
+        assert normalize_for_matching("1BM C0rp0rat10n") == "ibm corporation"
+        # 3. Saf rakam koruması (referans numarası korunmalı)
+        assert normalize_for_matching("REF-326121") == "ref-326121"

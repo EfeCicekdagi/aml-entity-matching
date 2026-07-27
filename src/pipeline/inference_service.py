@@ -50,11 +50,13 @@ class AMLInferenceService:
         if self.entity_extractor:
             extractions = self.entity_extractor.batch_extract(norm_exps)
 
+        from src.utils.text_utils import normalize_for_matching
         clean_texts = []
         for i, exp in enumerate(norm_exps):
             clean_text = exp
             if extractions and extractions[i] and getattr(extractions[i], "extracted_entity", None):
                 clean_text = extractions[i].extracted_entity
+            clean_text = normalize_for_matching(clean_text)
             clean_texts.append(clean_text)
 
         # 3. Embedding

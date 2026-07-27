@@ -71,11 +71,13 @@ class MatchEngine:
         metrics["ner_duration_s"] = time.time() - ner_start
 
         # Determine the cleanest text to use for retrieval and embedding
+        from src.utils.text_utils import normalize_for_matching
         clean_texts = []
         for i, exp in enumerate(norm_exps):
             clean_text = exp
             if extractions and extractions[i] and extractions[i].extracted_entity:
                 clean_text = extractions[i].extracted_entity
+            clean_text = normalize_for_matching(clean_text)
             clean_texts.append(clean_text)
 
         # 3. Embedding Generation (using clean_texts)
