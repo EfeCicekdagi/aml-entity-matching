@@ -47,6 +47,31 @@ def seed_companies():
         logger.info(f"Loading embedding model {model_name}...")
         model = SentenceTransformer(model_name)
         
+        # Vektör boyutu denetimi
+        model_dim = model.get_sentence_embedding_dimension()
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT format_type(a.atttypid, a.atttypmod), a.atttypmod
+                FROM pg_attribute a
+                JOIN pg_class c ON c.oid = a.attrelid
+                JOIN pg_namespace n ON n.oid = c.relnamespace
+                WHERE (c.relname = 'gold_company_embedding' OR c.relname = 'company_embedding') 
+                  AND a.attname = 'embedding' AND NOT a.attisdropped;
+            """)
+            row = cur.fetchone()
+            if row:
+                format_str, atttypmod = row[0], row[1]
+                import re
+                match = re.search(r"\((\d+)\)", str(format_str))
+                if match:
+                    db_dim = int(match.group(1))
+                    if db_dim != model_dim:
+                        logger.error(
+                            f"Fatal error: Database column embedding dimension ({db_dim}) does NOT match Python embedding model ({model_name}) dimension ({model_dim}). "
+                            "INSERT will fail!"
+                        )
+                        sys.exit(1)
+        
         with conn.cursor() as cur:
             # Eski verileri temizle (cascade ile embedding ve variant da silinir)
             logger.info("Clearing existing company data from all tables...")

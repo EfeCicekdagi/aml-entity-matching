@@ -3,9 +3,8 @@ database:
   port: 5433
   name: aml_db
   user: postgres
-  # Güvenlik: Şifreyi env var'dan oku. Eğer boş bırakılırsa AML_DB_PASSWORD env var'ına bakılır.
-  password: password
-  # password: ${AML_DB_PASSWORD}  # production için env var kullanın
+  # Güvenlik: Şifre ortam değişkeninden (AML_DB_PASSWORD) okunmalıdır (.env dosyası kullanın)
+  password: ${AML_DB_PASSWORD:-password}
 
 embedding:
   model_name: BAAI/bge-m3

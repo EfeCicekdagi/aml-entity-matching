@@ -22,17 +22,17 @@ TABLES = {
     "reranker_cache":     "aml_ml.reranker_cache",
 
     # Core — Eşleştirme ve alert sonuçları
-    "match_result":       "aml_core.match_result",      # Ana eşleştirme sonuç tablosu (Tüm işlemler)
-    "candidate_match":    "aml_core.candidate_match",   # Geriye dönük şema uyumluluğu
-    "scoring_result":     "aml_core.scoring_result",    # Geriye dönük şema uyumluluğu
+    "match_result":       "aml_core.match_result",      # Ana eşleştirme sonuç tablosu (Aktif kod tarafından kullanılır)
+    "candidate_match":    "aml_core.candidate_match",   # [DEPRECATED / LEGACY] Eski şema uyumluluğu ve temizlik betikleri için
+    "scoring_result":     "aml_core.scoring_result",    # [DEPRECATED / LEGACY] Eski şema uyumluluğu ve temizlik betikleri için
     "alert":              "aml_core.alert",             # Riskli varlıklar tablosu (Sadece HIGH/MEDIUM)
     "alert_export":       "aml_core.alert_export",      # Dışa aktarma ve analitik raporlama tablosu
 
-    # Config
+    # Config & Model Governance (aml_config şeması)
     "scoring_weight":     "aml_config.scoring_weight",
     "threshold":          "aml_config.threshold",
     "model_registry":     "aml_config.model_registry",
-    "model_governance":   "aml_eval.model_governance",
+    "model_governance":   "aml_config.model_registry",  # Alias: Model yönetişimi aml_config.model_registry üzerinden sağlanır
     "threshold_validation": "aml_config.threshold_validation",
     "calibration_model":  "aml_config.calibration_model",
 

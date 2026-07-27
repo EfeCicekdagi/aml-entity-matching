@@ -37,8 +37,13 @@ load_css(css_path)
 @st.cache_resource
 def get_repo():
     cfg = ConfigLoader().get_db_config()
-    return AMLRepository(host=cfg['host'], port=cfg['port'],
-                         dbname=cfg['name'], user=cfg['user'], password=cfg['password'])
+    return AMLRepository(
+        host=cfg['host'], port=cfg['port'], dbname=cfg['name'],
+        user=cfg['user'], password=cfg['password'],
+        sslmode=cfg.get('sslmode', 'prefer'),
+        enable_audit_trail=cfg.get('enable_audit_trail', True),
+        append_only_history=cfg.get('append_only_history', True)
+    )
 
 @st.cache_data(ttl=60)
 def load_runs():

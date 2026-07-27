@@ -49,6 +49,7 @@ MIGRATIONS = [
     "20_create_alert_export_table.sql",
     "21_create_experiment_tables.sql",
     "22_add_compact_match_fields.sql",
+    "23_enforce_append_only_history.sql",
 ]
 
 

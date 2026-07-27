@@ -40,7 +40,10 @@ class ApplicationContainer:
             port=self.db_config.get("port"),
             dbname=self.db_config.get("name"),
             user=self.db_config.get("user"),
-            password=self.db_config.get("password")
+            password=self.db_config.get("password"),
+            sslmode=self.db_config.get("sslmode", self.config.get("security", {}).get("db_sslmode", "prefer")),
+            enable_audit_trail=self.db_config.get("enable_audit_trail", self.config.get("security", {}).get("enable_audit_trail", True)),
+            append_only_history=self.db_config.get("append_only_history", self.config.get("security", {}).get("append_only_history", True)),
         )
         
         # 2. Retriever
@@ -52,22 +55,12 @@ class ApplicationContainer:
             config_version=self.scoring_config.get("scoring_config_version", "scoring_v2_reranker"),
             threshold_version=self.scoring_config.get("threshold_config_version", "threshold_v2_reranker")
         )
-        calibration_config = self.config.get("scoring", {}).get("calibration", {})
-        calibration_enabled = (
-            self.config.get("scoring", {}).get("enable_isotonic_calibration", False)
-            or calibration_config.get("enabled", False)
-        )
-        if calibration_enabled:
+        calibration_config = self.config.get("calibration", {})
+        if calibration_config.get("enabled", False):
             self.calibration = CalibrationWrapper(
                 calibration_model_path=calibration_config.get("model_path"),
-                calibration_version=calibration_config.get(
-                    "version",
-                    "bge-m3-isotonic-v1"
-                ),
-                calibration_method=calibration_config.get(
-                    "method",
-                    "ISOTONIC_REGRESSION"
-                ),
+                calibration_version=calibration_config.get("version"),
+                calibration_method=calibration_config.get("method"),
             )
             
         # 4. Entity Extractor
@@ -86,22 +79,56 @@ class ApplicationContainer:
                     config=self.config.get("entity_extraction")
                 )
             except Exception as e:
-                logger.error(f"Failed to load NER model: {e}")
+                logger.warning(
+                    f"Failed to load NER model: {e}. Graceful degradation applied: Pipeline will continue without entity extraction."
+                )
+                self.entity_extractor = None
+        else:
+            logger.info("NER model is optional and disabled in config. Pipeline will continue without entity extraction.")
+            self.entity_extractor = None
                 
         # 5. Embedding Model
-        emb_name = self.config.get("embedding", {}).get("model_name", "BAAI/bge-m3")
-        emb_dev_cfg = self.config.get("embedding", {}).get("device", "auto")
-        emb_device = "cuda" if (emb_dev_cfg in ("auto", None) and torch.cuda.is_available()) else (
-            emb_dev_cfg if emb_dev_cfg not in ("auto", None) else "cpu"
-        )
-        try:
-            from sentence_transformers import SentenceTransformer
-            self.embedding_model = SentenceTransformer(emb_name, device=emb_device)
-        except Exception as e:
-            logger.error(f"Failed to load embedding model: {e}")
+        emb_enabled = self.config.get("embedding", {}).get("enabled", True)
+        if emb_enabled:
+            emb_name = self.config.get("embedding", {}).get("model_name", "BAAI/bge-m3")
+            emb_dev_cfg = self.config.get("embedding", {}).get("device", "auto")
+            emb_device = "cuda" if (emb_dev_cfg in ("auto", None) and torch.cuda.is_available()) else (
+                emb_dev_cfg if emb_dev_cfg not in ("auto", None) else "cpu"
+            )
+            try:
+                from sentence_transformers import SentenceTransformer
+                self.embedding_model = SentenceTransformer(emb_name, device=emb_device)
+
+                # Vektör boyutu denetimi (DB kolonu ile Model boyutu eşleşiyor mu?)
+                try:
+                    model_dim = self.embedding_model.get_sentence_embedding_dimension()
+                except Exception:
+                    model_dim = self.config.get("embedding", {}).get("dimension", 1024)
+
+                if self.retriever and not self.retriever.validate_vector_dimension(model_dim):
+                    logger.warning(
+                        f"Vector dimension mismatch between model ({model_dim}) and DB column. Graceful degradation applied: Vector retrieval channel will be disabled."
+                    )
+                    self.retriever.disable_vector_retrieval(reason=f"Vector dimension mismatch (model dim={model_dim})")
+            except Exception as e:
+                logger.warning(
+                    f"Failed to load embedding model ({emb_name}): {e}. Graceful degradation applied: Pipeline will continue without embedding model and vector retrieval channel will be disabled."
+                )
+                self.embedding_model = None
+                if self.retriever:
+                    self.retriever.disable_vector_retrieval(reason="Embedding model failed to load")
+        else:
+            logger.info("Embedding model is optional and disabled in config. Pipeline will continue without embedding model and vector retrieval channel will be disabled.")
+            self.embedding_model = None
+            if self.retriever:
+                self.retriever.disable_vector_retrieval(reason="Embedding model disabled in config")
             
         # 6. Reranker
-        self.reranker = Reranker(self.repo, self.reranker_config)
+        if self.reranker_config.get("enabled", True):
+            self.reranker = Reranker(
+                self.repo,
+                self.reranker_config
+            )
         
         # 7. Inference Service
         self.inference_service = AMLInferenceService(

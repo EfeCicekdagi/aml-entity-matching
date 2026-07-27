@@ -20,15 +20,41 @@ logger = logging.getLogger(__name__)
 class AMLRepository:
     """PostgreSQL bağlantı havuzu ve veri erişim operasyonları."""
 
-    def __init__(self, host: str, port: int, dbname: str, user: str, password: str):
+    def __init__(
+        self,
+        host: str = None,
+        port: int = None,
+        dbname: str = None,
+        user: str = None,
+        password: str = None,
+        sslmode: str = "prefer",
+        enable_audit_trail: bool = True,
+        append_only_history: bool = True,
+        name: str = None,
+        **kwargs
+    ):
+        self.enable_audit_trail = enable_audit_trail
+        self.append_only_history = append_only_history
+        effective_dbname = dbname or name or kwargs.get("name")
         try:
+            conn_kwargs = {
+                "host": host,
+                "port": port,
+                "dbname": effective_dbname,
+                "user": user,
+                "password": password,
+            }
+            if sslmode:
+                conn_kwargs["sslmode"] = sslmode
             self.pool = ThreadedConnectionPool(
-                minconn=1, maxconn=50,
-                host=host, port=port, dbname=dbname, user=user, password=password
+                minconn=1, maxconn=50, **conn_kwargs
             )
+            if self.append_only_history:
+                self.enforce_append_only_policy()
         except Exception as e:
             logger.error(f"Failed to initialize connection pool: {e}")
             self.pool = None
+
 
     def get_connection(self):
         """Havuzdan bağlantı al."""
@@ -67,6 +93,41 @@ class AMLRepository:
             raise
         finally:
             self.release_connection(conn)
+
+    def enforce_append_only_policy(self) -> None:
+        """
+        append_only_history yapılandırması aktifse, alert_status_history tablosu üzerinde
+        UPDATE ve DELETE işlemlerini veritabanı (SQL trigger) düzeyinde engelleyen kuralları uygular.
+        """
+        if not getattr(self, "append_only_history", True):
+            return
+        conn = self.get_connection()
+        if not conn:
+            return
+        try:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    CREATE OR REPLACE FUNCTION aml_audit.prevent_update_delete_history()
+                    RETURNS trigger AS $$
+                    BEGIN
+                        RAISE EXCEPTION 'Table aml_audit.alert_status_history is append-only! % operation is prohibited by security policy.', TG_OP;
+                    END;
+                    $$ LANGUAGE plpgsql;
+
+                    DROP TRIGGER IF EXISTS trg_prevent_update_delete_history ON aml_audit.alert_status_history;
+
+                    CREATE TRIGGER trg_prevent_update_delete_history
+                    BEFORE UPDATE OR DELETE ON aml_audit.alert_status_history
+                    FOR EACH ROW EXECUTE FUNCTION aml_audit.prevent_update_delete_history();
+                """)
+            conn.commit()
+            logger.debug("Append-only policy trigger enforced on aml_audit.alert_status_history.")
+        except Exception as e:
+            logger.debug(f"Could not enforce append-only SQL trigger (table might not exist yet): {e}")
+            conn.rollback()
+        finally:
+            self.release_connection(conn)
+
 
     def execute_script(self, script_path: str) -> None:
         """SQL script dosyasını çalıştırır."""
@@ -108,6 +169,9 @@ class AMLRepository:
         git_commit_hash: str = None,
     ) -> None:
         """Run log kaydını başlatır."""
+        if not getattr(self, "enable_audit_trail", True):
+            logger.debug("Audit trail is disabled in config; skipping start_run_log.")
+            return
         conn = self.get_connection()
         if not conn:
             return
@@ -146,6 +210,9 @@ class AMLRepository:
 
     def finish_run_log(self, run_id: str, metrics: dict, duration_seconds: float = None) -> None:
         """Run log kaydını tamamlandı olarak günceller."""
+        if not getattr(self, "enable_audit_trail", True):
+            logger.debug("Audit trail is disabled in config; skipping finish_run_log.")
+            return
         conn = self.get_connection()
         if not conn:
             return
@@ -213,6 +280,8 @@ class AMLRepository:
     def update_run_metrics(self, run_id: str, precision: float, recall: float,
                            f1: float, exact_match: float) -> None:
         """Benchmark metriklerini run log'a günceller."""
+        if not getattr(self, "enable_audit_trail", True):
+            return
         conn = self.get_connection()
         if not conn:
             return
@@ -235,6 +304,8 @@ class AMLRepository:
 
     def fail_run_log(self, run_id: str, error_message: str) -> None:
         """Run log kaydını hata ile günceller."""
+        if not getattr(self, "enable_audit_trail", True):
+            return
         conn = self.get_connection()
         if not conn:
             return
@@ -520,22 +591,23 @@ class AMLRepository:
                       decision_reason, alert_id))
 
                 # History tablosuna append
-                cur.execute(f"""
-                    INSERT INTO {TABLES['alert_history']} (
-                        alert_id, run_id, reviewed_by, reviewed_at,
-                        previous_status, new_status, analyst_status,
+                if getattr(self, "enable_audit_trail", True):
+                    cur.execute(f"""
+                        INSERT INTO {TABLES['alert_history']} (
+                            alert_id, run_id, reviewed_by, reviewed_at,
+                            previous_status, new_status, analyst_status,
+                            analyst_note, decision_reason,
+                            confidence, false_positive_category,
+                            escalation_reason, final_analyst_label
+                        )
+                        VALUES (%s, %s, %s, now(), %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    """, (
+                        alert_id, run_id, reviewed_by,
+                        previous_status, status, status,
                         analyst_note, decision_reason,
                         confidence, false_positive_category,
-                        escalation_reason, final_analyst_label
-                    )
-                    VALUES (%s, %s, %s, now(), %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                """, (
-                    alert_id, run_id, reviewed_by,
-                    previous_status, status, status,
-                    analyst_note, decision_reason,
-                    confidence, false_positive_category,
-                    escalation_reason, status
-                ))
+                        escalation_reason, status
+                    ))
 
             conn.commit()
             logger.info(f"Updated alert {alert_id}: {previous_status} → {status}")
@@ -552,6 +624,8 @@ class AMLRepository:
         Args:
             history_record: History alanlarını içeren dict
         """
+        if not getattr(self, "enable_audit_trail", True):
+            return
         conn = self.get_connection()
         if not conn:
             return

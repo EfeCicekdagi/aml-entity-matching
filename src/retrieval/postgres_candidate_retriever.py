@@ -28,6 +28,70 @@ class PostgresCandidateRetriever:
         self.min_trgm_score   = self.config.get("min_trgm_score", 0.25)
         self.min_vector_score = self.config.get("min_vector_score", 0.50)
         self.reranker_prefilter_score = self.config.get("reranker_prefilter_score", 0.60)
+        self.vector_enabled = self.config.get("vector_enabled", True)
+
+    def disable_vector_retrieval(self, reason: str = "") -> None:
+        """Vektör arama kanalını devre dışı bırakır (Graceful degradation)."""
+        logger.warning(
+            "Disabling vector retrieval channel in PostgresCandidateRetriever"
+            + (f": {reason}" if reason else ".")
+        )
+        self.vector_enabled = False
+
+    def validate_vector_dimension(self, model_dim: int) -> bool:
+        """
+        Veritabanındaki company_embedding.embedding kolonunun vektör boyutunu doğrular.
+        Model boyutu (model_dim) ile DB kolonu eşleşmiyorsa False döner.
+        """
+        conn = self.repo.get_connection()
+        if not conn:
+            return False
+
+        try:
+            full_table = TABLES.get("company_embedding", "aml_ml.company_embedding")
+            if "." in full_table:
+                schema_name, table_name = full_table.split(".", 1)
+            else:
+                schema_name, table_name = "public", full_table
+
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT format_type(a.atttypid, a.atttypmod), a.atttypmod
+                    FROM pg_attribute a
+                    JOIN pg_class c ON c.oid = a.attrelid
+                    JOIN pg_namespace n ON n.oid = c.relnamespace
+                    WHERE n.nspname = %s AND c.relname = %s AND a.attname = 'embedding' AND NOT a.attisdropped;
+                """, (schema_name, table_name))
+                row = cur.fetchone()
+                if not row:
+                    logger.warning(f"Column 'embedding' not found in table {full_table}.")
+                    return True  # Kolon bulunamazsa engellemeyelim
+
+                format_str, atttypmod = row[0], row[1]
+                import re
+                match = re.search(r"\((\d+)\)", str(format_str))
+                if match:
+                    db_dim = int(match.group(1))
+                    if db_dim != model_dim:
+                        logger.error(
+                            f"Vector dimension mismatch! Database column {full_table}.embedding is {format_str} (dim={db_dim}), "
+                            f"but Python embedding model generates {model_dim}-dimensional vectors. "
+                            "INSERT and similarity queries (<=>) will fail!"
+                        )
+                        return False
+                elif atttypmod > 0 and atttypmod != model_dim:
+                    logger.error(
+                        f"Vector dimension mismatch! Database column {full_table}.embedding has atttypmod={atttypmod}, "
+                        f"but Python embedding model generates {model_dim}-dimensional vectors."
+                    )
+                    return False
+
+            return True
+        except Exception as e:
+            logger.warning(f"Could not validate vector dimension: {e}")
+            return True
+        finally:
+            self.repo.release_connection(conn)
 
     # ── Tekil sorgu metodları ─────────────────────────────────────────────────
 
@@ -150,7 +214,7 @@ class PostgresCandidateRetriever:
         Returns:
             Aday listesi (vector_score dahil)
         """
-        if not query_embedding:
+        if not self.vector_enabled or not query_embedding:
             return []
 
         conn = self.repo.get_connection()
@@ -216,7 +280,7 @@ class PostgresCandidateRetriever:
         from src.utils.text_utils import normalize_leetspeak
         trgm_cands = self.retrieve_trgm_candidates(normalized_explanation)
         fts_cands  = self.retrieve_full_text_candidates(normalized_explanation)
-        vec_cands  = self.retrieve_vector_candidates(query_embedding) if query_embedding else []
+        vec_cands  = self.retrieve_vector_candidates(query_embedding) if (query_embedding and self.vector_enabled) else []
 
         leet_exp = normalize_leetspeak(normalized_explanation)
         if leet_exp != normalized_explanation:
@@ -291,10 +355,11 @@ class PostgresCandidateRetriever:
             reasons.append("TRIGRAM_NO_RESULT")
         if channel_counts.get("fts", 0) == 0:
             reasons.append("FTS_NO_RESULT")
-        if channel_counts.get("vector", 0) == 0:
+        if self.vector_enabled and channel_counts.get("vector", 0) == 0:
             reasons.append("VECTOR_NO_RESULT")
 
-        if len(reasons) == 3:
+        expected_channels = 3 if self.vector_enabled else 2
+        if len(reasons) == expected_channels:
             return "ALL_RETRIEVAL_CHANNELS_EMPTY", "ALL_RETRIEVAL_CHANNELS_EMPTY"
         elif reasons:
             return reasons[0], ", ".join(reasons)
@@ -451,64 +516,65 @@ class PostgresCandidateRetriever:
                         })
                         channel_counts[rid]["fts"] += 1
 
-                # ── QUERY 3: Batch Vector ──────────────────────────────────
-                row_ids_arr    = [str(r["row_id"]) for r in rows]
-                embeddings_arr = [
-                    "[" + ",".join(str(x) for x in r["embedding"]) + "]"
-                    for r in rows
-                ]
+                if self.vector_enabled and any(r.get("embedding") is not None for r in rows):
+                    valid_rows = [r for r in rows if r.get("embedding") is not None]
+                    row_ids_arr    = [str(r["row_id"]) for r in valid_rows]
+                    embeddings_arr = [
+                        "[" + ",".join(str(x) for x in r["embedding"]) + "]"
+                        for r in valid_rows
+                    ]
 
-                vec_batch_query = f"""
-                    SELECT
-                        input.row_id,
-                        nearest.company_id,
-                        nearest.variant_id,
-                        nearest.candidate_score,
-                        nearest.company_name,
-                        nearest.variant_name,
-                        nearest.variant_type,
-                        nearest.alias_confidence
-                    FROM
-                        (SELECT
-                             UNNEST(%s::text[])         AS row_id,
-                             UNNEST(%s::text[])::vector AS emb
-                        ) AS input
-                    CROSS JOIN LATERAL (
+                    vec_batch_query = f"""
                         SELECT
-                            e.company_id,
-                            e.variant_id,
-                            1 - (e.embedding <=> input.emb) AS candidate_score,
-                            v.original_company_name AS company_name,
-                            v.normalized_variant_name AS variant_name,
-                            v.variant_type,
-                            COALESCE(v.alias_confidence, 1.0) AS alias_confidence
-                        FROM {TABLES['company_embedding']} e
-                        JOIN {TABLES['company_variant']} v ON e.variant_id = v.variant_id
-                        WHERE v.is_active = true
-                          AND 1 - (e.embedding <=> input.emb) >= %s
-                        ORDER BY e.embedding <=> input.emb
-                        LIMIT %s
-                    ) AS nearest
-                """
-                cur.execute(vec_batch_query,
-                            (row_ids_arr, embeddings_arr,
-                             self.min_vector_score, self.vector_top_k))
+                            input.row_id,
+                            nearest.company_id,
+                            nearest.variant_id,
+                            nearest.candidate_score,
+                            nearest.company_name,
+                            nearest.variant_name,
+                            nearest.variant_type,
+                            nearest.alias_confidence
+                        FROM
+                            (SELECT
+                                 UNNEST(%s::text[])         AS row_id,
+                                 UNNEST(%s::text[])::vector AS emb
+                            ) AS input
+                        CROSS JOIN LATERAL (
+                            SELECT
+                                e.company_id,
+                                e.variant_id,
+                                1 - (e.embedding <=> input.emb) AS candidate_score,
+                                v.original_company_name AS company_name,
+                                v.normalized_variant_name AS variant_name,
+                                v.variant_type,
+                                COALESCE(v.alias_confidence, 1.0) AS alias_confidence
+                            FROM {TABLES['company_embedding']} e
+                            JOIN {TABLES['company_variant']} v ON e.variant_id = v.variant_id
+                            WHERE v.is_active = true
+                              AND 1 - (e.embedding <=> input.emb) >= %s
+                            ORDER BY e.embedding <=> input.emb
+                            LIMIT %s
+                        ) AS nearest
+                    """
+                    cur.execute(vec_batch_query,
+                                (row_ids_arr, embeddings_arr,
+                                 self.min_vector_score, self.vector_top_k))
 
-                for vrow in cur.fetchall():
-                    rid = vrow[0]
-                    if rid in results:
-                        results[rid].append({
-                            "company_id":       vrow[1],
-                            "variant_id":       vrow[2],
-                            "vector_score":     float(vrow[3]),
-                            "candidate_score":  float(vrow[3]),
-                            "company_name":     vrow[4],
-                            "variant_name":     vrow[5],
-                            "variant_type":     vrow[6],
-                            "alias_confidence": float(vrow[7]) if vrow[7] is not None else 1.0,
-                            "sources":          ["pgvector"],
-                        })
-                        channel_counts[rid]["vector"] += 1
+                    for vrow in cur.fetchall():
+                        rid = vrow[0]
+                        if rid in results:
+                            results[rid].append({
+                                "company_id":       vrow[1],
+                                "variant_id":       vrow[2],
+                                "vector_score":     float(vrow[3]),
+                                "candidate_score":  float(vrow[3]),
+                                "company_name":     vrow[4],
+                                "variant_name":     vrow[5],
+                                "variant_type":     vrow[6],
+                                "alias_confidence": float(vrow[7]) if vrow[7] is not None else 1.0,
+                                "sources":          ["pgvector"],
+                            })
+                            channel_counts[rid]["vector"] += 1
 
         except Exception as e:
             logger.error(f"Error in batch_get_candidates: {e}")
