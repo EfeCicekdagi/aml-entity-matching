@@ -5,6 +5,13 @@ Cross-encoder modeli ham çıktıyı doğrudan olasılık olarak
 değerlendirmek yerine, istatistiksel bir kalibrasyon modeli
 (Platt Scaling veya Isotonic Regression) üzerinden geçirir.
 
+ÖNEMLİ MİMARİ NOT (Kalibrasyonun Amacı):
+Kalibrasyonun amacı sistemin eşik değer kararlarını, risk seviyesini (HIGH/MEDIUM/LOW) 
+veya alarm üretme kararını değiştirmek değildir. Kalibrasyon, ensemble final skoru yerine 
+yalnızca Cross-Encoder (normalized_reranker_score) çıktısı üzerine uygulanır; temel amacı 
+karar vermek değil, reranker skorunun istatistiksel olasılık ve güvenilirlik değerini 
+denetim izinde (audit trail) raporlamak ve açıklanabilirliği desteklemektir.
+
 Kalibrasyon modeli yoksa sistem eski normalize edilmiş skoru kullanır
 ancak bu durum audit loglarına yazılır (calibration_applied=False).
 

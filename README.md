@@ -45,6 +45,7 @@ $$\text{Final Score} = (0.50 \times \text{Vector}) + (0.40 \times \text{Reranker
   - *Kök Eşleşmesi (Compact Core Match):* Skor en az **0.95** yapılır.
   - *Sadece Şirket Türü Farkı (Legal Suffix):* Skor en az **0.92** yapılır.
 - **Açıklanabilir Karar Sistemi (Reason Codes & Explanations):** Yapay zeka verdiği her karar için veritabanına JSON formatında Neden Kodları (`EXACT_MATCH`, `LEETSPEAK_EVASION_DETECTED`, `TYPO_DETECTED`, `ACRONYM_MATCH`) ve denetçiler için Türkçe İnsani Açıklama (`human_explanation`) loglar.
+- **İstatistiksel Kalibrasyon (Platt / Isotonic Calibration):** Reranker modelinden (Cross-Encoder) gelen skoru doğrudan istatistiksel bir olasılık (`calibrated_probability`) olarak yorumlamak ve denetim izine (audit trail) kaydetmek amacıyla uygulanır. Kalibrasyon mekanizması bilinçli olarak karar eşiklerini veya operasyonel risk seviyesini (`HIGH`/`MEDIUM`/`LOW`) değiştirmez; karar eşikleri her zaman ensemble `final_score` üzerine kuruludur.
 
 ### 6. Karar ve Eşik Değerler (Thresholding)
 Eşik Optimizasyonu (Threshold Optimizer) sonucuna göre belirlenen kurumsal risk katmanları (`aml_config.yaml`):
@@ -66,7 +67,7 @@ Sistem, Medallion mimarisine uygun olarak 8 özelleştirilmiş şema üzerinde �
    - `alert`: Sadece **HIGH** ve **MEDIUM** riskli operasyonel alarm kayıtları.
    - `alert_export`: UI (Dashboard) ve BI araçları için hızlı flat (düzleştirilmiş) raporlama tablosu.
 5. **`aml_audit`:**
-   - `run_log`: Her pipeline partisinin başlangıç/bitiş zamanı, işlenen satır sayısı, alarm dağılımı, P50/P95/P99 milisaniye gecikme süreleri, model versiyonları ve Git commit hash sürümünü loglar.
+   - `run_log`: Her pipeline partisinin başlangıç/bitiş zamanı, işlenen satır sayısı, alarm dağılımı, P50/P95/P99 milisaniye gecikme süreleri (chunk ortalaması üzerinden tahmini satır latency), model versiyonları ve Git commit hash sürümünü loglar.
    - `performance_log` & `quality_check_result`: Sistem performansı ve veri kalitesi denetim sonuçları.
    - `alert_status_history`: Alarmların analist incelemesi sonrası statü değişiklik tarihçesi.
 
@@ -79,7 +80,7 @@ AML Analistlerinin üretilen alarmları inceleyip aksiyon alabilmeleri için gel
 
 **Özellikleri:**
 - **Ana Sayfa (Canlı Sandbox Test):** Analistlerin anlık olarak bir EFT açıklaması yazarak sistemin hangi skorla hangi şirketi bulacağını, neden kodlarını ve Türkçe açıklamaları test ettiği ortamdı.
-- **Run Detayları & KPI Metrikleri:** İşlenen girdi, bulunan aday, HIGH/MEDIUM/LOW alarm dağılımları ve P50/P95/P99 gecikme metrikleri.
+- **Run Detayları & KPI Metrikleri:** İşlenen girdi, bulunan aday, HIGH/MEDIUM/LOW alarm dağılımları ve P50/P95/P99 gecikme metrikleri (toplu çıkarım tahmini ortalaması).
 - **Alert İnceleme Yönetimi:** Analistin alarmı inceleyip durumunu (`OPEN`, `IN_REVIEW`, `CONFIRMED_MATCH`, `FALSE_POSITIVE`, `ESCALATED`, `CLOSED`) değiştirebildiği, inceleyen adını ve notunu girebildiği operasyon paneli. Değişiklikler anlık olarak veritabanına işlenir.
 
 ---

@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 def _compute_latency_percentiles(latencies_ms: list) -> dict:
-    """P50, P95, P99 latency hesaplar."""
+    """P50, P95, P99 latency hesaplar (toplu işleme nedeniyle chunk ortalaması üzerinden tahmini satır latency)."""
     if not latencies_ms:
         return {"p50": None, "p95": None, "p99": None}
     arr = np.array(latencies_ms)
@@ -53,14 +53,24 @@ class BatchProcessor:
             "input_row_count":        0,
             "input_count":            0,
             "processed_row_count":    0,
-            "candidate_count":        0,
+            "candidate_count":        0,  # Legacy alias for scored_candidate_count
+            "scored_candidate_count": 0,
             "alert_count":            0,
-            "high_alert_count":       0,
-            "medium_alert_count":     0,
+            "high_alert_count":       0,  # Legacy alias for high_candidate_count
+            "high_candidate_count":   0,
+            "high_eft_count":         0,
+            "medium_alert_count":     0,  # Legacy alias for medium_candidate_count
+            "medium_candidate_count": 0,
+            "medium_eft_count":       0,
             "no_match_count":         0,
             "no_candidate_count":     0,
             "match_result_count":     0,
             "error_count":            0,
+            "ner_duration_s":         0.0,
+            "embedding_duration_s":   0.0,
+            "retrieval_duration_s":   0.0,
+            "reranker_duration_s":    0.0,
+            "scoring_duration_s":     0.0,
         }
         per_row_latencies = []
 
@@ -96,6 +106,7 @@ class BatchProcessor:
         conn_for_read = self.repo.get_connection()
         if not conn_for_read:
             logger.error("Could not get DB connection for reading.")
+            self.repo.finish_run_log(run_id, metrics, duration_seconds=time.time() - pipeline_start, status="FAILED", error_message="Could not get DB connection for reading.")
             return
 
         try:
@@ -133,6 +144,22 @@ class BatchProcessor:
                             run_id=run_id,
                             eft_ids=eft_ids
                         )
+                        chunk_duration_s = time.time() - chunk_start
+                        chunk_duration_ms = chunk_duration_s * 1000
+                        avg_row_latency_ms = chunk_duration_ms / len(chunk) if len(chunk) > 0 else 0.0
+                        per_row_latencies.extend([avg_row_latency_ms] * len(chunk))
+
+                        if batch_results and "metrics" in batch_results[0]:
+                            c_metrics = batch_results[0]["metrics"]
+                            ner_d = c_metrics.get("ner_duration_s", 0.0)
+                            emb_d = c_metrics.get("embedding_duration_s", 0.0)
+                            ret_d = c_metrics.get("retrieval_duration_s", 0.0)
+                            rer_d = c_metrics.get("reranker_duration_s", 0.0)
+                            metrics["ner_duration_s"] += ner_d
+                            metrics["embedding_duration_s"] += emb_d
+                            metrics["retrieval_duration_s"] += ret_d
+                            metrics["reranker_duration_s"] += rer_d
+                            metrics["scoring_duration_s"] += max(0.0, chunk_duration_s - (ner_d + emb_d + ret_d + rer_d))
                     except Exception as e:
                         logger.error(f"Failed to process chunk: {e}", exc_info=True)
                         metrics["error_count"] += len(chunk)
@@ -143,18 +170,28 @@ class BatchProcessor:
 
                     for res in batch_results:
                         metrics["processed_row_count"] += 1
-                        metrics["candidate_count"] += sum(1 for mr in res["match_results"] if mr.get("decision_status") != "NO_CANDIDATE_FOUND")
+                        valid_cands = sum(1 for mr in res["match_results"] if mr.get("decision_status") != "NO_CANDIDATE_FOUND")
+                        metrics["candidate_count"] += valid_cands
+                        metrics["scored_candidate_count"] += valid_cands
+
                         if res["no_candidate"]:
                             metrics["no_candidate_count"] += 1
                             
                         metrics["high_alert_count"] += res["high_count"]
+                        metrics["high_candidate_count"] += res["high_count"]
+                        if res["high_count"] > 0:
+                            metrics["high_eft_count"] += 1
+
                         metrics["medium_alert_count"] += res["medium_count"]
+                        metrics["medium_candidate_count"] += res["medium_count"]
+                        if res["medium_count"] > 0:
+                            metrics["medium_eft_count"] += 1
+
                         metrics["no_match_count"] += res["no_match_count"]
                         metrics["alert_count"] += res["high_count"] + res["medium_count"]
                         
                         chunk_match_results.extend(res["match_results"])
                         chunk_alerts.extend(res["alerts"])
-                        per_row_latencies.append((time.time() - chunk_start) * 1000 / len(chunk))
 
                     if chunk_match_results:
                         self.repo.insert_match_results_bulk(chunk_match_results)
@@ -165,6 +202,10 @@ class BatchProcessor:
                         self.repo.insert_alerts_bulk(chunk_alerts)
                         logger.info(f"  → {len(chunk_alerts)} alert(s) written.")
 
+        except Exception as exc:
+            total_duration = time.time() - pipeline_start
+            self.repo.finish_run_log(run_id, metrics, duration_seconds=total_duration, status="FAILED", error_message=str(exc))
+            raise
         finally:
             self.repo.release_connection(conn_for_read)
 
@@ -177,7 +218,15 @@ class BatchProcessor:
             metrics["candidate_count"] / max(metrics["processed_row_count"], 1)
         )
 
-        self.repo.finish_run_log(run_id, metrics, duration_seconds=total_duration)
+        err_cnt = metrics.get("error_count", 0)
+        inp_cnt = metrics.get("input_count", 0)
+        if err_cnt == 0:
+            final_status = "SUCCESS"
+        elif 0 < err_cnt < inp_cnt:
+            final_status = "PARTIAL_SUCCESS"
+        else:
+            final_status = "FAILED"
+        self.repo.finish_run_log(run_id, metrics, duration_seconds=total_duration, status=final_status)
         self._update_latency_metrics(run_id, latency_stats)
         
         try:
@@ -185,7 +234,7 @@ class BatchProcessor:
         except Exception as e:
             logger.error(f"Error populating export table: {e}")
 
-        logger.info(f"Batch complete. Rows: {metrics['input_row_count']} | HIGH: {metrics['high_alert_count']} | MEDIUM: {metrics['medium_alert_count']}")
+        logger.info(f"Batch complete. Rows: {metrics['input_row_count']} | Scored Cands: {metrics['scored_candidate_count']} | HIGH Cands: {metrics['high_candidate_count']} (EFTs: {metrics['high_eft_count']}) | MEDIUM Cands: {metrics['medium_candidate_count']} (EFTs: {metrics['medium_eft_count']})")
 
     def _update_latency_metrics(self, run_id: str, latency_stats: dict) -> None:
         conn = self.repo.get_connection()

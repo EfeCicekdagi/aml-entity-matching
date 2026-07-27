@@ -8,6 +8,7 @@ from src.models.reranker import Reranker
 from src.scoring.final_scorer import FinalScorer
 from src.models.calibration import CalibrationWrapper
 from src.pipeline.inference_service import AMLInferenceService
+from src.pipeline.match_engine import MatchEngine
 
 logger = logging.getLogger(__name__)
 
@@ -130,13 +131,19 @@ class ApplicationContainer:
                 self.reranker_config
             )
         
-        # 7. Inference Service
-        self.inference_service = AMLInferenceService(
+        # 7. Match Engine
+        self.match_engine = MatchEngine(
             config=self.config,
             retriever=self.retriever,
             reranker=self.reranker,
             entity_extractor=self.entity_extractor,
-            embedding_model=self.embedding_model,
+            embedding_model=self.embedding_model
+        )
+        
+        # 8. Inference Service
+        self.inference_service = AMLInferenceService(
+            config=self.config,
             scorer=self.scorer,
-            calibration=self.calibration
+            calibration=self.calibration,
+            match_engine=self.match_engine
         )

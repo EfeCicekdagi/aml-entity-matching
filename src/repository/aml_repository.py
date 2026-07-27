@@ -208,7 +208,7 @@ class AMLRepository:
         finally:
             self.release_connection(conn)
 
-    def finish_run_log(self, run_id: str, metrics: dict, duration_seconds: float = None) -> None:
+    def finish_run_log(self, run_id: str, metrics: dict, duration_seconds: float = None, status: str = None, error_message: str = None) -> None:
         """Run log kaydını tamamlandı olarak günceller."""
         if not getattr(self, "enable_audit_trail", True):
             logger.debug("Audit trail is disabled in config; skipping finish_run_log.")
@@ -216,6 +216,15 @@ class AMLRepository:
         conn = self.get_connection()
         if not conn:
             return
+        if status is None:
+            err_cnt = metrics.get("error_count", 0)
+            inp_cnt = metrics.get("input_count", 0)
+            if err_cnt == 0:
+                status = 'SUCCESS'
+            elif 0 < err_cnt < inp_cnt:
+                status = 'PARTIAL_SUCCESS'
+            else:
+                status = 'FAILED'
         try:
             with conn.cursor() as cur:
                 cur.execute(f"""
@@ -235,6 +244,7 @@ class AMLRepository:
                         prescreen_skipped_count  = %s,
                         total_duration_s         = %s,
                         ner_duration_s           = %s,
+                        embedding_duration_s     = %s,
                         retrieval_duration_s     = %s,
                         reranker_duration_s      = %s,
                         scoring_duration_s       = %s,
@@ -243,7 +253,8 @@ class AMLRepository:
                         p99_latency_ms           = %s,
                         rows_per_second          = %s,
                         avg_candidate_per_row    = %s,
-                        status                   = 'SUCCESS'
+                        status                   = %s,
+                        error_message            = %s
                     WHERE run_id = %s
                 """, (
                     metrics.get("processed_row_count", 0),
@@ -259,6 +270,7 @@ class AMLRepository:
                     metrics.get("prescreen_skipped_count", 0),
                     duration_seconds,
                     metrics.get("ner_duration_s"),
+                    metrics.get("embedding_duration_s"),
                     metrics.get("retrieval_duration_s"),
                     metrics.get("reranker_duration_s"),
                     metrics.get("scoring_duration_s"),
@@ -267,6 +279,8 @@ class AMLRepository:
                     metrics.get("p99_latency_ms"),
                     metrics.get("rows_per_second"),
                     metrics.get("avg_candidate_per_row"),
+                    status,
+                    error_message,
                     run_id
                 ))
             conn.commit()

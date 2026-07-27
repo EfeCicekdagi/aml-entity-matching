@@ -4,6 +4,7 @@ from typing import List, Dict, Any, Optional
 
 from src.scoring.score_features import build_score_features
 from src.scoring.reason_codes import list_to_codes, build_human_explanation, ReasonCode
+from src.pipeline.match_engine import MatchEngine
 
 logger = logging.getLogger(__name__)
 
@@ -11,20 +12,36 @@ class AMLInferenceService:
     def __init__(
         self,
         config: dict,
-        retriever,
-        reranker,
-        entity_extractor,
-        embedding_model,
-        scorer,
-        calibration=None
+        retriever=None,
+        reranker=None,
+        entity_extractor=None,
+        embedding_model=None,
+        scorer=None,
+        calibration=None,
+        match_engine: Optional[MatchEngine] = None
     ):
         self.config = config
-        self.retriever = retriever
-        self.reranker = reranker
-        self.entity_extractor = entity_extractor
-        self.embedding_model = embedding_model
         self.scorer = scorer
         self.calibration = calibration
+        
+        if match_engine:
+            self.match_engine = match_engine
+            self.retriever = match_engine.retriever
+            self.reranker = match_engine.reranker
+            self.entity_extractor = match_engine._entity_extractor
+            self.embedding_model = match_engine.embedding_model
+        else:
+            self.retriever = retriever
+            self.reranker = reranker
+            self.entity_extractor = entity_extractor
+            self.embedding_model = embedding_model
+            self.match_engine = MatchEngine(
+                config=config,
+                retriever=retriever,
+                reranker=reranker,
+                entity_extractor=entity_extractor,
+                embedding_model=embedding_model
+            )
         
         self.batch_size = config.get("embedding", {}).get("batch_size", 32)
         self.reranker_prefilter_score = config.get("retrieval", {}).get("reranker_prefilter_score", 0.60)
@@ -33,91 +50,34 @@ class AMLInferenceService:
     def analyze_batch(self, raw_explanations: List[str], row_ids: List[str], run_id: str, eft_ids: List[int]) -> List[Dict]:
         """
         Processes a batch of EFTs end-to-end.
-        Returns a list of result dictionaries per row.
+        Delegates candidate retrieval and reranking to MatchEngine,
+        and performs feature generation, scoring, calibration, and alerting.
         """
-        # Duplicate row_id guard
-        row_index: dict[str, int] = {}
-        for i, rid in enumerate(row_ids):
-            if rid in row_index:
-                raise ValueError(f"Duplicate row_id detected: '{rid}'. All row_ids must be unique.")
-            row_index[rid] = i
+        if not (len(raw_explanations) == len(row_ids) == len(eft_ids)):
+            raise ValueError("raw_explanations, row_ids and eft_ids must have equal lengths.")
 
-        # 1. Normalization
-        norm_exps = [str(exp).casefold() for exp in raw_explanations]
+        match_output = self.match_engine.process_batch(raw_explanations, row_ids)
 
-        # 2. Entity Extraction
-        extractions = None
-        if self.entity_extractor:
-            extractions = self.entity_extractor.batch_extract(norm_exps)
-
-        from src.utils.text_utils import normalize_for_matching
-        clean_texts = []
-        for i, exp in enumerate(norm_exps):
-            clean_text = exp
-            if extractions and extractions[i] and getattr(extractions[i], "extracted_entity", None):
-                clean_text = extractions[i].extracted_entity
-            clean_text = normalize_for_matching(clean_text)
-            clean_texts.append(clean_text)
-
-        # 3. Embedding
-        embeddings = []
-        if self.embedding_model and clean_texts:
-            embeddings = self.embedding_model.encode(
-                clean_texts, batch_size=self.batch_size, show_progress_bar=False
-            )
-
-        # 4. Retrieval
-        rows_for_batch = [
-            {
-                "row_id": row_ids[i],
-                "normalized_explanation": clean_texts[i],
-                "embedding": embeddings[i].tolist() if i < len(embeddings) else None,
-            }
-            for i in range(len(row_ids))
-        ]
-        all_retrieval_data = self.retriever.batch_get_candidates(rows_for_batch)
-
-        # 5. Reranking
-        reranker_bulk_data = {}
-        for rid, retrieval_data in all_retrieval_data.items():
-            candidates = retrieval_data.get("candidates", [])
-            idx = row_index[rid]
-            clean_text = clean_texts[idx]
-
-            strong = [
-                c for c in candidates
-                if c.get("candidate_score", 0.0) >= self.reranker_prefilter_score
-                or self._exact_name_score(clean_text, c.get("variant_name", "")) == 1.0
-            ]
-            if not strong and candidates:
-                strong = candidates
-
-            strong = sorted(strong, key=lambda c: c.get("candidate_score", 0.0), reverse=True)
-            strong = strong[:self.reranker_top_k]
-
-            reranker_bulk_data[rid] = {"norm_exp": clean_text, "candidates": strong}
-
-        if self.reranker:
-            self.reranker.score_candidates_bulk(reranker_bulk_data)
-
-        # 6. Final Scoring & Decision
         final_results = []
         for i, rid in enumerate(row_ids):
             eft_id = eft_ids[i]
-            ret_data = all_retrieval_data.get(rid, {})
-            cands = reranker_bulk_data.get(rid, {}).get("candidates", [])
-            extraction = extractions[i] if extractions else None
+            row_data = match_output[rid]
             
             row_result = self._score_row(
                 row_id=rid,
                 eft_id=eft_id,
                 run_id=run_id,
-                norm_exp=norm_exps[i],
-                clean_text=clean_texts[i],
-                extraction=extraction,
-                retrieval_data=ret_data,
-                candidates=cands
+                norm_exp=row_data["norm_exp"],
+                clean_text=row_data["clean_text"],
+                extraction=row_data["extraction"],
+                retrieval_data={
+                    "pipeline_status": row_data["pipeline_status"],
+                    "no_candidate_reason": row_data["no_candidate_reason"],
+                    "channel_counts": row_data["channel_counts"],
+                },
+                candidates=row_data["candidates"]
             )
+            row_result["metrics"] = row_data.get("metrics", {})
             final_results.append(row_result)
 
         return final_results
@@ -144,26 +104,28 @@ class AMLInferenceService:
         ex_status = getattr(extraction, "entity_extraction_status", "NOT_FOUND") if extraction else "NOT_FOUND"
 
         if not candidates:
+            is_empty_input = (pipeline_status == "EMPTY_EXPLANATION" or no_cand_reason == "INVALID_INPUT")
             result["no_candidate"] = True
             result["match_results"].append({
                 "run_id": run_id,
                 "eft_id": eft_id,
                 "pipeline_status": pipeline_status,
                 "no_candidate_reason": no_cand_reason or "ALL_RETRIEVAL_CHANNELS_EMPTY",
-                "decision_status": "NO_CANDIDATE_FOUND",
+                "decision_status": "INVALID_INPUT" if is_empty_input else "NO_CANDIDATE_FOUND",
                 "candidate_count": 0,
                 "extracted_entity": ex_entity,
                 "entity_type": ex_type,
-                "extraction_method": ex_method,
-                "extraction_confidence": ex_conf,
-                "entity_extraction_status": ex_status,
-                "reason_codes": [ReasonCode.NO_CANDIDATE_FOUND.value],
-                "human_explanation": "Kara liste veya yaptırım listesinde bu metinle eşleşen kayıt bulunamadı.",
+                "extraction_method": "EMPTY_EXPLANATION" if is_empty_input else ex_method,
+                "extraction_confidence": 0.0 if is_empty_input else ex_conf,
+                "entity_extraction_status": "EMPTY" if is_empty_input else ex_status,
+                "reason_codes": [ReasonCode.INVALID_INPUT.value] if is_empty_input else [ReasonCode.NO_CANDIDATE_FOUND.value],
+                "human_explanation": "Boş veya geçersiz EFT açıklaması (NaN/null) girildiği için arama yapılmadı." if is_empty_input else "Kara liste veya yaptırım listesinde bu metinle eşleşen kayıt bulunamadı.",
                 "retrieval_sources": channel_counts,
             })
             return result
 
-        for rank_idx, cand in enumerate(candidates):
+        scored_records = []
+        for cand in candidates:
             # Fallback: if variant name is contained in text and no entity was extracted, set extraction info
             cand_is_contained = bool(clean_text and cand.get("variant_name") and cand.get("variant_name").casefold() in clean_text)
             current_ex_entity = ex_entity
@@ -187,6 +149,9 @@ class AMLInferenceService:
             risk_level = self.scorer.assign_risk_level(final_score)
             decision_status = self.scorer.assign_decision_status(risk_level)
             
+            # Kalibrasyon Amacı: Kalibrasyon mekanizması bilinçli olarak risk kararlarını, eşik değerleri
+            # veya final_score'u değiştirmez. Yalnızca reranker (Cross-Encoder) çıktısını istatistiksel 
+            # güvenilirlik ve olasılık değeri olarak denetim izine (audit trail) raporlamak için kullanılır.
             calibrated_prob = None
             calibration_applied = False
             calibration_method = None
@@ -239,7 +204,7 @@ class AMLInferenceService:
                 "reason_codes": reason_codes,
                 "human_explanation": human_exp,
                 "retrieval_sources": channel_counts,
-                "candidate_rank": rank_idx + 1,
+                "candidate_rank": 0,  # Assigned after sorting by final_score
                 "matched_variant_name": cand.get("variant_name"),
                 "variant_type": cand.get("variant_type"),
                 "watchlist_company_name": cand.get("company_name"),
@@ -248,6 +213,13 @@ class AMLInferenceService:
                 "compact_matched_variant": scores_dict.get("compact_matched_variant"),
                 "rule_score": scores_dict.get("rule_score", 0.0),
             }
+            scored_records.append((match_record, cand, risk_level, match_reason))
+
+        # Sort by final_score descending so candidate_rank reflects the true final evaluation order
+        scored_records.sort(key=lambda x: x[0]["final_score"], reverse=True)
+
+        for rank_idx, (match_record, cand, risk_level, match_reason) in enumerate(scored_records):
+            match_record["candidate_rank"] = rank_idx + 1
             result["match_results"].append(match_record)
             
             if self.scorer.is_alert_worthy(risk_level):

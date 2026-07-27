@@ -91,13 +91,31 @@ class EntityExtractor:
             return None
 
         try:
-            entity = self.ner_extractor.extract_entity(text)
-            if entity and len(entity.strip()) >= self.min_entity_length:
+            ner_res = self.ner_extractor.extract_entity(text)
+            if not ner_res:
+                return None
+                
+            if isinstance(ner_res, dict):
+                entity_text = ner_res.get("text", "").strip()
+                entity_type = ner_res.get("entity_type", "ORGANIZATION")
+                confidence = float(ner_res.get("confidence", 0.90))
+                start_idx = ner_res.get("start")
+                end_idx = ner_res.get("end")
+            else:
+                entity_text = str(ner_res).strip()
+                entity_type = "ORGANIZATION"
+                confidence = 0.90
+                start_idx = None
+                end_idx = None
+
+            if entity_text and len(entity_text) >= self.min_entity_length:
                 return ExtractionResult(
-                    extracted_entity=entity.strip(),
-                    entity_type="ORGANIZATION",   # Mevcut model ORG/PER çıkarıyor
+                    extracted_entity=entity_text,
+                    entity_type=entity_type,
                     extraction_method="NER_MODEL",
-                    extraction_confidence=0.90,
+                    extraction_confidence=confidence,
+                    extraction_start=start_idx,
+                    extraction_end=end_idx,
                     entity_extraction_status="EXTRACTED"
                 )
         except Exception as e:
@@ -114,11 +132,16 @@ class EntityExtractor:
         """
         # Büyük harfli + suffix içeren blok ara
         match = _CAPITALIZED_BLOCK_PATTERN.search(text)
+        if not match:
+            # If no uppercase match, try on uppercased text to handle lowercased inputs
+            upper_text = text.upper()
+            match = _CAPITALIZED_BLOCK_PATTERN.search(upper_text)
         if match:
             candidate = match.group(0).strip()
             if (self.min_entity_length <= len(candidate) <= self.max_entity_length
                     and not _IBAN_PATTERN.match(candidate)
                     and not _ACCOUNT_PATTERN.match(candidate)):
+                # extraction_start/end refer to original text positions; they may be approximate for uppercased search
                 return ExtractionResult(
                     extracted_entity=candidate,
                     entity_type="ORGANIZATION",
@@ -397,6 +420,7 @@ class EntityExtractor:
     def batch_extract(
         self,
         texts: list[str],
+        row_ids: Optional[list[str]] = None,
         candidates_per_row: Optional[dict] = None,
         use_full_text_fallback: bool = False
     ) -> list[ExtractionResult]:
@@ -406,6 +430,7 @@ class EntityExtractor:
 
         Args:
             texts: EFT metin listesi
+            row_ids: Satır kimlikleri (row ID listesi, opsiyonel)
             candidates_per_row: {row_id: [candidates]} haritası (opsiyonel)
             use_full_text_fallback: Katman 5 aktif edilsin mi
 
@@ -414,6 +439,9 @@ class EntityExtractor:
         """
         if not texts:
             return []
+
+        if row_ids is not None and len(row_ids) != len(texts):
+            raise ValueError("texts and row_ids must have equal lengths when row_ids is provided.")
 
         from src.utils.text_utils import clean_spaced_characters
         texts = [clean_spaced_characters(t) if t else "" for t in texts]
@@ -430,7 +458,8 @@ class EntityExtractor:
 
         # 2. Sonuçları birleştir & Fallback katmanları
         for i, text in enumerate(texts):
-            candidates = candidates_per_row.get(str(i), []) if candidates_per_row else None
+            rid = str(row_ids[i]) if row_ids is not None and i < len(row_ids) else str(i)
+            candidates = candidates_per_row.get(rid, []) if candidates_per_row else None
             
             if not text or not text.strip():
                 results[i] = ExtractionResult(
@@ -441,15 +470,31 @@ class EntityExtractor:
 
             # Check if batched NER found something
             ner_val = ner_entities[i]
-            if ner_val and len(ner_val.strip()) >= self.min_entity_length:
-                results[i] = ExtractionResult(
-                    extracted_entity=ner_val.strip(),
-                    entity_type="ORGANIZATION",
-                    extraction_method="NER_MODEL",
-                    extraction_confidence=0.90,
-                    entity_extraction_status="EXTRACTED"
-                )
-                continue
+            if ner_val:
+                if isinstance(ner_val, dict):
+                    entity_text = ner_val.get("text", "").strip()
+                    entity_type = ner_val.get("entity_type", "ORGANIZATION")
+                    confidence = float(ner_val.get("confidence", 0.90))
+                    start_idx = ner_val.get("start")
+                    end_idx = ner_val.get("end")
+                else:
+                    entity_text = str(ner_val).strip()
+                    entity_type = "ORGANIZATION"
+                    confidence = 0.90
+                    start_idx = None
+                    end_idx = None
+
+                if entity_text and len(entity_text) >= self.min_entity_length:
+                    results[i] = ExtractionResult(
+                        extracted_entity=entity_text,
+                        entity_type=entity_type,
+                        extraction_method="NER_MODEL",
+                        extraction_confidence=confidence,
+                        extraction_start=start_idx,
+                        extraction_end=end_idx,
+                        entity_extraction_status="EXTRACTED"
+                    )
+                    continue
 
             # Fallbacks: Candidates, Rule-based, Variant fallback, Full text
             result = None

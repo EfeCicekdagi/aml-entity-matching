@@ -83,6 +83,8 @@ class ReasonCode(str, Enum):
     CALIBRATION_APPLIED        = "CALIBRATION_APPLIED"
 
     # ── Retrieval ve aday durumu ──────────────────────────────────────────────
+    INVALID_INPUT              = "INVALID_INPUT"
+    EMPTY_EXPLANATION          = "EMPTY_EXPLANATION"
     NO_CANDIDATE_FOUND         = "NO_CANDIDATE_FOUND"
     LOW_CONFIDENCE             = "LOW_CONFIDENCE"
     MATCH_BELOW_THRESHOLD      = "MATCH_BELOW_THRESHOLD"
@@ -160,6 +162,10 @@ _REASON_DESCRIPTIONS: dict[ReasonCode, str] = {
         "Kalibrasyon uygulandı; olasılık tahmini istatistiksel modelle hesaplandı.",
     ReasonCode.NO_CANDIDATE_FOUND:
         "Hiçbir retrieval kanalından aday bulunamadı.",
+    ReasonCode.INVALID_INPUT:
+        "Girdi metni boş veya geçersiz (NaN/None) olduğu için arama yapılmadı.",
+    ReasonCode.EMPTY_EXPLANATION:
+        "EFT açıklaması boş, sadece boşluk veya 'nan' ifadesi içeriyor.",
     ReasonCode.LOW_CONFIDENCE:
         "Eşleşme skorları düşük güven seviyesinde.",
     ReasonCode.MATCH_BELOW_THRESHOLD:

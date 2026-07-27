@@ -1,6 +1,6 @@
 import logging
 import time
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 import pandas as pd
 
 logger = logging.getLogger(__name__)
@@ -16,7 +16,8 @@ class MatchEngine:
       - Reranking
       
     This engine is stateless with respect to the database updates. It takes raw text inputs
-    and returns a set of candidates with their raw scores (Fuzzy, Vector, Reranker).
+    and returns retrieval and reranker candidates.
+    Final fuzzy/rule/ensemble scoring is handled by AMLInferenceService.
     """
 
     def __init__(self, config: dict, retriever, reranker, entity_extractor, embedding_model):
@@ -51,7 +52,10 @@ class MatchEngine:
                 "metrics": dict
             }
         """
-        metrics = {"ner_duration_s": 0.0, "retrieval_duration_s": 0.0, "reranker_duration_s": 0.0}
+        if len(raw_explanations) != len(row_ids):
+            raise ValueError("raw_explanations and row_ids must have equal lengths.")
+
+        metrics = {"ner_duration_s": 0.0, "retrieval_duration_s": 0.0, "reranker_duration_s": 0.0, "embedding_duration_s": 0.0}
 
         # Duplicate row_id guard — early fail before any expensive work
         row_index: dict[str, int] = {}
@@ -60,46 +64,88 @@ class MatchEngine:
                 raise ValueError(f"Duplicate row_id detected: '{rid}'. All row_ids must be unique.")
             row_index[rid] = i
 
-        # 1. Text Normalization
-        norm_exps = [str(exp).casefold() for exp in raw_explanations]
+        # 1. Prepare raw texts for NER and guard against Empty/NaN expressions becoming "nan"
+        def _is_empty_or_nan(val: Any) -> bool:
+            if val is None or pd.isna(val):
+                return True
+            s = str(val).strip()
+            return not s or s.casefold() == "nan"
 
-        # 2. NER / Entity Extraction
+        raw_texts = ["" if _is_empty_or_nan(exp) else str(exp) for exp in raw_explanations]
+        norm_exps = [text.casefold() for text in raw_texts]
+
+        # 2. NER / Entity Extraction (on original cased text)
         ner_start = time.time()
         extractions = None
         if self._entity_extractor:
-            extractions = self._entity_extractor.batch_extract(norm_exps)
+            extractions = self._entity_extractor.batch_extract(raw_texts, row_ids=row_ids)
         metrics["ner_duration_s"] = time.time() - ner_start
 
         # Determine the cleanest text to use for retrieval and embedding
         from src.utils.text_utils import normalize_for_matching
         clean_texts = []
         for i, exp in enumerate(norm_exps):
+            if not exp:
+                clean_texts.append("")
+                continue
             clean_text = exp
             if extractions and extractions[i] and extractions[i].extracted_entity:
                 clean_text = extractions[i].extracted_entity
             clean_text = normalize_for_matching(clean_text)
             clean_texts.append(clean_text)
 
-        # 3. Embedding Generation (using clean_texts)
-        embeddings = []
-        if self.embedding_model and clean_texts:
-            embeddings = self.embedding_model.encode(
-                clean_texts, batch_size=self.batch_size, show_progress_bar=False
+        # 3. Embedding Generation (using clean_texts, skip empty ones)
+        emb_start = time.time()
+        embeddings = [None] * len(clean_texts)
+        valid_indices = [i for i, text in enumerate(clean_texts) if text]
+        if self.embedding_model and valid_indices:
+            valid_texts = [clean_texts[i] for i in valid_indices]
+            valid_embs = self.embedding_model.encode(
+                valid_texts, batch_size=self.batch_size, show_progress_bar=False
             )
+            for idx, emb in zip(valid_indices, valid_embs):
+                embeddings[idx] = emb
+        metrics["embedding_duration_s"] = time.time() - emb_start
 
-        # 4. Batch Candidate Retrieval
+        # 4. Batch Candidate Retrieval (only query DB for valid non-empty rows)
         rows_for_batch = [
             {
                 "row_id": row_ids[i],
                 "normalized_explanation": clean_texts[i],
-                "embedding": embeddings[i].tolist() if i < len(embeddings) else None,
+                "embedding": embeddings[i].tolist() if embeddings[i] is not None else None,
             }
-            for i in range(len(row_ids))
+            for i in valid_indices
         ]
 
         retrieval_start = time.time()
         all_retrieval_data = self.retriever.batch_get_candidates(rows_for_batch)
         metrics["retrieval_duration_s"] = time.time() - retrieval_start
+
+        # Populate explicit EMPTY_EXPLANATION / INVALID_INPUT status for empty rows
+        for i, rid in enumerate(row_ids):
+            if i not in valid_indices:
+                all_retrieval_data[rid] = {
+                    "candidates": [],
+                    "pipeline_status": "EMPTY_EXPLANATION",
+                    "no_candidate_reason": "INVALID_INPUT",
+                    "channel_counts": {}
+                }
+
+        # 4.5. Candidate-Supported Extraction Pass (Stage 2)
+        # For rows where NER and Rule-based extraction did not find an entity (or returned ENTITY_NOT_FOUND),
+        # utilize the retrieved candidates to run candidate-supported extraction layers (Layers 3 & 4).
+        if self._entity_extractor and extractions:
+            for i in valid_indices:
+                ext = extractions[i]
+                if ext and (ext.extraction_method == "ENTITY_NOT_FOUND" or not ext.extracted_entity):
+                    rid = row_ids[i]
+                    candidates = all_retrieval_data.get(rid, {}).get("candidates", [])
+                    if candidates:
+                        cand_ext = self._entity_extractor._extract_via_candidates(clean_texts[i], candidates)
+                        if not cand_ext:
+                            cand_ext = self._entity_extractor._extract_via_variant_fallback(clean_texts[i], candidates)
+                        if cand_ext:
+                            extractions[i] = cand_ext
 
         # 5. Batched Reranking
         reranker_start = time.time()
@@ -126,6 +172,14 @@ class MatchEngine:
 
         if self.reranker:
             self.reranker.score_candidates_bulk(reranker_bulk_data)
+            # Re-sort candidates by normalized_reranker_score after reranking
+            for rid in reranker_bulk_data:
+                cands = reranker_bulk_data[rid].get("candidates", [])
+                reranker_bulk_data[rid]["candidates"] = sorted(
+                    cands,
+                    key=lambda c: c.get("normalized_reranker_score", c.get("candidate_score", 0.0)),
+                    reverse=True
+                )
         metrics["reranker_duration_s"] = time.time() - reranker_start
 
 

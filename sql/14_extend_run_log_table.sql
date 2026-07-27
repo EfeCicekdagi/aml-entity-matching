@@ -28,6 +28,7 @@ ALTER TABLE aml_audit.run_log
     -- Operasyonel süreler (saniye)
     ADD COLUMN IF NOT EXISTS total_duration_s         NUMERIC(12,2),
     ADD COLUMN IF NOT EXISTS ner_duration_s           NUMERIC(12,2),
+    ADD COLUMN IF NOT EXISTS embedding_duration_s     NUMERIC(12,2),
     ADD COLUMN IF NOT EXISTS retrieval_duration_s     NUMERIC(12,2),
     ADD COLUMN IF NOT EXISTS reranker_duration_s      NUMERIC(12,2),
     ADD COLUMN IF NOT EXISTS scoring_duration_s       NUMERIC(12,2),
