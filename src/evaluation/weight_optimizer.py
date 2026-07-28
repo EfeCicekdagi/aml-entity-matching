@@ -4,6 +4,7 @@ import pandas as pd
 import json
 from datetime import datetime
 import logging
+import optuna
 from sklearn.metrics import precision_score, recall_score, f1_score, accuracy_score
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
@@ -347,6 +348,107 @@ class WeightOptimizer:
             "all_results": results
         }
 
+    def optuna_search(self, raw_scores_list, n_trials=50):
+        logger.info("Starting Optuna Hyperparameter Tuning for Weights and Overrides...")
+
+        def objective(trial):
+            # Propose linear weights (sum to 1.0)
+            w1 = trial.suggest_float("w1", 0.1, 1.0)
+            w2 = trial.suggest_float("w2", 0.1, 1.0)
+            w3 = trial.suggest_float("w3", 0.1, 1.0)
+            total = w1 + w2 + w3
+            f_w = w1 / total
+            v_w = w2 / total
+            r_w = w3 / total
+
+            # Propose override thresholds
+            o_acro = trial.suggest_float("override_acronym", 0.70, 1.00)
+            o_cons = trial.suggest_float("override_consonant", 0.70, 1.00)
+            o_leet = trial.suggest_float("override_leetspeak", 0.75, 1.00)
+            o_legal = trial.suggest_float("override_legal_suffix", 0.80, 1.00)
+            o_core = trial.suggest_float("override_core_match", 0.80, 1.00)
+            o_comp = trial.suggest_float("override_compact_match", 0.85, 1.00)
+
+            self.scorer.weights = {
+                "fuzzy_weight": f_w,
+                "vector_weight": v_w,
+                "reranker_weight": r_w,
+                "acronym_weight": 0.0,
+                "rule_weight": 0.0,
+                "override_acronym": o_acro,
+                "override_consonant": o_cons,
+                "override_leetspeak": o_leet,
+                "override_legal_suffix": o_legal,
+                "override_core_match": o_core,
+                "override_compact_match": o_comp,
+            }
+
+            y_true = []
+            y_pred = []
+            
+            for item in raw_scores_list:
+                y_true.append(1 if item["should_match"] else 0)
+                final_score, _, _ = self.scorer.calculate_final_score(item["raw_scores"], 1.0)
+                y_pred.append(1 if final_score >= 0.60 else 0)
+
+            # Maximize F1 Score
+            f1 = f1_score(y_true, y_pred, zero_division=0)
+            return f1
+
+        optuna.logging.set_verbosity(optuna.logging.WARNING)
+        study = optuna.create_study(direction="maximize")
+        study.optimize(objective, n_trials=n_trials)
+
+        logger.info("\n" + "="*60)
+        logger.info("OPTUNA TUNING RECOMMENDATION REPORT")
+        logger.info("="*60)
+        logger.info(f"Best F1 Score: {study.best_value:.4f}")
+        logger.info("Best Parameters:")
+        
+        # Calculate derived true weights
+        best_w1 = study.best_params["w1"]
+        best_w2 = study.best_params["w2"]
+        best_w3 = study.best_params["w3"]
+        total = best_w1 + best_w2 + best_w3
+        
+        logger.info(f"  -> fuzzy_weight: {best_w1/total:.3f}")
+        logger.info(f"  -> vector_weight: {best_w2/total:.3f}")
+        logger.info(f"  -> reranker_weight: {best_w3/total:.3f}")
+        
+        for key, value in study.best_params.items():
+            if not key.startswith("w"):
+                logger.info(f"  -> {key}: {value:.3f}")
+                
+        logger.info("="*60 + "\n")
+
+        # Save trials to JSON for UI visualization
+        trials_data = []
+        for t in study.trials:
+            if t.state.name == "COMPLETE":
+                w1 = t.params["w1"]
+                w2 = t.params["w2"]
+                w3 = t.params["w3"]
+                tot = w1 + w2 + w3
+                trial_dict = {
+                    "trial_number": t.number,
+                    "f1_score": t.value,
+                    "fuzzy_weight": w1 / tot,
+                    "vector_weight": w2 / tot,
+                    "reranker_weight": w3 / tot,
+                }
+                for k, v in t.params.items():
+                    if not k.startswith("w"):
+                        trial_dict[k] = v
+                trials_data.append(trial_dict)
+
+        out_path = os.path.join("outputs", "optuna_results.json")
+        os.makedirs(os.path.dirname(out_path), exist_ok=True)
+        with open(out_path, "w", encoding="utf-8") as f:
+            json.dump({"best_f1": study.best_value, "trials": trials_data}, f, indent=2)
+        logger.info(f"Optuna results saved to {out_path} for UI visualization.")
+
+        return study
+
 
 if __name__ == "__main__":
     import numpy as np
@@ -354,6 +456,6 @@ if __name__ == "__main__":
     df = opt.load_ground_truth("tests/aml_eft_challenge_ground_truth_1440_berke_final.csv")
     raw_scores = opt.extract_raw_scores(df)
     
-    # Example ranges: 0.1 to 0.8 with 0.1 step
-    r = [round(x, 1) for x in np.arange(0.1, 0.9, 0.1)]
-    opt.grid_search(raw_scores, fuzzy_range=r, vector_range=r, reranker_range=r)
+    # Run Optuna tuning instead of Grid Search
+    opt.optuna_search(raw_scores, n_trials=5)
+

@@ -46,13 +46,19 @@ class FinalScorer:
         self.threshold_version = threshold_version
         self.calibration_wrapper = calibration_wrapper
 
-        # Default fallback degerler (DB'den okuma basarisiz olursa)
+        # Default fallback degerler (Optuna F1=0.8420 optimized)
         self.weights: dict[str, float] = {
-            "fuzzy_weight":    0.40,
-            "vector_weight":   0.20,
+            "fuzzy_weight":    0.332,
+            "vector_weight":   0.323,
             "acronym_weight":  0.0,
             "rule_weight":     0.0,
-            "reranker_weight": 0.40,
+            "reranker_weight": 0.345,
+            "override_acronym": 0.915,
+            "override_consonant": 0.996,
+            "override_leetspeak": 0.934,
+            "override_legal_suffix": 0.904,
+            "override_core_match": 0.859,
+            "override_compact_match": 0.975,
         }
         self.thresholds: list[dict] = []
         self._load_config_from_db()
@@ -256,7 +262,7 @@ class FinalScorer:
                 cand_compact_len = len(cand_str.replace(" ", ""))
                 if is_safe and (cand_compact_len >= 6 or reranker_ok):
                     # Uzun/distinctive adlarda veya reranker onayladiysa yuksek risk
-                    final_score = max(final_score, 0.88)
+                    final_score = max(final_score, self.weights.get("override_acronym", 0.88))
                     match_reason = "ACRONYM_MATCH"
                 elif cand_compact_len >= 3:
                     # Kisa tek-token adlarda veya reranker supheli ise:
@@ -278,7 +284,7 @@ class FinalScorer:
             cand_str  = scores.get("_variant_str", "")
             is_safe, safe_code = self._is_safe_exact_override(query_str, cand_str, alias_confidence)
             if is_safe:
-                final_score = max(final_score, 0.85)
+                final_score = max(final_score, self.weights.get("override_consonant", 0.85))
                 match_reason = "CONSONANT_ONLY_MATCH"
                 reason_codes.append(ReasonCode.CONSONANT_ONLY_MATCH)
             else:
@@ -328,7 +334,7 @@ class FinalScorer:
         if scores.get("leetspeak_evasion_detected"):
             if ReasonCode.LEETSPEAK_EVASION not in reason_codes:
                 reason_codes.append(ReasonCode.LEETSPEAK_EVASION)
-            final_score = max(final_score, 0.88)
+            final_score = max(final_score, self.weights.get("override_leetspeak", 0.88))
             match_reason = "LEETSPEAK_EVASION_DETECTED"
 
         # ── Legal suffix only difference override ────────────────────────────
@@ -338,7 +344,7 @@ class FinalScorer:
             is_safe, safe_code = self._is_safe_exact_override(query_str, cand_str, alias_confidence)
 
             if is_safe:
-                final_score  = max(final_score, 0.92)
+                final_score  = max(final_score, self.weights.get("override_legal_suffix", 0.92))
                 match_reason = "LEGAL_SUFFIX_ONLY_DIFFERENCE"
                 reason_codes.append(ReasonCode.LEGAL_SUFFIX_ONLY_DIFFERENCE)
             else:
@@ -351,7 +357,7 @@ class FinalScorer:
             is_safe, safe_code = self._is_safe_exact_override(query_str, cand_str, alias_confidence)
 
             if is_safe:
-                final_score  = max(final_score, 0.95)
+                final_score  = max(final_score, self.weights.get("override_core_match", 0.95))
                 match_reason = "EXACT_CORE_MATCH"
                 reason_codes.append(ReasonCode.EXACT_CORE_MATCH)
             else:
@@ -389,7 +395,7 @@ class FinalScorer:
             cand_str  = scores.get("_variant_str", "")
             is_safe, safe_code = self._is_safe_exact_override(query_str, cand_str, alias_confidence)
             min_length = 10
-            score_floor = 0.98
+            score_floor = self.weights.get("override_compact_match", 0.98)
             
             if is_safe and len(compact_cand) >= min_length:
                 final_score = max(final_score, score_floor)

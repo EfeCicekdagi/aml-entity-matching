@@ -663,7 +663,49 @@ elif page == "📊 Model Optimizasyon":
         st.error("Veritabanına bağlanılamadı.")
     else:
         try:
-            # 1. Weight Optimizasyonu Sonuçları
+            # 0. Optuna Hyperparameter Optimization Sonuçları
+            import os, json
+            optuna_path = os.path.join("outputs", "optuna_results.json")
+            if os.path.exists(optuna_path):
+                st.markdown("### 🎯 Yapay Zeka Hiperparametre Optimizasyonu (Optuna)")
+                st.markdown("Aşağıdaki veriler, son çalıştırılan Optuna denemelerinden (JSON) anlık çekilmektedir. Bu analiz, sadece temel ağırlıkları değil, aynı zamanda **Kural Tavan Puanlarını (Overrides)** da optimize eder.")
+                
+                with open(optuna_path, "r", encoding="utf-8") as f:
+                    optuna_data = json.load(f)
+                
+                best_f1_opt = optuna_data.get("best_f1", 0.0)
+                st.success(f"**🌟 Ulaşılan En İyi F1 Skoru:** `{best_f1_opt:.4f}`")
+                
+                trials = optuna_data.get("trials", [])
+                if trials:
+                    df_opt = pd.DataFrame(trials)
+                    
+                    # Sort by F1
+                    df_opt = df_opt.sort_values("f1_score", ascending=True)
+                    df_opt["trial_str"] = "Trial " + df_opt["trial_number"].astype(str)
+                    
+                    # Plotly chart
+                    fig_opt = px.bar(
+                        df_opt, x="f1_score", y="trial_str", orientation='h',
+                        title="Tüm Optuna Denemeleri - F1 Skoru Dağılımı",
+                        color="f1_score", color_continuous_scale="Magma",
+                        labels={'f1_score': 'F1 Skoru', 'trial_str': 'Deneme (Trial)'}
+                    )
+                    fig_opt.update_layout(height=400)
+                    st.plotly_chart(fig_opt, use_container_width=True)
+                    
+                    # Table
+                    st.markdown("#### 📋 Optuna Optimizasyon Detayları (Tüm Parametreler)")
+                    df_opt_display = df_opt.sort_values("f1_score", ascending=False).copy()
+                    st.dataframe(
+                        df_opt_display.style.highlight_max(subset=["f1_score"], color="#d4edda")
+                          .highlight_min(subset=["f1_score"], color="#f8d7da"),
+                        use_container_width=True,
+                        height=400
+                    )
+                st.divider()
+
+            # 1. Weight Optimizasyonu Sonuçları (Veritabanı Grid Search)
             st.markdown("### 1. Ağırlık (Weight) Optimizasyonu Sonuçları")
             st.markdown("Farklı (Fuzzy, Vector, Reranker) ağırlık kombinasyonlarının **F1 Skoru** üzerindeki etkileri:")
             
