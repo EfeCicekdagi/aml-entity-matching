@@ -132,10 +132,6 @@ class EntityExtractor:
         """
         # Büyük harfli + suffix içeren blok ara
         match = _CAPITALIZED_BLOCK_PATTERN.search(text)
-        if not match:
-            # If no uppercase match, try on uppercased text to handle lowercased inputs
-            upper_text = text.upper()
-            match = _CAPITALIZED_BLOCK_PATTERN.search(upper_text)
         if match:
             candidate = match.group(0).strip()
             if (self.min_entity_length <= len(candidate) <= self.max_entity_length

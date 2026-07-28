@@ -1,10 +1,10 @@
 """
-final_scorer.py — AML eşleştirme nihai skor ve risk atama motoru.
+final_scorer.py — AML eslestirme nihai skor ve risk atama motoru.
 
-Özellikler:
-  - Kısa ve genel isimler (token sayısı < 2, uzunluk < 4) için exact match override uygulanmaz; yapay zeka ensemble sonucu korunur.
-  - Denetim izi (audit trail) için reason_codes, decision_status ve calibrated_probability alanlarını üretir.
-  - Konfigürasyon tabanlı eşik değerleriyle (HIGH, MEDIUM, LOW/NO_MATCH) katmanlı risk sınıflandırması sağlar.
+Ozellikler:
+  - Kisa ve genel isimler (token sayisi < 2, uzunluk < 4) icin exact match override uygulanmaz; yapay zeka ensemble sonucu korunur.
+  - Denetim izi (audit trail) icin reason_codes, decision_status ve calibrated_probability alanlarini uretir.
+  - Konfigurasyon tabanli esik degerleriyle (HIGH, MEDIUM, LOW/NO_MATCH) katmanli risk siniflandirmasi saglar.
 """
 
 import logging
@@ -15,16 +15,16 @@ from src.utils.text_utils import _AMBIGUOUS_SHORT_NAMES
 
 logger = logging.getLogger(__name__)
 
-# Exact override için minimum güvenli koşullar
-_EXACT_OVERRIDE_MIN_TOKEN_COUNT = 2   # En az 2 token (şirket eklerinden arındırılmış öz isim için)
+# Exact override icin minimum guvenli kosullar
+_EXACT_OVERRIDE_MIN_TOKEN_COUNT = 2   # En az 2 token (sirket eklerinden arindirilmis oz isim icin)
 _EXACT_OVERRIDE_MIN_CHAR_LENGTH = 5   # En az 5 karakter (suffix dahil)
 
 
 class FinalScorer:
     """
-    Adayları puanlayan ve nihai AML kararını veren sınıf.
+    Adaylari puanlayan ve nihai AML kararini veren sinif.
 
-    Weights ve threshold'lar DB'den yüklenir.
+    Weights ve threshold'lar DB'den yuklenir.
     """
 
     def __init__(
@@ -37,16 +37,16 @@ class FinalScorer:
         """
         Args:
             repository: AMLRepository instance
-            config_version: DB'den çekilecek model/ağırlık versiyonu
-            threshold_version: DB'den çekilecek eşik (threshold) versiyonu
-            calibration_wrapper: Seçimli ProbabilityCalibration sınıf örneği
+            config_version: DB'den cekilecek model/agirlik versiyonu
+            threshold_version: DB'den cekilecek esik (threshold) versiyonu
+            calibration_wrapper: Secimli ProbabilityCalibration sinif ornegi
         """
         self.repo = repository
         self.config_version = config_version
         self.threshold_version = threshold_version
         self.calibration_wrapper = calibration_wrapper
 
-        # Default fallback değerler (DB'den okuma başarısız olursa)
+        # Default fallback degerler (DB'den okuma basarisiz olursa)
         self.weights: dict[str, float] = {
             "fuzzy_weight":    0.40,
             "vector_weight":   0.20,
@@ -58,7 +58,7 @@ class FinalScorer:
         self._load_config_from_db()
 
     def _load_config_from_db(self) -> None:
-        """Veritabanından ağırlıkları ve eşik değerlerini yükler."""
+        """Veritabanindan agirliklari ve esik degerlerini yukler."""
         if not self.repo:
             return
 
@@ -68,7 +68,7 @@ class FinalScorer:
 
         try:
             with conn.cursor() as cur:
-                # ── Ağırlıklar ──────────────────────────────────────────────
+                # ── Agirliklar ──────────────────────────────────────────────
                 cur.execute(f"""
                     SELECT fuzzy_weight, vector_weight, acronym_weight, rule_weight, reranker_weight
                     FROM {TABLES['scoring_weight']}
@@ -107,7 +107,7 @@ class FinalScorer:
         finally:
             self.repo.release_connection(conn)
 
-    # ── Exact match güvenlik kontrolü ─────────────────────────────────────────
+    # ── Exact match guvenlik kontrolu ─────────────────────────────────────────
 
     def _is_safe_exact_override(
         self,
@@ -116,19 +116,19 @@ class FinalScorer:
         alias_confidence: float = 1.0
     ) -> tuple[bool, ReasonCode]:
         """
-        Exact match override'ın güvenli olup olmadığını belirler.
+        Exact match override'in guvenli olup olmadigini belirler.
 
-        Override güvenli DEĞİLSE:
-          - Kısa/tek token isimler (< 2 token veya < 5 karakter)
+        Override guvenli DEGILSE:
+          - Kisa/tek token isimler (< 2 token veya < 5 karakter)
           - Genel/ambiguous kelimeler (ABC, STAR, GLOBAL vb.)
-          - Alias confidence düşükse (algoritmik üretilmiş)
+          - Alias confidence dusukse (algoritmik uretilmis)
 
         Returns:
             (is_safe, reason_code)
         """
         from src.utils.text_utils import get_normalized_core_name
 
-        # Alias confidence düşükse (algoritmik typo vb.)
+        # Alias confidence dusukse (algoritmik typo vb.)
         if alias_confidence < 0.6:
             return False, ReasonCode.EXACT_MATCH_REQUIRES_REVIEW
 
@@ -139,19 +139,19 @@ class FinalScorer:
             tokens = stripped.split()
             char_len = len(stripped.replace(" ", ""))
 
-            # Çok kısa veya tek token
+            # Cok kisa veya tek token
             if len(tokens) < _EXACT_OVERRIDE_MIN_TOKEN_COUNT:
                 return False, ReasonCode.SHORT_AMBIGUOUS_EXACT_MATCH
 
             if char_len < _EXACT_OVERRIDE_MIN_CHAR_LENGTH:
                 return False, ReasonCode.SHORT_AMBIGUOUS_EXACT_MATCH
 
-            # Öz ismin (core name) tek token veya çok kısa olması (ör. Apple Corp -> apple)
+            # Oz ismin (core name) tek token veya cok kisa olmasi (or. Apple Corp -> apple)
             core_name = get_normalized_core_name(stripped).strip().casefold()
             core_tokens = core_name.split()
             if len(core_tokens) < _EXACT_OVERRIDE_MIN_TOKEN_COUNT:
                 if len(core_tokens) == 1 and len(core_name) >= 6 and len(tokens) >= 2 and core_name not in _AMBIGUOUS_SHORT_NAMES and stripped not in _AMBIGUOUS_SHORT_NAMES:
-                    pass  # Uzun, ayırt edici tek kelime + legal suffix (ör. Indiaforensic Services, Finspire Solutions)
+                    pass  # Uzun, ayirt edici tek kelime + legal suffix (or. Indiaforensic Services, Finspire Solutions)
                 else:
                     return False, ReasonCode.SHORT_AMBIGUOUS_EXACT_MATCH
             elif len(core_name.replace(" ", "")) < _EXACT_OVERRIDE_MIN_CHAR_LENGTH:
@@ -161,7 +161,7 @@ class FinalScorer:
             if stripped in _AMBIGUOUS_SHORT_NAMES or core_name in _AMBIGUOUS_SHORT_NAMES:
                 return False, ReasonCode.SHORT_AMBIGUOUS_EXACT_MATCH
 
-            # Core name içindeki herhangi bir token tek başına ambiguous listesindeyse ve sadece 1 kelime ise
+            # Core name icindeki herhangi bir token tek basina ambiguous listesindeyse ve sadece 1 kelime ise
             if len(core_tokens) == 1 and core_tokens[0] in _AMBIGUOUS_SHORT_NAMES:
                 return False, ReasonCode.SHORT_AMBIGUOUS_EXACT_MATCH
 
@@ -173,14 +173,14 @@ class FinalScorer:
         alias_confidence: float = 1.0
     ) -> tuple[float, str, list[str]]:
         """
-        Nihai skoru hesaplar ve reason code'ları üretir.
+        Nihai skoru hesaplar ve reason code'lari uretir.
 
         Args:
             scores: Skor dict'i. Zorunlu anahtarlar:
                     fuzzy_score, vector_score, acronym_score, rule_score, reranker_score,
                     exact_normalized_match, exact_core_match, legal_suffix_only_difference,
                     query_token_count
-            alias_confidence: Eşleşen alias'ın güven seviyesi (0.0-1.0)
+            alias_confidence: Eslesen alias'in guven seviyesi (0.0-1.0)
 
         Returns:
             (final_score, match_reason, reason_codes_list)
@@ -188,14 +188,14 @@ class FinalScorer:
         query_token_count = scores.get("query_token_count", 3)
         reason_codes: list[ReasonCode] = []
 
-        # ── Ağırlıklar ──────────────────────────────────────────────────────
+        # ── Agirliklar ──────────────────────────────────────────────────────
         w_fuzzy    = self.weights.get("fuzzy_weight",    0.0)
         w_vector   = self.weights.get("vector_weight",   0.30)
         w_acronym  = self.weights.get("acronym_weight",  0.0)
         w_rule     = self.weights.get("rule_weight",     0.0)
         w_reranker = self.weights.get("reranker_weight", 0.70)
 
-        # Dinamik ağırlık: kısa sorgular için lexical ağırlığı artır
+        # Dinamik agirlik: kisa sorgular icin lexical agirligi artir
         if query_token_count <= 2:
             w_vector   = 0.10
             w_reranker = 0.40
@@ -221,7 +221,7 @@ class FinalScorer:
         weighted_score = fuzzy_contrib + vector_contrib + acronym_contrib + rule_contrib + reranker_contrib
         final_score = float(min(max(weighted_score, 0.0), 1.0))
 
-        # ── Sinyaller için reason code üretimi ──────────────────────────────
+        # ── Sinyaller icin reason code uretimi ──────────────────────────────
         match_reason = "LOW_CONFIDENCE"
 
         if scores.get("reranker_score", 0.0) > 0.75:
@@ -249,22 +249,22 @@ class FinalScorer:
                 if ReasonCode.ACRONYM_MATCH not in reason_codes:
                     reason_codes.append(ReasonCode.ACRONYM_MATCH)
 
-                # Reranker skoru burada önemli: kısa tek-token adlarda (< 6 harf)
-                # reranker onayı olmadan HIGH risk vermek hatalı eşleşmelere (false positive) yol açar.
-                # Örn: "mehar" → "mehar entertainment" (mehar=düğün başlığı olabilir)
+                # Reranker skoru burada onemli: kisa tek-token adlarda (< 6 harf)
+                # reranker onayi olmadan HIGH risk vermek hatali eslesmelere (false positive) yol acar.
+                # Orn: "mehar" → "mehar entertainment" (mehar=dugun basligi olabilir)
                 reranker_ok = scores.get("reranker_score", 0.0) >= 0.35
                 cand_compact_len = len(cand_str.replace(" ", ""))
                 if is_safe and (cand_compact_len >= 6 or reranker_ok):
-                    # Uzun/distinctive adlarda veya reranker onayladıysa yüksek risk
+                    # Uzun/distinctive adlarda veya reranker onayladiysa yuksek risk
                     final_score = max(final_score, 0.88)
                     match_reason = "ACRONYM_MATCH"
                 elif cand_compact_len >= 3:
-                    # Kısa tek-token adlarda veya reranker şüpheli ise:
+                    # Kisa tek-token adlarda veya reranker supheli ise:
                     # Analist incelemesi (MEDIUM), otomatik HIGH risk yok
                     final_score = max(final_score, 0.65)
                     match_reason = "ACRONYM_MATCH"
                 else:
-                    # Çok kısa (2 harfli) ambiguous olabilecek kısaltmalarda orta risk ve inceleme kodu
+                    # Cok kisa (2 harfli) ambiguous olabilecek kisaltmalarda orta risk ve inceleme kodu
                     final_score = max(final_score, 0.65)
                     if safe_code not in reason_codes:
                         reason_codes.append(safe_code)
@@ -284,7 +284,7 @@ class FinalScorer:
             else:
                 reason_codes.append(safe_code)
 
-        # ── High fuzzy match boost (yazım hatası, eksik harf, typo desteği) ──
+        # ── High fuzzy match boost (yazim hatasi, eksik harf, typo destegi) ──
         fuzzy_val = scores.get("fuzzy_score", 0.0)
         if fuzzy_val >= 0.82:
             query_str = scores.get("_query_str", "")
@@ -300,9 +300,9 @@ class FinalScorer:
                 if ReasonCode.HIGH_FUZZY_SIMILARITY not in reason_codes:
                     reason_codes.append(ReasonCode.HIGH_FUZZY_SIMILARITY)
             else:
-                # Güvenli değil (tek kelimelik veya genel kelime: ör. Apple, Oracle, Amazon)
-                # Yalnızca hem sorgu hem aday çoklu kelimeden oluşuyorsa (ör. Amazn Technologies Inc)
-                # ve token sayısı benzerse makul bir destek ver
+                # Guvenli degil (tek kelimelik veya genel kelime: or. Apple, Oracle, Amazon)
+                # Yalnizca hem sorgu hem aday coklu kelimeden olusuyorsa (or. Amazn Technologies Inc)
+                # ve token sayisi benzerse makul bir destek ver
                 from src.utils.text_utils import get_normalized_core_name
                 q_tokens = query_str.split()
                 c_tokens = cand_str.split()
@@ -355,14 +355,14 @@ class FinalScorer:
                 match_reason = "EXACT_CORE_MATCH"
                 reason_codes.append(ReasonCode.EXACT_CORE_MATCH)
             else:
-                # Güvenli değil — sadece reason code ekle, skor override etme
+                # Guvenli degil — sadece reason code ekle, skor override etme
                 reason_codes.append(safe_code)
                 logger.debug(
                     f"Exact core match override skipped for '{query_str}' "
                     f"(reason: {safe_code.value})"
                 )
 
-        # ── Exact normalized match override (en güçlü) ──────────────────────
+        # ── Exact normalized match override (en guclu) ──────────────────────
         if scores.get("exact_normalized_match"):
             query_str = scores.get("_query_str", "")
             cand_str  = scores.get("_variant_str", "")
@@ -373,8 +373,8 @@ class FinalScorer:
                 match_reason = "EXACT_NORMALIZED_MATCH"
                 reason_codes.append(ReasonCode.EXACT_OFFICIAL_NAME)
             else:
-                # Güvenli değil (Apple, Oracle vb. tek veya genel kelimeler)
-                # Doğrudan yüksek risk (override) VERME! Bağlamı (ensemble skoru) değerlendir!
+                # Guvenli degil (Apple, Oracle vb. tek veya genel kelimeler)
+                # Dogrudan yuksek risk (override) VERME! Baglami (ensemble skoru) degerlendir!
                 reason_codes.append(safe_code)
                 match_reason = "EXACT_NORMALIZED_MATCH_WITH_CAUTION"
                 logger.debug(
@@ -406,26 +406,26 @@ class FinalScorer:
             if ReasonCode.PARTIAL_MATCH_REQUIRES_REVIEW not in reason_codes:
                 reason_codes.append(ReasonCode.PARTIAL_MATCH_REQUIRES_REVIEW)
             match_reason = "PARTIAL_MATCH_REQUIRES_REVIEW"
-            # Doğrudan yüksek risk vermek yerine analist incelemesine (orta risk bandı: 0.45 - 0.64) gönder
+            # Dogrudan yuksek risk vermek yerine analist incelemesine (orta risk bandi: 0.45 - 0.64) gonder
             if final_score >= 0.65:
                 final_score = 0.64
             elif final_score < 0.45 and scores.get("fuzzy_score", 0.0) >= 0.40:
-                # Kısmi bilgi yeterliyse en azından analist incelemesi oluşturabilmeli (aday kaybolmamalı)
+                # Kismi bilgi yeterliyse en azindan analist incelemesi olusturabilmeli (aday kaybolmamali)
                 final_score = max(final_score, 0.50)
 
-        # ── Reranker Veto (Semantik red → lexical override'ı kısıtla) ──────────
-        # Reranker semantik olarak açıkça reddettiyse (< 0.25) VE kesin bir
-        # lexical kanıt yoksa (exact normalized / compact / leetspeak evasion),
-        # lexical override'ların HIGH risk üretmesine izin verme.
-        # Bu; tek-token eşleşme, compact evasion veya kısmi fuzzy'nin yol açtığı
+        # ── Reranker Veto (Semantik red → lexical override'i kisitla) ──────────
+        # Reranker semantik olarak acikca reddettiyse (< 0.25) VE kesin bir
+        # lexical kanit yoksa (exact normalized / compact / leetspeak evasion),
+        # lexical override'larin HIGH risk uretmesine izin verme.
+        # Bu; tek-token eslesme, compact evasion veya kismi fuzzy'nin yol actigi
         # false positive HIGH alert'leri engeller.
         reranker_val = scores.get("reranker_score", 0.0)
         _has_hard_lexical_evidence = (
             scores.get("exact_normalized_match") or
             scores.get("exact_compact_match") or
             scores.get("leetspeak_evasion_detected") or
-            scores.get("exact_core_match") or          # compact_core eşleşmesi evasion'ı kapsar
-            scores.get("acronym_score", 0.0) >= 1.0   # NST/IBM gibi kısaltma eşleşmesi
+            scores.get("exact_core_match") or          # compact_core eslesmesi evasion'i kapsar
+            scores.get("acronym_score", 0.0) >= 1.0   # NST/IBM gibi kisaltma eslesmesi
         )
         if reranker_val < 0.25 and not _has_hard_lexical_evidence:
             if final_score > 0.64:
@@ -437,21 +437,24 @@ class FinalScorer:
                 if ReasonCode.RERANKER_REJECTED not in reason_codes:
                     reason_codes.append(ReasonCode.RERANKER_REJECTED)
 
-        if not reason_codes:
-            reason_codes.append(ReasonCode.LOW_CONFIDENCE)
+        # Tekrar eden kodları temizle (sırayı koruyarak)
+        unique_reason_codes = list(dict.fromkeys(reason_codes))
 
-        return float(min(max(final_score, 0.0), 1.0)), match_reason, codes_to_list(reason_codes)
+        if not unique_reason_codes:
+            unique_reason_codes.append(ReasonCode.LOW_CONFIDENCE)
+
+        return float(min(max(final_score, 0.0), 1.0)), match_reason, codes_to_list(unique_reason_codes)
 
     def assign_risk_level(self, final_score: float) -> str:
         """
-        Final skora göre risk seviyesi atar.
+        Final skora gore risk seviyesi atar.
 
-        Öncelik sırası:
-          1. DB threshold tablosundaki değerler
+        Oncelik sirasi:
+          1. DB threshold tablosundaki degerler
           2. Fallback: HIGH >= 0.70, MEDIUM >= 0.60, NO_MATCH < 0.60
 
         Args:
-            final_score: 0.0 - 1.0 arasında final skor
+            final_score: 0.0 - 1.0 arasinda final skor
 
         Returns:
             'HIGH', 'MEDIUM', 'LOW', veya 'NO_MATCH'
@@ -466,7 +469,7 @@ class FinalScorer:
                     if t["min_score"] <= final_score < t["max_score"]:
                         return t["risk_level"]
 
-        # DB'den threshold yüklenemezse veya aralık dışındaysa fallback
+        # DB'den threshold yuklenemezse veya aralik disindaysa fallback
         if final_score >= 0.65:
             return "HIGH"
         elif final_score >= 0.45:
@@ -476,7 +479,7 @@ class FinalScorer:
 
     def assign_decision_status(self, risk_level: str) -> str:
         """
-        Risk seviyesini iş kararı (decision_status) alanına dönüştürür.
+        Risk seviyesini is karari (decision_status) alanina donusturur.
 
         Args:
             risk_level: 'HIGH', 'MEDIUM', 'LOW', 'NO_MATCH'
@@ -494,10 +497,10 @@ class FinalScorer:
 
     def is_alert_worthy(self, risk_level: str) -> bool:
         """
-        Bu risk seviyesi için alert tablosuna kayıt oluşturulmalı mı?
+        Bu risk seviyesi icin alert tablosuna kayit olusturulmali mi?
 
-        Yalnızca HIGH ve MEDIUM alertler alert tablosuna yazılır.
-        LOW ve NO_MATCH sadece match_result'a yazılır.
+        Yalnizca HIGH ve MEDIUM alertler alert tablosuna yazilir.
+        LOW ve NO_MATCH sadece match_result'a yazilir.
 
         Args:
             risk_level: Risk seviyesi string

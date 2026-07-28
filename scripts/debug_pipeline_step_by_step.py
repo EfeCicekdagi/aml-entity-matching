@@ -67,7 +67,7 @@ def print_breakpoint(bp_num: int, bp_title: str, variables: Dict[str, Any]):
             val_str = ", ".join([str(v) for v in var_value]) if var_value else "(bos)"
         else:
             val_str = str(var_value)
-        print(f"     • {var_name:<30} : {val_str}")
+        print(f"     - {var_name:<30} : {val_str}")
     print("   " + "-" * 72)
 
 
@@ -179,6 +179,9 @@ def run_pipeline_step_by_step(
         codes=reason_codes_obj,
         final_score=final_score
     )
+    # Konsol çiktisi bozulmamasi icin Turkce karakterleri Ingilizceye cevir (Sadece debug betigi icin)
+    tr_map = str.maketrans("ığıüşöçİĞÜŞÖÇ", "igiusocIGUSOC")
+    human_exp = human_exp.translate(tr_map)
 
     # Dogrusal formulun ciplak sonucunu hesaplayalim (kiyaslama icin)
     w_vec = scorer.weights.get("vector_weight", 0.20)

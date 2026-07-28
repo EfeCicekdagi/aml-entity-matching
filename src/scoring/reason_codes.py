@@ -1,11 +1,11 @@
 """
-reason_codes.py — AML eşleştirme karar gerekçe kodları.
+reason_codes.py — AML eslestirme karar gerekce kodlari.
 
-Her eşleştirme sonucu için insan tarafından okunabilir
-açıklama üretmek amacıyla kullanılır. reason_codes JSONB
-alanında list[str] olarak saklanır.
+Her eslestirme sonucu icin insan tarafindan okunabilir
+aciklama uretmek amaciyla kullanilir. reason_codes JSONB
+alaninda list[str] olarak saklanir.
 
-Kullanım:
+Kullanim:
     from src.scoring.reason_codes import ReasonCode, build_human_explanation
 
     codes = [ReasonCode.EXACT_OFFICIAL_NAME, ReasonCode.HIGH_VECTOR_SIMILARITY]
@@ -23,14 +23,14 @@ from typing import Optional
 
 class ReasonCode(str, Enum):
     """
-    AML eşleştirme karar gerekçe kodları.
+    AML eslestirme karar gerekce kodlari.
 
     Kategoriler:
-      - EXACT_*: Tam eşleşme türleri
-      - HIGH_*: Yüksek skor sinyalleri
-      - SHORT_*/AMBIGUOUS_*: Düşük güven sinyalleri
+      - EXACT_*: Tam eslesme turleri
+      - HIGH_*: Yuksek skor sinyalleri
+      - SHORT_*/AMBIGUOUS_*: Dusuk guven sinyalleri
       - NER_*: Entity extraction ile ilgili
-      - COUNTRY_*/ENTITY_TYPE_*/DATE_*: Yardımcı alan çelişkileri
+      - COUNTRY_*/ENTITY_TYPE_*/DATE_*: Yardimci alan celiskileri
       - CALIBRATION_*: Kalibrasyon durumu
       - NO_*: Aday yok durumu
     """
@@ -42,12 +42,12 @@ class ReasonCode(str, Enum):
     EXACT_MATCH_REQUIRES_REVIEW  = "EXACT_MATCH_REQUIRES_REVIEW"
     EXACT_COMPACT_MATCH        = "EXACT_COMPACT_MATCH"
 
-    # ── Tam eşleşme uyarıları ─────────────────────────────────────────────────
+    # ── Tam eslesme uyarilari ─────────────────────────────────────────────────
     SHORT_AMBIGUOUS_EXACT_MATCH = "SHORT_AMBIGUOUS_EXACT_MATCH"
     DUPLICATE_ALIAS_MATCH       = "DUPLICATE_ALIAS_MATCH"
     PARTIAL_MATCH_REQUIRES_REVIEW = "PARTIAL_MATCH_REQUIRES_REVIEW"
 
-    # ── Yüksek skor sinyalleri ────────────────────────────────────────────────
+    # ── Yuksek skor sinyalleri ────────────────────────────────────────────────
     HIGH_TRIGRAM_SIMILARITY    = "HIGH_TRIGRAM_SIMILARITY"
     HIGH_VECTOR_SIMILARITY     = "HIGH_VECTOR_SIMILARITY"
     HIGH_FUZZY_SIMILARITY      = "HIGH_FUZZY_SIMILARITY"
@@ -56,7 +56,7 @@ class ReasonCode(str, Enum):
     SEMANTIC_MATCH             = "SEMANTIC_MATCH"
     CONSONANT_ONLY_MATCH       = "CONSONANT_ONLY_MATCH"
 
-    # ── Alias / variant türü ──────────────────────────────────────────────────
+    # ── Alias / variant turu ──────────────────────────────────────────────────
     OFFICIAL_ALIAS_MATCH       = "OFFICIAL_ALIAS_MATCH"
     TRANSLITERATION_MATCH      = "TRANSLITERATION_MATCH"
     FORMER_NAME_MATCH          = "FORMER_NAME_MATCH"
@@ -71,7 +71,7 @@ class ReasonCode(str, Enum):
     CANDIDATE_SUPPORTED_EXTRACTION = "CANDIDATE_SUPPORTED_EXTRACTION"
     FULL_TEXT_FALLBACK_USED    = "FULL_TEXT_FALLBACK_USED"
 
-    # ── Yardımcı alan çelişkileri ─────────────────────────────────────────────
+    # ── Yardimci alan celiskileri ─────────────────────────────────────────────
     COUNTRY_CONFLICT           = "COUNTRY_CONFLICT"
     DATE_OF_BIRTH_CONFLICT     = "DATE_OF_BIRTH_CONFLICT"
     IDENTIFIER_EXACT_MATCH     = "IDENTIFIER_EXACT_MATCH"
@@ -90,7 +90,7 @@ class ReasonCode(str, Enum):
     MATCH_BELOW_THRESHOLD      = "MATCH_BELOW_THRESHOLD"
 
 
-# ── İnsan tarafından okunabilir açıklama şablonları ──────────────────────────
+# ── Insan tarafindan okunabilir aciklama sablonlari ──────────────────────────
 _REASON_DESCRIPTIONS: dict[ReasonCode, str] = {
     ReasonCode.EXACT_COMPACT_MATCH:
         "EFT açıklamasında şirket adı boşluk ve noktalama işaretlerinden bağımsız normalizasyon sonrasında tam olarak tespit edildi.",
@@ -178,12 +178,12 @@ def get_description(code: ReasonCode) -> str:
     Reason code için Türkçe açıklama döndürür.
 
     Args:
-        code: ReasonCode enum değeri
+        code: ReasonCode enum degeri
 
     Returns:
-        İnsan tarafından okunabilir açıklama
+        Insan tarafindan okunabilir aciklama
     """
-    return _REASON_DESCRIPTIONS.get(code, f"Bilinmeyen gerekçe kodu: {code.value}")
+    return _REASON_DESCRIPTIONS.get(code, f"Bilinmeyen gerekce kodu: {code.value}")
 
 
 def build_human_explanation(
@@ -227,7 +227,7 @@ def build_human_explanation(
             f"Kalibre edilmiş olasılık: %{calibrated_probability * 100:.1f}."
         )
 
-    # Her reason code için kısa açıklama
+    # Her reason code icin kisa aciklama
     for code in codes:
         desc = get_description(code)
         if desc:
@@ -238,7 +238,7 @@ def build_human_explanation(
 
 def codes_to_list(codes: list[ReasonCode]) -> list[str]:
     """
-    ReasonCode listesini string listesine çevirir (DB'ye yazmak için).
+    ReasonCode listesini string listesine cevirir (DB'ye yazmak icin).
 
     Args:
         codes: ReasonCode listesi
@@ -251,8 +251,8 @@ def codes_to_list(codes: list[ReasonCode]) -> list[str]:
 
 def list_to_codes(code_strings: list[str]) -> list[ReasonCode]:
     """
-    String listesini ReasonCode listesine çevirir (DB'den okumak için).
-    Bilinmeyen kodları siler.
+    String listesini ReasonCode listesine cevirir (DB'den okumak icin).
+    Bilinmeyen kodlari siler.
 
     Args:
         code_strings: String listesi

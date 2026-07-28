@@ -133,7 +133,7 @@ with st.sidebar:
     st.title("🚨 AML Dashboard")
     st.divider()
     
-    page = st.radio("Menü", ["🏠 Ana Sayfa", "📈 Run Detayları", "📊 Model Optimizasyon"])
+    page = st.radio("Menü", ["🏠 Ana Sayfa", "📈 Run Detayları", "📊 Model Optimizasyon", "🧪 Sistem Testleri"])
     st.divider()
 
     runs_df = load_runs()
@@ -198,7 +198,8 @@ if page == "🏠 Ana Sayfa":
                 
                 # 1. Normalization & NER
                 norm_exp = normalize_text(user_input).lower()
-                entity = ner_extractor.extract_entity(user_input)
+                entity_raw = ner_extractor.extract_entity(user_input)
+                entity = entity_raw.get("text") if isinstance(entity_raw, dict) else entity_raw
                 
                 st.markdown(f"**Çıkarılan Varlık (NER):** `{entity if entity else 'Bulunamadı'}`")
                 
@@ -823,3 +824,34 @@ elif page == "📊 Model Optimizasyon":
             st.error(f"Veri çekilirken hata oluştu: {e}")
         finally:
             repo.release_connection(conn)
+
+elif page == "🧪 Sistem Testleri":
+    st.title("🧪 Sistem Testleri")
+    st.markdown("Projenin Unit ve Integration testlerini bu sayfa üzerinden canlı olarak çalıştırıp sonuçlarını anlık izleyebilirsiniz. Testler arka planda pytest kullanılarak koşturulur.")
+    st.divider()
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown("### 🛠️ Unit Testler")
+        if st.button("▶️ Unit Testleri Çalıştır", type="primary"):
+            with st.spinner("Unit testler koşuluyor..."):
+                import subprocess
+                result = subprocess.run(["conda", "run", "-n", "tensorflow10", "pytest", "tests/unit", "-v"], capture_output=True, text=True)
+                st.code(result.stdout + "\n" + (result.stderr if result.stderr else ""), language="bash")
+                if result.returncode == 0:
+                    st.success("✅ Tüm unit testler başarıyla geçti!")
+                else:
+                    st.error("❌ Bazı unit testler başarısız oldu. Lütfen logları inceleyin.")
+                    
+    with col2:
+        st.markdown("### 🔗 Integration Testler")
+        if st.button("▶️ Integration Testleri Çalıştır", type="primary"):
+            with st.spinner("Integration testler koşuluyor..."):
+                import subprocess
+                result = subprocess.run(["conda", "run", "-n", "tensorflow10", "pytest", "tests/integration", "-v"], capture_output=True, text=True)
+                st.code(result.stdout + "\n" + (result.stderr if result.stderr else ""), language="bash")
+                if result.returncode == 0:
+                    st.success("✅ Tüm integration testler başarıyla geçti!")
+                else:
+                    st.error("❌ Bazı integration testler başarısız oldu. Lütfen logları inceleyin.")
+
