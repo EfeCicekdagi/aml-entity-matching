@@ -424,7 +424,8 @@ class FinalScorer:
             scores.get("exact_normalized_match") or
             scores.get("exact_compact_match") or
             scores.get("leetspeak_evasion_detected") or
-            scores.get("exact_core_match")  # compact_core_query == compact_core_cand evasion'ı da kapsar
+            scores.get("exact_core_match") or          # compact_core eşleşmesi evasion'ı kapsar
+            scores.get("acronym_score", 0.0) >= 1.0   # NST/IBM gibi kısaltma eşleşmesi
         )
         if reranker_val < 0.25 and not _has_hard_lexical_evidence:
             if final_score > 0.64:

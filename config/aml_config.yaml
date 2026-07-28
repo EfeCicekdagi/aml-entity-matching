@@ -54,11 +54,11 @@ processing:
 scoring:
   scoring_config_version: scoring_v2_reranker
   threshold_config_version: threshold_v3_bge_m3
-  # Optimum Ağırlık Konfigürasyonu (1440 TX Weight Optimizer Çıktısı - Exp ID 55)
+  # Optimum Ağırlık Konfigürasyonu (1440 TX Weight Optimizer Çıktısı - Exp ID 58)
   weights:
-    fuzzy_weight: 0.10
-    vector_weight: 0.80
-    reranker_weight: 0.10
+    fuzzy_weight: 0.40
+    vector_weight: 0.20
+    reranker_weight: 0.40
     acronym_weight: 0.00
     rule_weight: 0.00
   # Optimum Eşik Değerleri (1440 TX Threshold Optimizer Çıktısı - En Optimize [A] & AML Önerisi [B])

@@ -24,7 +24,7 @@ def main():
         INSERT INTO aml_config.scoring_weight (
             config_version, fuzzy_weight, vector_weight, acronym_weight, rule_weight, reranker_weight, is_active
         )
-        VALUES ('scoring_v2_reranker', 0.10, 0.50, 0.00, 0.00, 0.40, true)
+        VALUES ('scoring_v2_reranker', 0.40, 0.20, 0.00, 0.00, 0.40, true)
         ON CONFLICT (config_version) DO UPDATE SET
             fuzzy_weight = EXCLUDED.fuzzy_weight,
             vector_weight = EXCLUDED.vector_weight,

@@ -129,7 +129,8 @@ class WeightOptimizer:
         logger.info(f"Processing {len(explanations)} explanations through MatchEngine...")
         engine_results = self.match_engine.process_batch(explanations, row_ids)
 
-        from src.utils.text_utils import normalize_text, get_normalized_core_name
+        from src.utils.text_utils import normalize_text
+        from src.scoring.score_features import build_score_features
 
         for i, rid in enumerate(row_ids):
             eft_id = int(rid)
@@ -137,41 +138,48 @@ class WeightOptimizer:
             res = engine_results.get(rid, {})
             candidates = res.get("candidates", [])
             clean_text = res.get("clean_text", "")
+            raw_explanation = explanations[i]  # Orijinal ham açıklama (leetspeak, compact için gerekli)
+
+            # extraction sonucundan entity bilgisini al
+            extraction = res.get("extraction")
+            extracted_entity = None
+            if extraction and hasattr(extraction, "extracted_entity"):
+                extracted_entity = extraction.extracted_entity
 
             best_cand = candidates[0] if candidates else None
 
             if best_cand:
                 norm_query = normalize_text(clean_text)
-                norm_cand = normalize_text(best_cand.get("variant_name", ""))
-                core_query = get_normalized_core_name(norm_query)
-                core_cand = get_normalized_core_name(norm_cand)
-                exact_normalized_match = (norm_query == norm_cand and bool(norm_query))
-                exact_core_match = (core_query == core_cand and bool(core_query))
 
-                raw_scores = dict(best_cand)
-                raw_scores.update({
-                    "fuzzy_score": best_cand.get("fuzzy_score", best_cand.get("trgm_score", 0.0)),
-                    "vector_score": best_cand.get("vector_score", 0.0),
-                    "reranker_score": best_cand.get("reranker_score", 0.0),
-                    "acronym_score": best_cand.get("acronym_score", 0.0),
-                    "rule_score": best_cand.get("rule_score", 0.0),
-                    "exact_normalized_match": exact_normalized_match,
-                    "exact_core_match": exact_core_match,
-                    "legal_suffix_only_difference": exact_core_match and not exact_normalized_match,
-                    "consonant_match": best_cand.get("consonant_match", False),
-                    "query_token_count": len(norm_query.split()),
-                    "candidate_company_id": best_cand.get("company_id") or best_cand.get("candidate_company_id"),
-                    "alias_confidence": best_cand.get("alias_confidence", 1.0),
-                    "_query_str": norm_query,
-                    "_variant_str": norm_cand,
-                })
+                # build_score_features: tüm feature'ları (compact, leetspeak, substantial_missing_info vb.)
+                # gerçek pipeline ile aynı şekilde hesaplar — grid search tutarlı hale gelir
+                score_features = build_score_features(
+                    norm_exp=norm_query,
+                    cand=best_cand,
+                    extracted_entity=extracted_entity,
+                    raw_explanation=raw_explanation,
+                )
+
+                # Reranker score'u normalize edilmiş versiyonuyla güncelle
+                score_features["reranker_score"] = best_cand.get(
+                    "normalized_reranker_score",
+                    best_cand.get("reranker_score", 0.0)
+                )
+
+                # Grid search ve audit için ek metadata
+                score_features["candidate_company_id"] = (
+                    best_cand.get("company_id") or best_cand.get("candidate_company_id")
+                )
+                score_features["alias_confidence"] = best_cand.get("alias_confidence", 1.0)
+
                 raw_scores_list.append({
                     "eft_id": eft_id,
                     "should_match": should_match,
-                    "raw_scores": raw_scores,
+                    "raw_scores": score_features,
                     "best_cand_name": best_cand.get("variant_name") or best_cand.get("company_name"),
                 })
             else:
+                # Aday bulunamadı — tüm feature'lar sıfır/False
                 raw_scores_list.append({
                     "eft_id": eft_id,
                     "should_match": should_match,
@@ -180,9 +188,14 @@ class WeightOptimizer:
                         "acronym_score": 0.0, "rule_score": 0.0,
                         "exact_normalized_match": False, "exact_core_match": False,
                         "legal_suffix_only_difference": False, "consonant_match": False,
+                        "exact_compact_match": False, "compact_explanation": "",
+                        "compact_matched_variant": "", "leetspeak_evasion_detected": False,
+                        "substantial_missing_info": False,
+                        "query_is_contained_in_candidate": False,
+                        "candidate_is_contained_in_query": False,
                         "query_token_count": len(clean_text.split()),
                         "candidate_company_id": None, "alias_confidence": 1.0,
-                        "_query_str": clean_text, "_variant_str": "",
+                        "_query_str": normalize_text(clean_text), "_variant_str": "",
                     },
                     "best_cand_name": None,
                 })

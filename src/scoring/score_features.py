@@ -296,7 +296,11 @@ def build_score_features(
         raw_compact_sim = max(c_sim1, c_sim2)
         # Guard: perfect compact sim (1.0) yalnızca boşluk kaldırmayla oluşuyorsa
         # (örn. "MICRO SOFT" → "microsoft") skor capped değere düşürülür.
-        if raw_compact_sim >= 1.0 and not _is_genuine_compact_match(raw_compact_sim, core_cand, norm_exp):
+        # Bypass: compact_core_query == compact_core_cand ise (örn. "fin spire" → compact="finspire"
+        # ve kandidat compact core "finspire" — bu kesin split/concat evasion kanıtıdır).
+        is_core_exact_match = (compact_core_query and compact_core_query == compact_core_cand
+                               and len(compact_core_cand) >= 4)
+        if raw_compact_sim >= 1.0 and not is_core_exact_match and not _is_genuine_compact_match(raw_compact_sim, core_cand, norm_exp):
             fuzzy_score = max(fuzzy_score, 0.70)  # Partial credit: high_fuzzy_boost tetiklenmez (threshold 0.82)
         else:
             fuzzy_score = max(fuzzy_score, raw_compact_sim)

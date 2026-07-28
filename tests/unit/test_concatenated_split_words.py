@@ -65,9 +65,15 @@ class TestConcatenatedSplitWords:
         
         scores = build_score_features(query, cand, raw_explanation=query)
         
-        # Compact core eşleştiğinde fuzzy skoru 1.0 (veya çok yüksek) olmalı
-        assert scores["fuzzy_score"] >= 0.95
-        
+        # Compact core eşleştiğinde ya fuzzy >= 0.95 ya da exact_compact_match=True olmalı.
+        # "micro soft corporation" gibi split-evasion case'lerinde guard fuzzy'yi 0.70'e kısıtlar
+        # ama exact_compact_match=True compact tam eşleşmeyi hâlâ yakalar.
+        has_strong_signal = scores["fuzzy_score"] >= 0.95 or scores["exact_compact_match"]
+        assert has_strong_signal, (
+            f"'{query}' için güçlü eşleşme sinyali bulunamadı: "
+            f"fuzzy={scores['fuzzy_score']:.3f}, exact_compact={scores['exact_compact_match']}"
+        )
+
         # Eğer yasal ekler de uyumluysa exact_compact_match tetiklenmeli
         if expect_exact_compact:
             assert scores["exact_compact_match"] is True
