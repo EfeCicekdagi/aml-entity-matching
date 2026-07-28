@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
 """
-[*] AML Pipeline Adım Adım (Step-by-Step) Debug ve Değer İzleme Aracı [*]
+[*] AML Pipeline Adim Adim (Step-by-Step) Debug ve Deger Izleme Araci [*]
 
-Bu betik, bir EFT transfer açıklamasının ve aday şirket isminin AML motorundan geçerken
-6 katmanda (Breakpoint / Debug Kesme Noktaları) bellek değişkenlerinde hangi değerleri
-aldığını, harflerin nasıl dönüştüğünü ve hibrit formülün skoru nasıl hesapladığını
-görsel olarak denetlemek için tasarlanmıştır.
+Bu betik, bir EFT transfer aciklamasinin ve aday sirket isminin AML motorundan gecerken
+6 katmanda (Breakpoint / Debug Kesme Noktalari) bellek degiskenlerinde hangi degerleri
+aldigini, harflerin nasil donustugunu ve hibrit formulun skoru nasil hesapladigini
+gorsel olarak denetlemek icin tasarlanmistir.
 
-Kullanım:
-    1. Varsayılan 4 Kritik AML Senaryosunu Test Etmek İçin:
+Kullanim:
+    1. Varsayilan 4 Kritik AML Senaryosunu Test Etmek Icin:
        python scripts/debug_pipeline_step_by_step.py --demo
 
-    2. Özel Bir Transfer ve Şirket İkişilisini Debug Etmek İçin:
+    2. Ozel Bir Transfer ve Sirket Ikisilisini Debug Etmek Icin:
        python scripts/debug_pipeline_step_by_step.py \
-           --explanation "Ödeme M!cr0s0ft C0rp0r4t!0n lisans bedeli" \
+           --explanation "Odeme M!cr0s0ft C0rp0r4t!0n lisans bedeli" \
            --candidate "Microsoft Corporation" \
            --vector 0.88 \
            --reranker 0.94
@@ -25,13 +25,8 @@ import argparse
 import difflib
 from typing import Dict, Any
 
-# Windows konsolunda karakter kodlama hatalarını engelle
-if hasattr(sys.stdout, 'reconfigure'):
-    try:
-        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
-    except Exception:
-        pass
-
+# Python 3.6+ Windows konsolunda Unicode'u otomatik destekler.
+# Manuel UTF-8 zorlamasi PowerShell'de karakterlerin bozuk cikmasina sebep oluyordu, bu yuzden kaldirildi.
 # Proje dizinini yola ekle
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
@@ -49,7 +44,7 @@ from src.scoring.reason_codes import list_to_codes, build_human_explanation, Rea
 
 
 class MockRepository:
-    """Veritabanına bağlanmadan bağımsız debug yapabilmek için tasarlanmış taslak depo."""
+    """Veritabanina baglanmadan bagimsiz debug yapabilmek icin tasarlanmis taslak depo."""
     def get_connection(self):
         return None
     def release_connection(self, conn):
@@ -69,7 +64,7 @@ def print_breakpoint(bp_num: int, bp_title: str, variables: Dict[str, Any]):
         if isinstance(var_value, float):
             val_str = f"{var_value:.4f}"
         elif isinstance(var_value, list):
-            val_str = ", ".join([str(v) for v in var_value]) if var_value else "(boş)"
+            val_str = ", ".join([str(v) for v in var_value]) if var_value else "(bos)"
         else:
             val_str = str(var_value)
         print(f"     • {var_name:<30} : {val_str}")
@@ -83,40 +78,40 @@ def run_pipeline_step_by_step(
     simulated_reranker_score: float = 0.90,
     simulated_entity: str = None
 ):
-    """Bir transfer açıklamasını 6 kesme noktasından geçirerek bellek değişimini yazdırır."""
-    print_header(f"TRANSFER ANALİZİ: '{explanation}' <---> '{candidate_name}'")
+    """Bir transfer aciklamasini 6 kesme noktasindan gecirerek bellek degisimini yazdirir."""
+    print_header(f"TRANSFER ANALIZI: '{explanation}' <---> '{candidate_name}'")
     
-    # ── BREAKPOINT 0: GİRDİLER VE PARAMETRELER ─────────────────────────────────
-    print_breakpoint(0, "Ham Girdiler ve Başlangıç Durumu", {
+    # ── BREAKPOINT 0: GIRDILER VE PARAMETRELER ─────────────────────────────────
+    print_breakpoint(0, "Ham Girdiler ve Baslangic Durumu", {
         "raw_explanation": explanation,
         "candidate_name_in_db": candidate_name,
         "simulated_vector_score (MPNet)": simulated_vector_score,
         "simulated_reranker_score (BGE-M3)": simulated_reranker_score
     })
 
-    # ── BREAKPOINT 1: NORMALİZASYON VE TEMİZLEME ───────────────────────────────
+    # ── BREAKPOINT 1: NORMALIZASYON VE TEMIZLEME ───────────────────────────────
     norm_exp = normalize_text(explanation)
     norm_cand = normalize_text(candidate_name)
     core_cand = remove_company_suffixes(norm_cand)
     compact_cand = get_compact_core_name(norm_cand)
     
-    print_breakpoint(1, "Metin Temizleme ve Çekirdek Ayrıştırma (Pre-processing)", {
-        "norm_exp (Küçük Harf & Noktalamasız)": norm_exp,
-        "norm_cand (Normalize Şirket Adı)": norm_cand,
-        "core_cand (Yapı Ekleri Temizlenmiş)": core_cand,
-        "compact_cand (Boşluksuz Çekirdek)": compact_cand
+    print_breakpoint(1, "Metin Temizleme ve Cekirdek Ayristirma (Pre-processing)", {
+        "norm_exp (Kucuk Harf & Noktalamasiz)": norm_exp,
+        "norm_cand (Normalize Sirket Adi)": norm_cand,
+        "core_cand (Yapi Ekleri Temizlenmis)": core_cand,
+        "compact_cand (Bosluksuz Cekirdek)": compact_cand
     })
 
-    # ── BREAKPOINT 2: SİBER ATLATMA (LEETSPEAK EVASION) DENETİMİ ───────────────
+    # ── BREAKPOINT 2: SIBER ATLATMA (LEETSPEAK EVASION) DENETIMI ───────────────
     leet_evasion, leet_sim, leet_exp_norm = check_leetspeak_evasion(explanation, candidate_name)
-    print_breakpoint(2, "Siber Atlatma ve Karakter Gizleme Kontrolü (Evasion Check)", {
+    print_breakpoint(2, "Siber Atlatma ve Karakter Gizleme Kontrolu (Evasion Check)", {
         "leetspeak_evasion_detected": leet_evasion,
-        "normalized_leetspeak_text": leet_exp_norm if leet_evasion else "(Manipülasyon Yok - Normal Metin)",
+        "normalized_leetspeak_text": leet_exp_norm if leet_evasion else "(Manipulasyon Yok - Normal Metin)",
         "leetspeak_similarity_boost": leet_sim if leet_evasion else 0.0
     })
 
-    # ── BREAKPOINT 3: VARLIK ÇIKARIMI (NER & FALLBACK) ─────────────────────────
-    # Eğer özel simüle edilmiş varlık verilmediyse akıllı fallback çalışır
+    # ── BREAKPOINT 3: VARLIK CIKARIMI (NER & FALLBACK) ─────────────────────────
+    # Eger ozel simule edilmis varlik verilmediyse akilli fallback calisir
     extracted_entity = simulated_entity
     extraction_method = "BERT_NER_MODEL"
     if not extracted_entity:
@@ -133,13 +128,13 @@ def run_pipeline_step_by_step(
             extracted_entity = explanation
             extraction_method = "FULL_TEXT_FALLBACK"
 
-    print_breakpoint(3, "Varlık Çıkarımı ve Alt-Dizi Eşleme (NER Extraction)", {
+    print_breakpoint(3, "Varlik Cikarimi ve Alt-Dizi Esleme (NER Extraction)", {
         "extracted_entity": extracted_entity,
         "extraction_method": extraction_method,
         "query_token_count": len(norm_exp.split())
     })
 
-    # ── BREAKPOINT 4: ÖZELLİK MİMARİSİ VE SKOR BİLEŞENLERİ (scores_dict) ───────
+    # ── BREAKPOINT 4: OZELLIK MIMARISI VE SKOR BILESENLERI (scores_dict) ───────
     cand_dict = {
         "variant_name": candidate_name,
         "normalized_variant_name": norm_cand,
@@ -155,14 +150,14 @@ def run_pipeline_step_by_step(
         raw_explanation=explanation
     )
     
-    # Reranker skoru dict'e yerleştirilir
+    # Reranker skoru dict'e yerlestirilir
     scores_dict["reranker_score"] = simulated_reranker_score
     scores_dict["vector_score"] = simulated_vector_score
 
-    print_breakpoint(4, "Bellek Özellik Sözlüğü (scores_dict Inspection)", {
-        "vector_score (Ağırlık: %50)": scores_dict.get("vector_score", 0.0),
-        "reranker_score (Ağırlık: %40)": scores_dict.get("reranker_score", 0.0),
-        "fuzzy_score (Ağırlık: %10)": scores_dict.get("fuzzy_score", 0.0),
+    print_breakpoint(4, "Bellek Ozellik Sozlugu (scores_dict Inspection)", {
+        "vector_score (Agirlik: %20)": scores_dict.get("vector_score", 0.0),
+        "reranker_score (Agirlik: %40)": scores_dict.get("reranker_score", 0.0),
+        "fuzzy_score (Agirlik: %40)": scores_dict.get("fuzzy_score", 0.0),
         "acronym_score": scores_dict.get("acronym_score", 0.0),
         "rule_score": scores_dict.get("rule_score", 0.0),
         "exact_normalized_match": scores_dict.get("exact_normalized_match", False),
@@ -171,7 +166,7 @@ def run_pipeline_step_by_step(
         "substantial_missing_info": scores_dict.get("substantial_missing_info", False)
     })
 
-    # ── BREAKPOINT 5: HİBRİT ENSEMBLE HESAPLAYICI VE NİHAİ KARAR ───────────────
+    # ── BREAKPOINT 5: HIBRIT ENSEMBLE HESAPLAYICI VE NIHAI KARAR ───────────────
     scorer = FinalScorer(MockRepository())
     final_score, match_reason, reason_codes_str = scorer.calculate_final_score(scores_dict)
     risk_level = scorer.assign_risk_level(final_score)
@@ -185,56 +180,56 @@ def run_pipeline_step_by_step(
         final_score=final_score
     )
 
-    # Doğrusal formülün çıplak sonucunu hesaplayalım (kıyaslama için)
-    w_vec = scorer.weights.get("vector_weight", 0.50)
+    # Dogrusal formulun ciplak sonucunu hesaplayalim (kiyaslama icin)
+    w_vec = scorer.weights.get("vector_weight", 0.20)
     w_rer = scorer.weights.get("reranker_weight", 0.40)
-    w_fuz = scorer.weights.get("fuzzy_weight", 0.10)
+    w_fuz = scorer.weights.get("fuzzy_weight", 0.40)
     raw_linear = (w_vec * simulated_vector_score) + (w_rer * simulated_reranker_score) + (w_fuz * scores_dict.get("fuzzy_score", 0.0))
 
-    print_breakpoint(5, "Nihai Skor Değerlendirmesi ve Kural Yaptırımı (Ensemble Engine)", {
-        "Ham Doğrusal Formül Sonucu": raw_linear,
+    print_breakpoint(5, "Nihai Skor Degerlendirmesi ve Kural Yaptirimi (Ensemble Engine)", {
+        "Ham Dogrusal Formul Sonucu": raw_linear,
         "Uygulanan Kesin Kural / Override": match_reason,
-        "NİHAİ RİSK SKORU (final_score)": final_score,
-        "ATANAN RİSK SEVİYESİ": risk_level,
+        "NIHAI RISK SKORU (final_score)": final_score,
+        "ATANAN RISK SEVIYESI": risk_level,
         "OPERASYONEL KARAR": decision_status,
-        "Tetiklenen Neden Kodları (Reason Codes)": reason_codes_str,
-        "Türkçe İnsani Açıklama": human_exp
+        "Tetiklenen Neden Kodlari (Reason Codes)": reason_codes_str,
+        "Turkce Insani Aciklama": human_exp
     })
     print("\n" + "=" * 80 + "\n")
 
 
 def run_demo_scenarios():
-    print_header("CRITICAL AML SENARYOLARI BİRLEŞİK DEBUG VE TEST KÜMESİ")
-    print("Bu test kümesi, yöneticiler ve denetçiler için 4 zorlu bankacılık senaryosunu adım adım test eder.")
+    print_header("CRITICAL AML SENARYOLARI BIRLESIK DEBUG VE TEST KUMESI")
+    print("Bu test kumesi, yoneticiler ve denetciler icin 4 zorlu bankacilik senaryosunu adim adim test eder.")
     
-    # 1. Senaryo: Leetspeak Evasion (Siber Saldırı Gizlemesi)
+    # 1. Senaryo: Leetspeak Evasion (Siber Saldiri Gizlemesi)
     run_pipeline_step_by_step(
-        explanation="Ödeme M!cr0s0ft C0rp0r4t!0n lisans bedeli",
+        explanation="Odeme M!cr0s0ft C0rp0r4t!0n lisans bedeli",
         candidate_name="Microsoft Corporation",
         simulated_vector_score=0.72,
         simulated_reranker_score=0.88
     )
 
-    # 2. Senaryo: Typo & Harf Eksikliği (Yazım Hatası)
+    # 2. Senaryo: Typo & Harf Eksikligi (Yazim Hatasi)
     run_pipeline_step_by_step(
-        explanation="Indaforensic Services Pvt Ltd sözleşme ödemesi",
+        explanation="Indaforensic Services Pvt Ltd sozlesme odemesi",
         candidate_name="Indiaforensic Services Pvt Ltd",
         simulated_vector_score=0.89,
         simulated_reranker_score=0.95
     )
 
-    # 3. Senaryo: Kısaltma (Acronym Match)
+    # 3. Senaryo: Kisaltma (Acronym Match)
     run_pipeline_step_by_step(
-        explanation="Transfer to IB M sistem hizmetleri faturası",
+        explanation="Transfer to IB M sistem hizmetleri faturasi",
         candidate_name="International Business Machines",
         simulated_vector_score=0.82,
         simulated_reranker_score=0.91
     )
 
-    # 4. Senaryo: Kısmi Bilgi ve Eksik Varlık (Analyst Review / Medium Risk)
+    # 4. Senaryo: Kismi Bilgi ve Eksik Varlik (Analyst Review / Medium Risk)
     run_pipeline_step_by_step(
-        explanation="Global Sanayi ve Ticaret ödemesi",
-        candidate_name="Global Sanayi Ticaret A.Ş. İstanbul Şubesi",
+        explanation="Global Sanayi ve Ticaret odemesi",
+        candidate_name="Global Sanayi Ticaret A.S. Istanbul Subesi",
         simulated_vector_score=0.68,
         simulated_reranker_score=0.62
     )
@@ -242,11 +237,11 @@ def run_demo_scenarios():
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="AML Pipeline Step-by-Step Debug Tool")
-    parser.add_argument("--demo", action="store_true", help="4 Kritik AML senaryosunu adım adım test eder.")
-    parser.add_argument("--explanation", type=str, help="Test edilecek EFT açıklaması.")
-    parser.add_argument("--candidate", type=str, help="Veritabanındaki aday şirket ismi.")
-    parser.add_argument("--vector", type=float, default=0.85, help="Simüle edilmiş MPNet vektör skoru (0.0-1.0).")
-    parser.add_argument("--reranker", type=float, default=0.90, help="Simüle edilmiş BGE-M3 reranker skoru (0.0-1.0).")
+    parser.add_argument("--demo", action="store_true", help="4 Kritik AML senaryosunu adim adim test eder.")
+    parser.add_argument("--explanation", type=str, help="Test edilecek EFT aciklamasi.")
+    parser.add_argument("--candidate", type=str, help="Veritabanindaki aday sirket ismi.")
+    parser.add_argument("--vector", type=float, default=0.85, help="Simule edilmis MPNet vektor skoru (0.0-1.0).")
+    parser.add_argument("--reranker", type=float, default=0.90, help="Simule edilmis BGE-M3 reranker skoru (0.0-1.0).")
 
     args = parser.parse_args()
 

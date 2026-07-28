@@ -48,8 +48,8 @@ class FinalScorer:
 
         # Default fallback değerler (DB'den okuma başarısız olursa)
         self.weights: dict[str, float] = {
-            "fuzzy_weight":    0.10,
-            "vector_weight":   0.50,
+            "fuzzy_weight":    0.40,
+            "vector_weight":   0.20,
             "acronym_weight":  0.0,
             "rule_weight":     0.0,
             "reranker_weight": 0.40,
