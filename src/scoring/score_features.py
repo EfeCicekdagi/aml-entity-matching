@@ -32,6 +32,52 @@ _TOKEN_MATCH_STOPWORDS = {
 }
 
 
+def _is_genuine_compact_match(compact_sim: float, core_c: str, n_exp: str) -> bool:
+    """
+    Compact fuzzy score'unun gerçek bir eşleşmeden mi yoksa boşluk kaldırmanın
+    yan etkisinden (yanlış concat) mi oluştuğunu kontrol eder.
+
+    Sorun:
+        compact_normalize tüm boşlukları kaldırır. "MICRO SOFT" → "microsoft".
+        Eğer "MICRO SOFT" Meksika tekstil firmasının adıysa, Microsoft'a yanlış
+        1.0 compact fuzzy skoru üretilir.
+
+    NOT: Bu guard yalnızca FUZZY SCORE ENRİCHMENT yolunda uygulanır.
+    `exact_compact_match` için uygulanmaz; çünkü tam compact variant eşleşmesi
+    zaten yanlış pozitifi doğal olarak engeller (açıklamada "corporation" yok →
+    compact_matched_variant="microsoftcorporation" bulunamaz).
+
+    Gerçek eşleşme kriterleri (birini sağlamak yeterli):
+      1. core_cand metinde standalone token olarak geçiyor (\bcore_cand\b)
+      2. core_cand, metindeki tek bir tokenin içinde substring olarak geçiyor
+         (örn. "microsoftcorporation" tokenı içindeki "microsoft" gerçek evasion)
+
+    Args:
+        compact_sim: Compact fuzzy benzerlik skoru (0.0 - 1.0)
+        core_c:      Adayın normalize edilmiş çekirdek adı (örn. "microsoft")
+        n_exp:       Normalize edilmiş açıklama metni
+
+    Returns:
+        True  → Gerçek eşleşme, tam compact fuzzy skoru geçerli
+        False → Yalnızca yanlış concat etkisi, partial credit (0.70) uygulanmalı
+    """
+    if compact_sim < 1.0:
+        return True   # Kısmi eşleşmeler her zaman geçerli
+    if not core_c:
+        return False
+    # Kriter 1: core_cand metinde standalone token (örn. "Microsoft Corporation odeme")
+    if re.search(r'\b' + re.escape(core_c) + r'\b', n_exp):
+        return True
+    # Kriter 2: core_cand tek bir token içinde substring olarak geçiyor
+    # (örn. "microsoftcorporation" → "microsoft" substring'i tek tokende mevcut)
+    core_c_lower = core_c.casefold()
+    for token in n_exp.split():
+        clean_token = re.sub(r'[^\w]', '', token).casefold()
+        if core_c_lower in clean_token and clean_token != core_c_lower:
+            return True
+    return False
+
+
 def _is_unrelated_acronym_in_text(acronym: str, explanation: str, company_name: str) -> bool:
     norm_acc = normalize_text(acronym).strip()
     norm_exp = normalize_text(explanation).strip()
@@ -218,8 +264,15 @@ def build_score_features(
 
     compact_explanation = compact_normalize(raw_explanation) if raw_explanation else compact_normalize(norm_exp)
     compact_matched_variant = compact_normalize(variant_name)
+
+    # ── exact_compact_match: compact substring eşleşmesi ───────────────────────────────────
+    # compact_matched_variant (tam variant), compact_explanation içinde geçiyor mu?
+    # NOT: _is_genuine_compact_match guard'a burada gerek yok.
+    # "MICRO SOFT tekstil" → compact_matched_variant="microsoftcorporation" zaten
+    # "microsofttekstilurunleritoptanalimi" içinde bulunmaz — naturally False.
+    # Guard yalnızca aşağıdaki FUZZY ENRICHMENT yolunda gereklidir (core_cand substring'i).
     exact_compact_match = bool(compact_matched_variant and compact_matched_variant in compact_explanation)
-    
+
     # Kural skoru eğer exact compact match ise 1.0 olmalı (fallback kural)
     base_rule_score = max(_rule_score(norm_exp, variant_name), _exact_name_score(norm_exp, variant_name))
     if exact_compact_match:
@@ -236,11 +289,17 @@ def build_score_features(
     if core_cand and core_query:
         core_fuzzy = _compute_token_fuzzy_score(core_query, core_cand)
         fuzzy_score = max(fuzzy_score, core_fuzzy)
-        
+
     if compact_core_cand and len(compact_core_cand) >= 4:
         c_sim1 = _compute_compact_fuzzy_score(compact_core_query, compact_core_cand)
         c_sim2 = _compute_compact_fuzzy_score(compact_explanation, compact_core_cand)
-        fuzzy_score = max(fuzzy_score, c_sim1, c_sim2)
+        raw_compact_sim = max(c_sim1, c_sim2)
+        # Guard: perfect compact sim (1.0) yalnızca boşluk kaldırmayla oluşuyorsa
+        # (örn. "MICRO SOFT" → "microsoft") skor capped değere düşürülür.
+        if raw_compact_sim >= 1.0 and not _is_genuine_compact_match(raw_compact_sim, core_cand, norm_exp):
+            fuzzy_score = max(fuzzy_score, 0.70)  # Partial credit: high_fuzzy_boost tetiklenmez (threshold 0.82)
+        else:
+            fuzzy_score = max(fuzzy_score, raw_compact_sim)
 
     orig_name = cand.get("original_company_name", "")
     acronym_score_val = _acronym_score(norm_exp, variant_name, orig_name)

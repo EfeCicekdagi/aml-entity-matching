@@ -82,11 +82,14 @@ def load_alerts(run_id):
     if conn is None:
         return pd.DataFrame()
     try:
+        # candidate_rank = 1: her EFT için sadece en yüksek skorlu eşleşmeyi göster.
+        # Eski veriler için (candidate_rank NULL) DISTINCT ON fallback uygulanır.
         df = pd.read_sql(f"""
-            SELECT *
+            SELECT DISTINCT ON (eft_id) *
             FROM {TABLES['alert_export']}
             WHERE run_id = %(run_id)s
-            ORDER BY final_score DESC
+              AND (candidate_rank = 1 OR candidate_rank IS NULL)
+            ORDER BY eft_id, final_score DESC
         """, conn, params={"run_id": run_id})
     finally:
         repo.release_connection(conn)

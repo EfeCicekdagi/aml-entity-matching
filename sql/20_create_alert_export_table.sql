@@ -44,6 +44,7 @@ CREATE TABLE IF NOT EXISTS aml_core.alert_export (
     candidate_count INT,
     human_explanation TEXT,
     retrieval_sources JSONB,
+    candidate_rank INT DEFAULT 1,  -- Her EFT icin en iyi eslesme = 1; UI'da rank=1 filtresiyle tekrar onlenir
     exported_at TIMESTAMP DEFAULT now()
 );
 
@@ -51,6 +52,10 @@ CREATE INDEX IF NOT EXISTS idx_alert_export_run_id ON aml_core.alert_export(run_
 CREATE INDEX IF NOT EXISTS idx_alert_export_alert_id ON aml_core.alert_export(alert_id);
 CREATE INDEX IF NOT EXISTS idx_alert_export_risk_level ON aml_core.alert_export(risk_level);
 CREATE INDEX IF NOT EXISTS idx_alert_export_final_score ON aml_core.alert_export(final_score DESC);
+CREATE INDEX IF NOT EXISTS idx_alert_export_run_rank ON aml_core.alert_export(run_id, candidate_rank);
 
 COMMENT ON TABLE aml_core.alert_export IS
     'EFT input bilgileriyle Alert skor sonuçlarının birleştiği Flat tablo. UI ve Dış sistemler için üretilir.';
+COMMENT ON COLUMN aml_core.alert_export.candidate_rank IS
+    'Bu EFT için adayın nihai skor sıralaması (1 = en yüksek). UI filtrelemesinde sadece rank=1 gösterilir.';
+

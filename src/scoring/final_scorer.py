@@ -249,9 +249,19 @@ class FinalScorer:
                 if ReasonCode.ACRONYM_MATCH not in reason_codes:
                     reason_codes.append(ReasonCode.ACRONYM_MATCH)
 
-                # 3 ve daha fazla karakterli kısaltmalarda veya güvenli kabul edilen durumlarda doğrudan yüksek risk ver
-                if is_safe or len(cand_str.replace(" ", "")) >= 3:
+                # Reranker skoru burada önemli: kısa tek-token adlarda (< 6 harf)
+                # reranker onayı olmadan HIGH risk vermek hatalı eşleşmelere (false positive) yol açar.
+                # Örn: "mehar" → "mehar entertainment" (mehar=düğün başlığı olabilir)
+                reranker_ok = scores.get("reranker_score", 0.0) >= 0.35
+                cand_compact_len = len(cand_str.replace(" ", ""))
+                if is_safe and (cand_compact_len >= 6 or reranker_ok):
+                    # Uzun/distinctive adlarda veya reranker onayladıysa yüksek risk
                     final_score = max(final_score, 0.88)
+                    match_reason = "ACRONYM_MATCH"
+                elif cand_compact_len >= 3:
+                    # Kısa tek-token adlarda veya reranker şüpheli ise:
+                    # Analist incelemesi (MEDIUM), otomatik HIGH risk yok
+                    final_score = max(final_score, 0.65)
                     match_reason = "ACRONYM_MATCH"
                 else:
                     # Çok kısa (2 harfli) ambiguous olabilecek kısaltmalarda orta risk ve inceleme kodu
@@ -402,6 +412,29 @@ class FinalScorer:
             elif final_score < 0.45 and scores.get("fuzzy_score", 0.0) >= 0.40:
                 # Kısmi bilgi yeterliyse en azından analist incelemesi oluşturabilmeli (aday kaybolmamalı)
                 final_score = max(final_score, 0.50)
+
+        # ── Reranker Veto (Semantik red → lexical override'ı kısıtla) ──────────
+        # Reranker semantik olarak açıkça reddettiyse (< 0.25) VE kesin bir
+        # lexical kanıt yoksa (exact normalized / compact / leetspeak evasion),
+        # lexical override'ların HIGH risk üretmesine izin verme.
+        # Bu; tek-token eşleşme, compact evasion veya kısmi fuzzy'nin yol açtığı
+        # false positive HIGH alert'leri engeller.
+        reranker_val = scores.get("reranker_score", 0.0)
+        _has_hard_lexical_evidence = (
+            scores.get("exact_normalized_match") or
+            scores.get("exact_compact_match") or
+            scores.get("leetspeak_evasion_detected") or
+            scores.get("exact_core_match")  # compact_core_query == compact_core_cand evasion'ı da kapsar
+        )
+        if reranker_val < 0.25 and not _has_hard_lexical_evidence:
+            if final_score > 0.64:
+                logger.debug(
+                    f"Reranker veto applied: reranker={reranker_val:.4f} < 0.25, "
+                    f"capping final_score {final_score:.4f} → 0.64 (MEDIUM cap, no HIGH allowed)"
+                )
+                final_score = 0.64
+                if ReasonCode.RERANKER_REJECTED not in reason_codes:
+                    reason_codes.append(ReasonCode.RERANKER_REJECTED)
 
         if not reason_codes:
             reason_codes.append(ReasonCode.LOW_CONFIDENCE)
